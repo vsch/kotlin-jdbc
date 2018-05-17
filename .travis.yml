@@ -1,0 +1,10 @@
+sudo: false
+language: kotlin
+jdk: oraclejdk8
+
+env:
+  - TEST=kotlin
+
+script:
+  - 'if [[ $TEST = java ]]; then mvn test -Dsurefire.useFile=false; fi'
+
