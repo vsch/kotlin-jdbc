@@ -8,6 +8,7 @@
 
 ## 0.1.2
 
+* Fix: pom missing info
 * Fix: pom and travis errors
 * Fix: pom for dokka plugin javadoc generation
 

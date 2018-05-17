@@ -6,15 +6,24 @@
     <groupId>com.vladsch.kotlin-jdbc</groupId>
     <artifactId>kotlin-jdbc</artifactId>
     <version>0.1.2</version>
-    <packaging>jar</packaging>
+    <packaging>pom</packaging>
 
     <name>Kotlin-JDBC</name>
+    <description>
+        A thin library that exposes JDBC API with the convenience of Kotlin and gets out of the way when not needed.
+    </description>
+
+    <url>https://github.com/vsch/reverse-regex</url>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <kotlin.version>1.2.41</kotlin.version>
         <junit.version>4.12</junit.version>
         <dokka.version>0.9.9</dokka.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <kotlin-jdbc.javadoc.location>${project.basedir}/target/apidocs/</kotlin-jdbc.javadoc.location>
+        <!-- Don't automatically publish artifacts to Central, we might want to inspect them first. -->
+        <nexus.staging.autoRelease>false</nexus.staging.autoRelease>
     </properties>
 
     <licenses>
