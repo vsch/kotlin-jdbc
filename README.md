@@ -3,9 +3,9 @@
 [![Build Status](https://travis-ci.org/vsch/kotlin-jdbc.svg)](https://travis-ci.org/vsch/kotlin-jdbc)
 
 A thin library that exposes JDBC API with the convenience of Kotlin and gets out of the way when
-you want. When working with a relational database my preference is not to obfuscate SQL with
-cryptic and cumbersome ORM or syntactic sugar wrappers. I prefer my SQL to there front and
-center where I can read it, validate it, use in query plans to optimize the queries and indexes.
+not needed. When working with a relational database my preference is not to obfuscate SQL with cryptic
+and cumbersome ORM or syntactic sugar wrappers. I prefer my SQL to be there front and center
+where I can read it, validate it, view query plans to optimize the queries and indexes.
 
 Refactored from [KotliQuery](https://github.com/seratch/kotliquery) which is an excellent idea
 but for my use I needed to simplify its implementation to make adding functionality easier
