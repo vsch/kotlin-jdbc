@@ -14,6 +14,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <kotlin.version>1.2.41</kotlin.version>
         <junit.version>4.12</junit.version>
+        <dokka.version>0.9.9</dokka.version>
     </properties>
 
     <licenses>
@@ -50,6 +51,13 @@
             <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
         </repository>
     </distributionManagement>
+
+    <pluginRepositories>
+        <pluginRepository>
+            <id>spring</id>
+            <url>http://repo.spring.io/plugins-release/</url>
+        </pluginRepository>
+    </pluginRepositories>
 
     <dependencies>
         <dependency>
@@ -153,17 +161,25 @@
                 </executions>
             </plugin>
             <plugin>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <version>2.9.1</version>
+                <!-- https://mvnrepository.com/artifact/org.jetbrains.dokka/dokka-maven-plugin -->
+                <groupId>org.jetbrains.dokka</groupId>
+                <artifactId>dokka-maven-plugin</artifactId>
+                <version>0.9.16</version>
                 <executions>
                     <execution>
-                        <id>package-javadoc</id>
-                        <phase>package</phase>
+                        <phase>prepare-package</phase>
                         <goals>
-                            <goal>jar</goal>
+                            <goal>dokka</goal>
+                            <goal>javadoc</goal>
+                            <goal>javadocJar</goal>
                         </goals>
                     </execution>
                 </executions>
+                <configuration>
+                    <includes>
+                        <file>packages.md</file>
+                    </includes>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.sonatype.plugins</groupId>
