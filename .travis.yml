@@ -6,5 +6,5 @@ env:
   - TEST=kotlin
 
 script:
-  - 'if [[ $TEST = java ]]; then mvn test -Dsurefire.useFile=false; fi'
+  - 'if [[ $TEST = kotlin ]]; then mvn test -Dsurefire.useFile=false; fi'
 
