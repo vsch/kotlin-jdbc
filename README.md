@@ -28,7 +28,17 @@ https://github.com/vsch/kotlin-jdbc/master/sample
 <dependency>
     <groupId>com.vladsch.kotlin-jdbc</groupId>
     <artifactId>kotlin-jdbc</artifactId>
-    <version>0.1.0</version>
+    <version>0.1.2</version>
+</dependency>
+```
+
+#### Gradle
+
+```maven
+<dependency>
+    <groupId>com.vladsch.kotlin-jdbc</groupId>
+    <artifactId>kotlin-jdbc</artifactId>
+    <version>0.1.2</version>
 </dependency>
 ```
 
@@ -142,7 +152,7 @@ parameter is only significant for its type used when getting the results back. F
 parameters pass the name in both maps.
 
 ```kotlin
-sqlQuery("""call storedProc(:inParam,:inOutParam,:outParam)""",
+sqlCall("""call storedProc(:inParam,:inOutParam,:outParam)""",
 	mapOf("inParam" to "Alice", "inOutParam" to "Bob"), 
 	mapOf("inOutParam" to "","outParam" to ""))
 ```
@@ -151,7 +161,7 @@ For convenience there are methods to pass parameters as in, inout, out as a list
 maps:
 
 ```kotlin
-sqlQuery("""call storedProc(:inParam,:inOutParam,:outParam)""")
+sqlCall("""call storedProc(:inParam,:inOutParam,:outParam)""")
 	.inParams("inParam" to "Alice")
 	.inOutParms("inOutParam" to "Bob") 
 	.outParams("outParam" to "")
@@ -275,7 +285,7 @@ Update and getting generated key(s):
 You can manually add `@Language("SQL")` annotation to strings or add a language injection
 configuration:
 
-The places text is:
+The places patterns text is:
 
 ```
 + kotlinParameter().ofFunction(0, kotlinFunction().withName("sqlCall").definedInPackage("com.vladsch.kotlin.jdbc"))
@@ -293,4 +303,5 @@ database you are using.
 
 (The MIT License)
 
-Copyright (c) 2018 - Vladimir Schneider Copyright (c) 2015 - Kazuhiro Sera
+Copyright (c) 2018 - Vladimir Schneider  
+Copyright (c) 2015 - Kazuhiro Sera
