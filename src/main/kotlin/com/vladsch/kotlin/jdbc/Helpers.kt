@@ -3,7 +3,6 @@ package com.vladsch.kotlin.jdbc
 import com.vladsch.boxed.json.BoxedJsValue
 import com.vladsch.boxed.json.MutableJsArray
 import com.vladsch.boxed.json.MutableJsObject
-import com.zaxxer.hikari.HikariDataSource
 import org.joda.time.LocalDateTime
 import java.io.BufferedReader
 import java.io.File
@@ -260,5 +259,40 @@ fun File.ensureCreateDirectory(paramName: String = "directory"): File {
         throw IllegalStateException("$paramName '${this.path}' exists and is not a directory")
     }
     return this
+}
+
+fun String.versionCompare(other:String):Int {
+    val theseParts = this.split('_', limit = 4)
+    val otherParts = other.split('_', limit = 4)
+
+    val iMax = Math.min(theseParts.size, otherParts.size)
+    for (i in 0 until iMax) {
+        if (i < 3) {
+            // use integer compare
+            val thisVersion = theseParts[i].toInt()
+            val otherVersion = otherParts[i].toInt()
+            if (thisVersion != otherVersion) {
+                return thisVersion.compareTo(otherVersion)
+            }
+        } else {
+            return theseParts[i].compareTo(otherParts[i])
+        }
+    }
+    return 0
+}
+
+fun getVersionDirectory(dbDir: File, dbVersion: String, createDir: Boolean?): File {
+    if (createDir != null) {
+        dbDir.ensureExistingDirectory("dbDir")
+    }
+
+    val dbVersionDir = dbDir + dbVersion
+
+    if (createDir == true) {
+        dbVersionDir.ensureCreateDirectory("dbDir/dbVersion")
+    } else if (createDir == false) {
+        dbVersionDir.ensureExistingDirectory("dbDir/dbVersion")
+    }
+    return dbVersionDir
 }
 

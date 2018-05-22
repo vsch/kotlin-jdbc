@@ -9,22 +9,9 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
     TABLE("TABLE", "table", "tables", ".tbl.sql"),
     TRIGGER("TRIGGER", "insert trigger", "triggers", ".ins.trg.sql"),
     VIEW("VIEW", "view", "views", ".view.sql"),
+    MIGRATION("", "migration", "migrations", ".up.sql"),
+    ROLLBACK("", "rollback", "migrations", ".down.sql"),
     ;
-
-    fun getVersionDirectory(dbDir: File, dbVersion: String, createDir: Boolean?): File {
-        if (createDir != null) {
-            dbDir.ensureExistingDirectory("dbDir")
-        }
-
-        val dbVersionDir = dbDir + dbVersion
-
-        if (createDir == true) {
-            dbVersionDir.ensureCreateDirectory("dbDir/dbVersion")
-        } else if (createDir == false) {
-            dbVersionDir.ensureExistingDirectory("dbDir/dbVersion")
-        }
-        return dbVersionDir
-    }
 
     fun getEntityDirectory(dbVersionDir: File, createDir: Boolean?): File {
         if (createDir != null) {
@@ -42,21 +29,17 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
         return entityDir
     }
 
+    fun removeSuffix(fileName:String):String {
+        return fileName.removeSuffix(fileSuffix)
+    }
+
+    fun addSuffix(fileName: String):String {
+        return fileName + fileSuffix
+    }
+
     fun getEntityDirectory(dbDir: File, dbVersion: String, createDir: Boolean?): File {
-        if (createDir != null) {
-            dbDir.ensureExistingDirectory("dbDir")
-        }
-
         val dbVersionDir = getVersionDirectory(dbDir, dbVersion, createDir)
-        val entityDir = dbVersionDir + this.dbEntityDirectory
-
-        // may need to create table directory
-        if (createDir == true) {
-            entityDir.ensureCreateDirectory("dbDir/dbVersion/${this.dbEntityDirectory}")
-        } else if (createDir == false) {
-            entityDir.ensureExistingDirectory("dbDir/dbVersion/${this.dbEntityDirectory}")
-        }
-        return entityDir
+        return getEntityDirectory(dbVersionDir, createDir)
     }
 
     fun getEntityResourceDirectory(dbVersion: String): File {
@@ -106,7 +89,7 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
         return getEntityFiles(entityDir)
     }
 
-    fun getEntityResourceFiles(resourceClass:Class<*>, dbVersion: String): List<String> {
+    fun getEntityResourceFiles(resourceClass: Class<*>, dbVersion: String): List<String> {
         val entityDir = this.getEntityResourceDirectory(dbVersion)
         return getResourceFiles(resourceClass, entityDir.path)
     }
@@ -120,14 +103,14 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
         return getEntityFile(entityDir, entityName)
     }
 
-    data class EntityScript(val entityName: String, val entityFileName: String, val entitySql: String)
+    data class EntityScript(val entityName: String, val entityResourceName: String, val entityResourcePath: String, val entitySql: String)
 
     /**
      * Get entity to EntityScript
      *
      * @return Map<String,EntityScript>
      */
-    fun getEntityResourceScripts(resourceClass:Class<*>, dbEntityExtractor: DbEntityExtractor, entityDir: File): Map<String, EntityScript> {
+    fun getEntityResourceScripts(resourceClass: Class<*>, dbEntityExtractor: DbEntityExtractor, entityDir: File): Map<String, EntityScript> {
         val entityNameRegEx = dbEntityExtractor.getExtractEntityNameRegEx(dbEntity);
         val files = getResourceFiles(resourceClass, entityDir.path)
 
@@ -149,7 +132,7 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
                         throw IllegalStateException("Duplicate SQL $displayName in File $file, $entityName already defined in ${entities[entityName]}")
                     }
 
-                    entities[entityLowercaseName] = EntityScript(entityName, (entityDir + file).path, entitySql);
+                    entities[entityLowercaseName] = EntityScript(entityName, file, (entityDir + file).path, entitySql);
                 } else {
                     throw IllegalStateException("Invalid SQL $displayName file $file, cannot find $displayName name")
                 }
@@ -158,7 +141,7 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
         return entities
     }
 
-    fun getEntityResourceScripts(resourceClass:Class<*>, dbEntityExtractor: DbEntityExtractor, dbVersion: String): Map<String, EntityScript> {
+    fun getEntityResourceScripts(resourceClass: Class<*>, dbEntityExtractor: DbEntityExtractor, dbVersion: String): Map<String, EntityScript> {
         val entityDir = getEntityDirectory(File("/db"), dbVersion, null)
         return getEntityResourceScripts(resourceClass, dbEntityExtractor, entityDir)
     }

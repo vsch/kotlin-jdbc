@@ -14,6 +14,8 @@ object MySqlEntityExtractor : DbEntityExtractor {
             DbEntity.TABLE -> createScript.replace(createTableCleanRegex, "")
             DbEntity.TRIGGER -> createScript
             DbEntity.VIEW -> createScript
+            DbEntity.MIGRATION -> createScript
+            DbEntity.ROLLBACK -> createScript
         }
     }
 
@@ -28,6 +30,8 @@ object MySqlEntityExtractor : DbEntityExtractor {
             DbEntity.TABLE -> "SHOW CREATE TABLE `$entityName`"
             DbEntity.TRIGGER -> ""
             DbEntity.VIEW -> ""
+            DbEntity.MIGRATION -> ""
+            DbEntity.ROLLBACK -> ""
         }
     }
 
@@ -38,6 +42,8 @@ object MySqlEntityExtractor : DbEntityExtractor {
             DbEntity.TABLE -> "SELECT table_name FROM information_schema.TABLES WHERE table_schema = '$schema'"
             DbEntity.TRIGGER -> "SELECT trigger_name FROM information_schema.TRIGGERS WHERE trigger_schema = '$schema'"
             DbEntity.VIEW -> "SELECT table_name FROM information_schema.VIEWS WHERE table_schema = '$schema'"
+            DbEntity.MIGRATION -> ""
+            DbEntity.ROLLBACK -> ""
         }
     }
 }

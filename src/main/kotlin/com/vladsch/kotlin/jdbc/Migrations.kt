@@ -84,7 +84,7 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
         for ((entityName, entityEntry) in entities) {
             if (excludeFilter == null || !excludeFilter.invoke(entityName)) {
                 val entityRealName = entityEntry.entityName
-                val entityFile = entityEntry.entityFileName
+                val entityFile = entityEntry.entityResourcePath
                 val entitySqlContents = entityEntry.entitySql
 
                 val query = sqlQuery(entitySqlContents)
@@ -126,16 +126,16 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
             if (tableEntities.contains("migrations")) {
                 // run the file found for the version
                 val tableEntry = tableEntities["migrations"]!!;
-                logger.info("Creating migrations table from ${dbTableResourceDir.path}/${tableEntry.entityFileName}")
+                logger.info("Creating migrations table from ${dbTableResourceDir.path}/${tableEntry.entityResourcePath}")
 
-                scriptName = tableEntry.entityFileName
+                scriptName = tableEntry.entityResourcePath
                 scriptSql = tableEntry.entitySql
             } else {
                 scriptSql = migration.createTableSql
                 scriptName = "<internal create migration table>"
             }
 
-
+            // create migration table
             migration.invokeWith { session ->
                 migration.insertMigrationAfter(scriptName, scriptSql) {
                     session.execute(sqlQuery(scriptSql))
@@ -151,6 +151,75 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
         }
 
         return migration
+    }
+
+    fun migrate(migration: MigrationSession) {
+        // here need to apply up migrations from current version to given version or latest in version sorted order
+        val entity = DbEntity.MIGRATION;
+        val currentVersion = migration.getCurrentVersion()
+        if (currentVersion == null) {
+            // no current version, we just update everything to given version
+        } else {
+            val versionCompare = currentVersion.versionCompare(migration.version)
+            if (versionCompare > 0) {
+                logger.info("Migrate: requested version ${migration.version} is less than current version $currentVersion, use rollback instead")
+                return
+            } else if (versionCompare <= 0) {
+                // need to run all up migrations from current version which have not been run
+                val migrations = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, currentVersion).values.toList().sortedBy { it.entityResourcePath }
+                val appliedMigrations = migration.getVersionBatchesNameMap()
+
+                migrations.forEach {
+                    if (!appliedMigrations.containsKey(it.entityResourcePath)) {
+                        // apply the migration
+                        val sqlScript = getResourceAsString(resourceClass, it.entityResourcePath)
+                        migration.insertUpMigrationAfter(it.entityResourcePath, sqlScript) {
+                            logger.info("Migrate up ${it.entityResourcePath}")
+                            session.execute(sqlQuery(sqlScript))
+                        }
+                    }
+                }
+
+                if (versionCompare < 0) {
+                    // need to run all migrations from later versions up to requested version
+                    val versionList = getVersions().filter { it.compareTo(currentVersion) > 0 }.sortedWith(Comparator(String::versionCompare))
+
+                    versionList.forEach { version ->
+                        val versionMigrations = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, version).values.toList().sortedBy { it.entityResourcePath }
+
+                        versionMigrations.forEach {
+                            // apply the migration
+                            val sqlScript = getResourceAsString(resourceClass, it.entityResourcePath)
+                            migration.insertUpMigrationAfter(it.entityResourcePath, sqlScript) {
+                                logger.info("Migrate up ${it.entityResourcePath}")
+                                session.execute(sqlQuery(sqlScript))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // run all updates from requested version
+        updateEntities(DbEntity.FUNCTION, migration)
+
+        // create all tables from current version which do not exist
+        createTables(migration)
+
+        updateEntities(DbEntity.VIEW, migration)
+        updateEntities(DbEntity.TRIGGER, migration)
+        updateEntities(DbEntity.PROCEDURE, migration)
+    }
+
+    fun rollback(migration: MigrationSession) {
+        // here need to apply down migrations from current version to given version or if none given then rollback the last batch which was not rolled back
+        val currentVersion = migration.getCurrentVersion()
+        if (currentVersion == null) {
+            // no current version nothing to rollback
+            logger.info("Rollback: nothing to rollback")
+        } else {
+
+        }
     }
 
     /**
@@ -171,6 +240,8 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
      *     dump-functions           - dump database functions
      *     dump-procedures          - dump database stored procedures
      *     dump-triggers            - dump database triggers
+     *
+     *     create-tables            - create all tables which do not exist
      *
      *     update-all               - update all: functions, views, procedures, triggers
      *     update-procedures
@@ -202,17 +273,6 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
                 while (i < args.size) {
                     val option = args[i++]
                     when (option) {
-                        "init" -> {
-                            if (migration != null) {
-                                throw IllegalArgumentException("db init command must be first executed command")
-                            }
-                            migration = initMigrations(dbVersion)
-                        }
-
-                        "migrate" -> {
-                            // here need to apply up migrations from current version to given version or latest in version sorted order
-                        }
-
                         "version" -> {
                             if (args.size <= i) {
                                 throw IllegalArgumentException("version option requires a version argument")
@@ -237,13 +297,35 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
                             dbPath = pathDir
                         }
 
-                        "rollback" -> {
-                            // here need to apply down migrations from current version to given version or if none given then rollback the last batch which was not rolled back
-                        }
-
                         "dump-tables" -> {
                             if (dbVersion == null) dbVersion = getLatestVersion()
                             dumpTables(dbPath, dbVersion!!)
+                        }
+
+                        "init" -> {
+                            if (migration != null) {
+                                throw IllegalArgumentException("db init command must be first executed command")
+                            }
+                            migration = initMigrations(dbVersion)
+                        }
+
+                        "migrate" -> {
+                            // here need to apply up migrations from current version to given version or latest in version sorted order
+                            if (migration == null) migration = initMigrations(dbVersion)
+
+                            migrate(migration!!)
+                        }
+
+                        "rollback" -> {
+                            // here need to apply down migrations from current version to given version or if none given then rollback the last batch which was not rolled back
+                            if (migration == null) migration = initMigrations(dbVersion)
+
+                            rollback(migration!!)
+                        }
+
+                        "create-tables", "create-tbls" -> {
+                            if (migration == null) migration = initMigrations(dbVersion)
+                            createTables(migration!!)
                         }
 
                         "update-all" -> {
