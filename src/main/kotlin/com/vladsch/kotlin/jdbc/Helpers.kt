@@ -3,8 +3,12 @@ package com.vladsch.kotlin.jdbc
 import com.vladsch.boxed.json.BoxedJsValue
 import com.vladsch.boxed.json.MutableJsArray
 import com.vladsch.boxed.json.MutableJsObject
+import com.zaxxer.hikari.HikariDataSource
 import org.joda.time.LocalDateTime
+import java.io.BufferedReader
+import java.io.File
 import java.io.InputStream
+import java.io.InputStreamReader
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.net.URL
@@ -197,5 +201,64 @@ val toJsonObject: (Row) -> JsonObject = {
     }
 
     jsonObject
+}
+
+fun getResourceFiles(resourceClass:Class<*>, path: String): List<String> {
+    val filenames = ArrayList<String>()
+
+    getResourceAsStream(resourceClass, path)?.use { inputStream ->
+        BufferedReader(InputStreamReader(inputStream)).use { br ->
+            while (true) {
+                val resource = br.readLine() ?: break
+                filenames.add(resource)
+            }
+        }
+    }
+
+    return filenames
+}
+
+fun getResourceAsString(resourceClass:Class<*>, path: String): String {
+    val sb = StringBuilder()
+
+    getResourceAsStream(resourceClass, path)?.use { inputStream ->
+        BufferedReader(InputStreamReader(inputStream)).use { br ->
+            while (true) {
+                val resource = br.readLine() ?: break
+                sb.append(resource).append('\n')
+            }
+        }
+    }
+
+    return sb.toString()
+}
+
+fun getResourceAsStream(resourceClass:Class<*>, resource: String): InputStream? {
+    return resourceClass.getResourceAsStream(resource)
+}
+
+operator fun File.plus(name: String): File {
+    val path = this.path
+    val dbDir = File(if (!path.endsWith('/') && !name.startsWith('/')) "$path/$name" else "$path$name")
+    return dbDir
+}
+
+fun File.ensureExistingDirectory(paramName: String = "directory"): File {
+    if (!this.exists() || !this.isDirectory) {
+        throw IllegalArgumentException("$paramName '${this.path}' must point to existing directory")
+    }
+    return this
+}
+
+fun File.ensureCreateDirectory(paramName: String = "directory"): File {
+    if (!this.exists()) {
+        if (!this.mkdir()) {
+            throw IllegalStateException("could not create directory $paramName '${this.path}' must point to existing directory")
+        }
+    }
+    if (!this.isDirectory) {
+        throw IllegalStateException("$paramName '${this.path}' exists and is not a directory")
+    }
+    return this
 }
 
