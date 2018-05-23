@@ -29,11 +29,11 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
         return entityDir
     }
 
-    fun removeSuffix(fileName:String):String {
+    fun removeSuffix(fileName: String): String {
         return fileName.removeSuffix(fileSuffix)
     }
 
-    fun addSuffix(fileName: String):String {
+    fun addSuffix(fileName: String): String {
         return fileName + fileSuffix
     }
 
@@ -70,9 +70,12 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
 
     fun getEntityFiles(entityDir: File): List<String> {
         val entityList = ArrayList<String>()
-        entityDir.list(FilenameFilter { file, name -> file.isFile && name.endsWith(this.fileSuffix) }).forEach {
-            entityList.add((entityDir + it).path)
-        }
+        entityDir.list(FilenameFilter { file, name -> name.endsWith(this.fileSuffix) })
+            .map { entityDir + it }
+            .filter { it.isFile }
+            .forEach {
+                entityList.add(it.path)
+            }
         return entityList
     }
 
