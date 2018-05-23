@@ -2,10 +2,17 @@
 
 [TOC]: # " "
 
+- [0.1.6](#016)
 - [0.1.4](#014)
 - [0.1.2](#012)
 - [0.1.0](#010)
 
+
+## 0.1.6
+
+* Add: rudimentary SQL based migrations with migrate/rollback with up/down sql scripts, table,
+  procedure, function, view and trigger script running. Migrations are for data and tables. The
+  rest of the scripts are applied for a given version. Needs docs and tests.
 
 ## 0.1.4
 
