@@ -4,6 +4,7 @@ import org.intellij.lang.annotations.Language
 import java.time.LocalDateTime
 
 class MigrationSession(val batchId: Int, val version: String, val migrations: Migrations) {
+
     data class Migration(
         val migration_id: Int,
         val version: String,
@@ -19,8 +20,6 @@ class MigrationSession(val batchId: Int, val version: String, val migrations: Mi
         companion object {
             @JvmStatic
             val toModel: (Row) -> Migration = { row ->
-                println(row.rowIndex)
-
                 Migration(
                     row.int("migration_id"),
                     row.string("version"),
@@ -92,8 +91,8 @@ INSERT INTO migrations (
         // now need to mark all rollbacks of this script that they were reversed
         val rollBackScriptName = DbEntity.ROLLBACK.addSuffix( DbEntity.MIGRATION.removeSuffix(scriptName))
         val updateSql = sqlQuery("""
-UPDATE migrations SET rolled_back_id = :transId WHERE script_name = :scriptName AND version = :version AND migration_type = -1 AND rolled_back_id IS NULL
-""", mapOf("transId" to transId, "version" to version, "scriptName" to rollBackScriptName))
+UPDATE migrations SET rolled_back_id = :transId WHERE (script_name = :scriptName OR script_name LIKE :scriptNameLike) AND version = :version AND migration_type = -1 AND rolled_back_id IS NULL
+""", mapOf("transId" to transId, "version" to version, "scriptName" to rollBackScriptName, "scriptNameLike" to "$rollBackScriptName[%]"))
         migrations.session.execute(updateSql)
     }
 
@@ -106,8 +105,8 @@ UPDATE migrations SET rolled_back_id = :transId WHERE script_name = :scriptName 
         // now need to mark all rollbacks of this script that they were reversed
         val rollBackScriptName = DbEntity.MIGRATION.addSuffix( DbEntity.ROLLBACK.removeSuffix(scriptName))
         val updateSql = sqlQuery("""
-UPDATE migrations SET rolled_back_id = :transId WHERE script_name = :scriptName AND version = :version AND migration_type = 1 AND rolled_back_id IS NULL
-""", mapOf("transId" to transId, "version" to version, "scriptName" to rollBackScriptName))
+UPDATE migrations SET rolled_back_id = :transId WHERE (script_name = :scriptName OR script_name LIKE :scriptNameLike) AND version = :version AND migration_type = 1 AND rolled_back_id IS NULL
+""", mapOf("transId" to transId, "version" to version, "scriptName" to rollBackScriptName, "scriptNameLike" to "$rollBackScriptName[%]"))
         migrations.session.execute(updateSql)
     }
 
@@ -116,17 +115,6 @@ UPDATE migrations SET rolled_back_id = :transId WHERE script_name = :scriptName 
 
         action.invoke()
         migrations.session.execute(sqlQuery)
-    }
-
-    fun getCurrentVersion(): String? {
-        return migrations.session.first(sqlQuery("""
-SELECT version FROM migrations
-WHERE rolled_back_id IS NULL AND last_problem IS NULL
-ORDER BY migration_id DESC
-LIMIT 1
-""")) { row ->
-            row.string(1)
-        }
     }
 
     fun getVersionBatches(): List<Migration> {
@@ -155,6 +143,10 @@ ORDER BY migration_id ASC
 SELECT * FROM migrations
 ORDER BY migration_id ASC
 """), Migration.toModel)
+    }
+
+    fun withVersion(version: String): MigrationSession {
+        return MigrationSession(batchId, version, migrations)
     }
 }
 

@@ -1,8 +1,17 @@
 package com.vladsch.kotlin.jdbc
 
 object MySqlEntityExtractor : DbEntityExtractor {
-    override fun getExtractEntityNameRegEx(entityTypeName: String): Regex {
-        return "^\\s*CREATE $entityTypeName\\s+(`[\\u0001-\\u005F\\u0061-\\uFFFF]+`|[0-9a-z_A-Z$\\u0080-\\uFFFF]+)".toRegex(RegexOption.IGNORE_CASE)
+    override fun getExtractEntityNameRegEx(entity: DbEntity): Regex? {
+        return when (entity) {
+            DbEntity.MIGRATION -> null
+            DbEntity.ROLLBACK -> null
+            else-> "^\\s*CREATE ${entity.dbEntity}\\s+(`[\\u0001-\\u005F\\u0061-\\uFFFF]+`|[0-9a-z_A-Z$\\u0080-\\uFFFF]+)".toRegex(RegexOption.IGNORE_CASE)
+//            DbEntity.FUNCTION -> createScript
+//            DbEntity.PROCEDURE -> createScript
+//            DbEntity.TABLE -> createScript.replace(createTableCleanRegex, "")
+//            DbEntity.TRIGGER -> createScript
+//            DbEntity.VIEW -> createScript
+        }
     }
 
     val createTableCleanRegex = "(?:\\s+ENGINE\\s*=\\s*[a-zA-Z0-9]+)?(?:\\s+AUTO_INCREMENT\\s*=\\s*\\d+)?".toRegex();

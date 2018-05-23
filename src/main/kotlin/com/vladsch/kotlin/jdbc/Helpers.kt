@@ -4,10 +4,7 @@ import com.vladsch.boxed.json.BoxedJsValue
 import com.vladsch.boxed.json.MutableJsArray
 import com.vladsch.boxed.json.MutableJsObject
 import org.joda.time.LocalDateTime
-import java.io.BufferedReader
-import java.io.File
-import java.io.InputStream
-import java.io.InputStreamReader
+import java.io.*
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.net.URL
@@ -101,13 +98,13 @@ fun sqlCall(statement: String, inputParams: Map<String, Any?>, outputParams: Map
     return SqlCall(statement, inputParams = inputParams, outputParams = outputParams)
 }
 
-fun session(url: String, user: String, password: String, returnGeneratedKey: Boolean = false): Session {
+fun session(url: String, user: String, password: String): Session {
     val conn = DriverManager.getConnection(url, user, password)
-    return Session(Connection(conn), returnGeneratedKey)
+    return Session(Connection(conn))
 }
 
-fun session(dataSource: DataSource, returnGeneratedKey: Boolean = false): Session {
-    return Session(Connection(dataSource.connection), returnGeneratedKey)
+fun session(dataSource: DataSource): Session {
+    return Session(Connection(dataSource.connection))
 }
 
 fun <A : AutoCloseable, R> using(closeable: A?, f: (A) -> R): R {
@@ -217,18 +214,29 @@ fun getResourceFiles(resourceClass:Class<*>, path: String): List<String> {
     return filenames
 }
 
+fun StringBuilder.appendStream(inputStream: InputStream) {
+    BufferedReader(InputStreamReader(inputStream)).use { br ->
+        while (true) {
+            val resource = br.readLine() ?: break
+            this.append(resource).append('\n')
+        }
+    }
+}
+
 fun getResourceAsString(resourceClass:Class<*>, path: String): String {
     val sb = StringBuilder()
 
     getResourceAsStream(resourceClass, path)?.use { inputStream ->
-        BufferedReader(InputStreamReader(inputStream)).use { br ->
-            while (true) {
-                val resource = br.readLine() ?: break
-                sb.append(resource).append('\n')
-            }
-        }
+        sb.appendStream(inputStream)
     }
 
+    return sb.toString()
+}
+
+fun getFileContent(file:File):String {
+    val inputStream = FileInputStream(file)
+    val sb = StringBuilder()
+    sb.appendStream(inputStream)
     return sb.toString()
 }
 
@@ -262,8 +270,8 @@ fun File.ensureCreateDirectory(paramName: String = "directory"): File {
 }
 
 fun String.versionCompare(other:String):Int {
-    val theseParts = this.split('_', limit = 4)
-    val otherParts = other.split('_', limit = 4)
+    val theseParts = this.removePrefix("V").split('_', limit = 4)
+    val otherParts = other.removePrefix("V").split('_', limit = 4)
 
     val iMax = Math.min(theseParts.size, otherParts.size)
     for (i in 0 until iMax) {

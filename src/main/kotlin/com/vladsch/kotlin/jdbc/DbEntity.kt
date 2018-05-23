@@ -111,7 +111,7 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
      * @return Map<String,EntityScript>
      */
     fun getEntityResourceScripts(resourceClass: Class<*>, dbEntityExtractor: DbEntityExtractor, entityDir: File): Map<String, EntityScript> {
-        val entityNameRegEx = dbEntityExtractor.getExtractEntityNameRegEx(dbEntity);
+        val entityNameRegEx = dbEntityExtractor.getExtractEntityNameRegEx(this);
         val files = getResourceFiles(resourceClass, entityDir.path)
 
         val entities = HashMap<String, EntityScript>()
@@ -119,22 +119,29 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
             if (file.endsWith(fileSuffix)) {
                 val entityNameFile = file.substring(0, file.length - this.fileSuffix.length)
                 val entitySql = getResourceAsString(resourceClass, (entityDir + file).path)
-                val matchGroup = entityNameRegEx.find(entitySql)
-                if (matchGroup != null) {
-                    val entityName = matchGroup.groupValues[1].removeSurrounding("`")
+                if (entityNameRegEx == null) {
+                    // no name check
+                    val entityName = this.removeSuffix(entityNameFile)
                     val entityLowercaseName = entityName.toLowerCase()
-
-                    if (entityName != entityNameFile) {
-                        throw IllegalStateException("File $file for $displayName $entityName should be named $entityName.udf.sql")
-                    }
-
-                    if (entities.contains(entityLowercaseName)) {
-                        throw IllegalStateException("Duplicate SQL $displayName in File $file, $entityName already defined in ${entities[entityName]}")
-                    }
-
                     entities[entityLowercaseName] = EntityScript(entityName, file, (entityDir + file).path, entitySql);
                 } else {
-                    throw IllegalStateException("Invalid SQL $displayName file $file, cannot find $displayName name")
+                    val matchGroup = entityNameRegEx.find(entitySql)
+                    if (matchGroup != null) {
+                        val entityName = matchGroup.groupValues[1].removeSurrounding("`")
+                        val entityLowercaseName = entityName.toLowerCase()
+
+                        if (entityName != entityNameFile) {
+                            throw IllegalStateException("File $file for $displayName $entityName should be named $entityName.udf.sql")
+                        }
+
+                        if (entities.contains(entityLowercaseName)) {
+                            throw IllegalStateException("Duplicate SQL $displayName in File $file, $entityName already defined in ${entities[entityName]}")
+                        }
+
+                        entities[entityLowercaseName] = EntityScript(entityName, file, (entityDir + file).path, entitySql);
+                    } else {
+                        throw IllegalStateException("Invalid SQL $displayName file $file, cannot find $displayName name")
+                    }
                 }
             }
         }
