@@ -43,9 +43,9 @@ CREATE TABLE `migrations` (
   `batch_id`       INT(11)     NOT NULL,
   `applied_at`     TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `migration_type` TINYINT(1),
+  `rolled_back_id` INT(11), # migration_id of roll back script
   `script_name`    VARCHAR(128),
   `script_sql`     MEDIUMTEXT,
-  `rolled_back_id` INT(11), # migration_id of roll back script
   `last_problem`   MEDIUMTEXT,
   PRIMARY KEY (`migration_id`)
 ) DEFAULT CHARSET = utf8
