@@ -46,6 +46,25 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
         val entity = DbEntity.TABLE
         val tablesDir = entity.getEntityDirectory(dbDir, dbVersion, true)
         val tables = getDbEntities(entity)
+        val tableCaseMap = HashMap<String, String>()
+        val sb = StringBuilder()
+
+        // build regex to match REFERENCES `tableName`
+        sb.append("\\s+REFERENCES\\s+`(")
+        var sep = ""
+
+        tables.forEach { tableName ->
+            val lowerCase = tableName.toLowerCase()
+            if (lowerCase != tableName) {
+                tableCaseMap.put(lowerCase, tableName)
+                sb.append(sep)
+                sep = "|"
+                sb.append("\\Q").append(lowerCase).append("\\E")
+            }
+        }
+        sb.append(")`")
+
+        val caseFixRegex = sb.toString().toRegex()
 
         for (table in tables) {
             val tableFile = entity.getEntityFile(tablesDir, table)
@@ -57,7 +76,14 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
             if (tableCreate != null) {
                 // remove auto increment start value
                 val createScript = dbEntityExtractor.cleanEntityScript(entity, tableCreate)
-                consumer.invoke(tableFile, createScript)
+                val fixedCaseSql = createScript.replace(caseFixRegex) { matchResult ->
+                    val tableName = matchResult.groupValues[1]
+                    val fixedCase = tableCaseMap[tableName]
+                    if (fixedCase != null) {
+                        matchResult.value.replace(tableName, fixedCase)
+                    } else matchResult.value
+                }
+                consumer.invoke(tableFile, fixedCaseSql)
             }
         }
     }
@@ -75,36 +101,44 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
     }
 
     fun dumpTables(dbDir: File, dbVersion: String) {
+        val migrationsFileName = DbEntity.TABLE.addSuffix("migrations")
         forEachTableFile(dbDir, dbVersion) { tableFile ->
             tableFile.delete()
         }
 
         forEachTableEntity(dbDir, dbVersion) { tableFile, tableScript ->
-            val tableWriter = FileWriter(tableFile)
-            tableWriter.write(tableScript)
-            tableWriter.flush()
-            tableWriter.close()
+            if (tableFile.name != migrationsFileName) {
+                val tableWriter = FileWriter(tableFile)
+                tableWriter.write(tableScript)
+                tableWriter.flush()
+                tableWriter.close()
+            }
         }
     }
 
     fun validateTables(dbDir: File, dbVersion: String) {
         val tableSet = HashSet<String>()
+        val migrationsFileName = DbEntity.TABLE.addSuffix("migrations")
         forEachTableEntity(dbDir, dbVersion) { tableFile, tableScript ->
-            tableSet.add(tableFile.path)
+            if (tableFile.name != migrationsFileName) {
+                tableSet.add(tableFile.path)
 
-            if (tableFile.exists()) {
-                val tableSql = getFileContent(tableFile)
-                if (tableSql.trim() != tableScript.trim()) {
-                    logger.error("Table validation failed for ${tableFile.path}, database and file versions differ")
+                if (tableFile.exists()) {
+                    val tableSql = getFileContent(tableFile)
+                    if (tableSql.trim() != tableScript.trim()) {
+                        logger.error("Table validation failed for ${tableFile.path}, database and file versions differ")
+                    }
+                } else {
+                    logger.error("Table validation failed for ${tableFile.path}, file is missing")
                 }
-            } else {
-                logger.error("Table validation failed for ${tableFile.path}, file is missing")
             }
         }
 
         forEachTableFile(dbDir, dbVersion) { tableFile ->
-            if (!tableSet.contains(tableFile.path)) {
-                logger.error("Table validation failed for ${tableFile.path}, no database table for file")
+            if (tableFile.name != migrationsFileName) {
+                if (!tableSet.contains(tableFile.path)) {
+                    logger.error("Table validation failed for ${tableFile.path}, no database table for file")
+                }
             }
         }
     }

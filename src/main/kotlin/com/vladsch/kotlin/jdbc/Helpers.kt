@@ -214,7 +214,7 @@ fun getResourceFiles(resourceClass:Class<*>, path: String): List<String> {
     return filenames
 }
 
-fun StringBuilder.appendStream(inputStream: InputStream) {
+fun StringBuilder.streamAppend(inputStream: InputStream) {
     BufferedReader(InputStreamReader(inputStream)).use { br ->
         while (true) {
             val resource = br.readLine() ?: break
@@ -227,7 +227,7 @@ fun getResourceAsString(resourceClass:Class<*>, path: String): String {
     val sb = StringBuilder()
 
     getResourceAsStream(resourceClass, path)?.use { inputStream ->
-        sb.appendStream(inputStream)
+        sb.streamAppend(inputStream)
     }
 
     return sb.toString()
@@ -236,7 +236,7 @@ fun getResourceAsString(resourceClass:Class<*>, path: String): String {
 fun getFileContent(file:File):String {
     val inputStream = FileInputStream(file)
     val sb = StringBuilder()
-    sb.appendStream(inputStream)
+    sb.streamAppend(inputStream)
     return sb.toString()
 }
 

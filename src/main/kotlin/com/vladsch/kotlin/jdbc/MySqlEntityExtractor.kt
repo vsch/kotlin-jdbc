@@ -46,9 +46,9 @@ object MySqlEntityExtractor : DbEntityExtractor {
 
     override fun getListEntitiesSql(entity: DbEntity, schema: String): String {
         return when (entity) {
-            DbEntity.FUNCTION -> "SELECT routine_name FROM information_schema.ROUTINES WHERE routine_schema = '$schema' AND routine_type == 'FUNCTION'"
-            DbEntity.PROCEDURE -> "SELECT routine_name FROM information_schema.ROUTINES WHERE routine_schema = '$schema' AND routine_type == 'PROCEDURE'"
-            DbEntity.TABLE -> "SELECT table_name FROM information_schema.TABLES WHERE table_schema = '$schema'"
+            DbEntity.FUNCTION -> "SELECT routine_name FROM information_schema.ROUTINES WHERE routine_schema = '$schema' AND routine_type = 'FUNCTION'"
+            DbEntity.PROCEDURE -> "SELECT routine_name FROM information_schema.ROUTINES WHERE routine_schema = '$schema' AND routine_type = 'PROCEDURE'"
+            DbEntity.TABLE -> "SELECT table_name FROM information_schema.TABLES WHERE table_schema = '$schema' AND TABLE_TYPE = 'BASE TABLE'"
             DbEntity.TRIGGER -> "SELECT trigger_name FROM information_schema.TRIGGERS WHERE trigger_schema = '$schema'"
             DbEntity.VIEW -> "SELECT table_name FROM information_schema.VIEWS WHERE table_schema = '$schema'"
             DbEntity.MIGRATION -> ""
