@@ -10,6 +10,8 @@
 
 ## 0.1.6
 
+* Fix: iteration over empty result set caused exception, due to insufficient conditions present
+  in result set to know there is no next row until next() is invoked.
 * Add: rudimentary SQL based migrations with migrate/rollback with up/down sql scripts, table,
   procedure, function, view and trigger script running. Migrations are for data and tables. The
   rest of the scripts are applied for a given version. Needs docs and tests.

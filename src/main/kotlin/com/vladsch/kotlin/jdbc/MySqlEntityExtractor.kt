@@ -14,22 +14,84 @@ object MySqlEntityExtractor : DbEntityExtractor {
         }
     }
 
-    val createTableCleanRegex = "(?:\\s+ENGINE\\s*=\\s*[a-zA-Z0-9]+)?(?:\\s+AUTO_INCREMENT\\s*=\\s*\\d+)?".toRegex();
 
-    override fun cleanEntityScript(entity: DbEntity, createScript: String): String {
+    class TableScriptFixer(tables:List<String>) : DbEntityCaseFixer(tables) {
+        val createCleanRegex = "(?:\\s+ENGINE\\s*=\\s*[a-zA-Z0-9]+)|(?:\\s+AUTO_INCREMENT\\s*=\\s*\\d+)".toRegex();
+
+        override fun addRegExPrefix(sb: StringBuilder) {
+            sb.append("\\s+REFERENCES\\s+")
+            super.addRegExPrefix(sb)
+        }
+
+        override fun addRegExSuffix(sb: StringBuilder) {
+            super.addRegExSuffix(sb)
+        }
+
+        override fun addEntityNameRegEx(sb: StringBuilder, entityName: String) {
+            super.addEntityNameRegEx(sb, entityName)
+        }
+
+        override fun cleanScript(createScript: String): String {
+            val cleanedScript = createScript.replace(createCleanRegex, "")
+            return super.cleanScript(cleanedScript)
+        }
+    }
+
+    class ViewScriptFixer(tables:List<String>) : DbEntityCaseFixer(tables) {
+        val createCleanRegex = "(?:\\s+ENGINE\\s*=\\s*[a-zA-Z0-9]+)|(?:\\s+AUTO_INCREMENT\\s*=\\s*\\d+)".toRegex();
+
+        override fun addRegExPrefix(sb: StringBuilder) {
+            sb.append("\\s+REFERENCES\\s+")
+            super.addRegExPrefix(sb)
+        }
+
+        override fun addRegExSuffix(sb: StringBuilder) {
+            super.addRegExSuffix(sb)
+        }
+
+        override fun addEntityNameRegEx(sb: StringBuilder, entityName: String) {
+            super.addEntityNameRegEx(sb, entityName)
+        }
+
+        override fun cleanScript(createScript: String): String {
+            val cleanedScript = createScript.replace(createCleanRegex, "")
+            return super.cleanScript(cleanedScript)
+        }
+    }
+
+    override fun getEntityQuery(dbEntity: DbEntity, session: Session): SqlQuery {
+        val defaultDb = session.connection.catalog
+        val entityQuery = sqlQuery(getListEntitiesSql(dbEntity, defaultDb));
+        return entityQuery
+    }
+
+    override fun getDbEntities(dbEntity: DbEntity, session: Session): List<String> {
+        val entityQuery = getEntityQuery(dbEntity, session)
+        val entities = session.list(entityQuery) { it.string(1) }
+        return entities;
+    }
+
+    override fun entityScriptFixer(entity: DbEntity, session: Session): DbEntityFixer {
         return when (entity) {
-            DbEntity.FUNCTION -> createScript
-            DbEntity.PROCEDURE -> createScript
-            DbEntity.TABLE -> createScript.replace(createTableCleanRegex, "")
-            DbEntity.TRIGGER -> createScript
-            DbEntity.VIEW -> createScript
-            DbEntity.MIGRATION -> createScript
-            DbEntity.ROLLBACK -> createScript
+            DbEntity.FUNCTION -> DbEntityFixer.NULL
+            DbEntity.PROCEDURE -> DbEntityFixer.NULL
+            DbEntity.TABLE -> {
+                val tables = getDbEntities(entity, session)
+                return TableScriptFixer(tables)
+            }
+            DbEntity.TRIGGER -> DbEntityFixer.NULL
+            DbEntity.VIEW -> DbEntityFixer.NULL
+            DbEntity.MIGRATION -> DbEntityFixer.NULL
+            DbEntity.ROLLBACK -> DbEntityFixer.NULL
         }
     }
 
     override fun getDropEntitySql(entityType: String, entityName: String): String {
         return "DROP $entityType IF EXISTS `$entityName`"
+    }
+
+    override fun getDropEntitySql(entity: DbEntity, entityName: String): String {
+        return getDropEntitySql(entity.dbEntity, entityName)
     }
 
     override fun getShowEntitySql(entity: DbEntity, entityName: String): String {

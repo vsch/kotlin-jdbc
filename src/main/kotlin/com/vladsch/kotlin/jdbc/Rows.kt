@@ -3,9 +3,12 @@ package com.vladsch.kotlin.jdbc
 import java.sql.ResultSet
 
 class Rows(rs: ResultSet) : Row(rs), Sequence<Row> {
+    private var movedNext = false
+
     private class RowIterator(val row:Rows):Iterator<Row> {
+
         override fun hasNext(): Boolean {
-            return !(row.rs.isClosed || row.rs.isLast || row.rs.isAfterLast)
+            return row.hasNext()
         }
 
         override fun next(): Row {
@@ -18,10 +21,19 @@ class Rows(rs: ResultSet) : Row(rs), Sequence<Row> {
     }
 
     fun hasNext(): Boolean {
-        return !(rs.isClosed || rs.isLast || rs.isAfterLast)
+        if (rs.isClosed || rs.isLast || rs.isAfterLast) return false
+        if (movedNext) return true
+
+        movedNext = rs.next()
+        return movedNext
     }
 
     fun next(): Rows {
+        if (movedNext) {
+            movedNext = false
+            return this
+        }
+
         rs.next()
         return this;
     }

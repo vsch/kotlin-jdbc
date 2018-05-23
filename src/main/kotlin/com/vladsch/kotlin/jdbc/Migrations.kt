@@ -30,78 +30,36 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
         return if (versions.isEmpty()) "V0_0_0" else versions.last();
     }
 
-    fun getEntityQuery(dbEntity: DbEntity): SqlQuery {
-        val defaultDb = session.connection.catalog
-        val entityQuery = sqlQuery(dbEntityExtractor.getListEntitiesSql(dbEntity, defaultDb));
-        return entityQuery
-    }
-
-    fun getDbEntities(dbEntity: DbEntity): List<String> {
-        val entityQuery = getEntityQuery(dbEntity)
-        val entities = session.list(entityQuery) { it.string(1) }
-        return entities;
-    }
-
-    private fun doForEachTable(tablesDir: File, tables: List<String>, consumer: (tableFile: File, tableScript: String) -> Unit) {
-        val entity = DbEntity.TABLE
-        val tableCaseMap = HashMap<String, String>()
-        val sb = StringBuilder()
-
-        // build regex to match REFERENCES `tableName`
-        sb.append("\\s+REFERENCES\\s+`(")
-        var sep = ""
-
-        tables.forEach { tableName ->
-            val lowerCase = tableName.toLowerCase()
-            if (lowerCase != tableName) {
-                tableCaseMap.put(lowerCase, tableName)
-                sb.append(sep)
-                sep = "|"
-                sb.append("\\Q").append(lowerCase).append("\\E")
-            }
-        }
-        sb.append(")`")
-
-        val caseFixRegex = sb.toString().toRegex()
-
-        for (table in tables) {
-            val tableFile = entity.getEntityFile(tablesDir, table)
-            val tableSql = sqlQuery(dbEntityExtractor.getShowEntitySql(entity, table))
-            val tableCreate = session.first(tableSql) {
+    private fun doForEachEntity(entity: DbEntity, tablesDir: File, entities: List<String>, consumer: (tableFile: File, tableScript: String) -> Unit) {
+        val entityFixer = dbEntityExtractor.entityScriptFixer(entity, session)
+        for (entityName in entities) {
+            val entityFile = entity.getEntityFile(tablesDir, entityName)
+            val entitySql = sqlQuery(dbEntityExtractor.getShowEntitySql(entity, entityName))
+            val entityCreate = session.first(entitySql) {
                 it.string(2)
             }
 
-            if (tableCreate != null) {
+            if (entityCreate != null) {
                 // remove auto increment start value
-                val createScript = dbEntityExtractor.cleanEntityScript(entity, tableCreate)
-                val fixedCaseSql = createScript.replace(caseFixRegex) { matchResult ->
-                    val tableName = matchResult.groupValues[1]
-                    val fixedCase = tableCaseMap[tableName]
-                    if (fixedCase != null) {
-                        matchResult.value.replace(tableName, fixedCase)
-                    } else matchResult.value
-                }
-                consumer.invoke(tableFile, fixedCaseSql)
+                val fixedCaseSql = entityFixer.cleanScript(entityCreate)
+                consumer.invoke(entityFile, fixedCaseSql)
             }
         }
     }
 
-    fun forEachTableEntity(dbDir: File, dbVersion: String, consumer: (tableFile: File, tableScript: String) -> Unit) {
-        val entity = DbEntity.TABLE
+    fun forEachEntity(entity: DbEntity, dbDir: File, dbVersion: String, consumer: (tableFile: File, tableScript: String) -> Unit) {
         val tablesDir = entity.getEntityDirectory(dbDir, dbVersion, true)
-        val tables = getDbEntities(entity)
-        doForEachTable(tablesDir, tables, consumer)
+        val tables = dbEntityExtractor.getDbEntities(entity, session)
+        doForEachEntity(DbEntity.TABLE, tablesDir, tables, consumer)
     }
 
-    fun forEachTableEntity(dbVersion: String, consumer: (tableFile: File, tableScript: String) -> Unit) {
-        val entity = DbEntity.TABLE
+    fun forEachEntity(entity: DbEntity, dbVersion: String, consumer: (tableFile: File, tableScript: String) -> Unit) {
         val tablesDir = entity.getEntityResourceDirectory(dbVersion)
-        val tables = getDbEntities(entity)
-        doForEachTable(tablesDir, tables, consumer)
+        val tables = dbEntityExtractor.getDbEntities(entity, session)
+        doForEachEntity(DbEntity.TABLE, tablesDir, tables, consumer)
     }
 
-    fun forEachTableFile(dbDir: File, dbVersion: String, consumer: (tableFile: File) -> Unit) {
-        val entity = DbEntity.TABLE
+    fun forEachEntityFile(dbDir: File, dbVersion: String, consumer: (tableFile: File) -> Unit, entity: DbEntity) {
         val tablesDir = entity.getEntityDirectory(dbDir, dbVersion, true)
         val tableFiles = entity.getEntityFiles(tablesDir)
 
@@ -112,8 +70,7 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
         }
     }
 
-    fun forEachTableResourceFile(dbVersion: String, consumer: (tableFile: File) -> Unit) {
-        val entity = DbEntity.TABLE
+    fun forEachEntityResourceFile(entity: DbEntity, dbVersion: String, consumer: (tableFile: File) -> Unit) {
         val tablesDir = entity.getEntityResourceDirectory(dbVersion)
         val tableFiles = entity.getEntityResourceFiles(resourceClass, dbVersion)
 
@@ -126,24 +83,24 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
 
     fun dumpTables(dbDir: File, dbVersion: String) {
         val migrationsFileName = DbEntity.TABLE.addSuffix("migrations")
-        forEachTableFile(dbDir, dbVersion) { tableFile ->
+        forEachEntityFile(dbDir, dbVersion, { tableFile ->
             tableFile.delete()
-        }
+        }, DbEntity.TABLE)
 
-        forEachTableEntity(dbDir, dbVersion) { tableFile, tableScript ->
+        forEachEntity(DbEntity.TABLE, dbDir, dbVersion, { tableFile, tableScript ->
             if (tableFile.name != migrationsFileName) {
                 val tableWriter = FileWriter(tableFile)
                 tableWriter.write(tableScript)
                 tableWriter.flush()
                 tableWriter.close()
             }
-        }
+        })
     }
 
     fun validateTables(dbDir: File, dbVersion: String) {
         val tableSet = HashSet<String>()
         val migrationsFileName = DbEntity.TABLE.addSuffix("migrations")
-        forEachTableEntity(dbDir, dbVersion) { tableFile, tableScript ->
+        forEachEntity(DbEntity.TABLE, dbDir, dbVersion, { tableFile, tableScript ->
             if (tableFile.name != migrationsFileName) {
                 tableSet.add(tableFile.path)
 
@@ -156,18 +113,18 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
                     logger.error("Table validation failed for ${tableFile.path}, file is missing")
                 }
             }
-        }
+        })
 
-        forEachTableFile(dbDir, dbVersion) { tableFile ->
+        forEachEntityFile(dbDir, dbVersion, { tableFile ->
             if (tableFile.name != migrationsFileName) {
                 if (!tableSet.contains(tableFile.path)) {
                     logger.error("Table validation failed for ${tableFile.path}, no database table for file")
                 }
             }
-        }
+        }, DbEntity.TABLE)
     }
 
-    fun doesResourceExist(resourcePath:String):Boolean {
+    fun doesResourceExist(resourcePath: String): Boolean {
         try {
             resourceClass.getResource(resourcePath)
             return true
@@ -179,7 +136,7 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
     fun validateTableResourceFiles(dbVersion: String, errorAppendable: Appendable? = null) {
         val tableSet = HashSet<String>()
         val migrationsFileName = DbEntity.TABLE.addSuffix("migrations")
-        forEachTableEntity(dbVersion) { tableFile, tableScript ->
+        forEachEntity(DbEntity.TABLE, dbVersion, { tableFile, tableScript ->
             if (tableFile.name != migrationsFileName) {
                 tableSet.add(tableFile.path)
 
@@ -196,9 +153,9 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
                     errorAppendable?.appendln(s)
                 }
             }
-        }
+        })
 
-        forEachTableResourceFile(dbVersion) { tableFile ->
+        forEachEntityResourceFile(DbEntity.TABLE, dbVersion, { tableFile ->
             if (tableFile.name != migrationsFileName) {
                 if (!tableSet.contains(tableFile.path)) {
                     val s = "Table validation failed for ${tableFile.path}, no database table for resource"
@@ -206,7 +163,7 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
                     errorAppendable?.appendln(s)
                 }
             }
-        }
+        })
     }
 
     /**
@@ -220,7 +177,7 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
         val entity = DbEntity.TABLE
 
         // may need to create table directory
-        val tables = getDbEntities(entity)
+        val tables = dbEntityExtractor.getDbEntities(entity, session)
         val tableSet = tables.map { it.toLowerCase() }.toSet()
         val entities = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, migration.version)
 
@@ -248,16 +205,36 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
         }
     }
 
-    fun updateEntities(dbEntity: DbEntity, migration: MigrationSession, excludeFilter: ((String) -> Boolean)? = null) {
+    fun updateEntities(entity: DbEntity, migration: MigrationSession, excludeFilter: ((String) -> Boolean)? = null) {
         // may need to create table directory
-        val entities = dbEntity.getEntityResourceScripts(resourceClass, dbEntityExtractor, migration.version)
-        runEntitiesSql(migration, entities, "Update ${dbEntity.displayName}", if (dbEntity == DbEntity.TABLE) null else dbEntity.dbEntity, excludeFilter)
+        val entities = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, migration.version)
+        runEntitiesSql(migration, entities, "Update ${entity.displayName}", if (entity == DbEntity.TABLE) null else entity.dbEntity, excludeFilter)
+
+        // delete all which do not exist in files
+        val dbEntities = dbEntityExtractor.getDbEntities(entity, session)
+        dbEntities.forEach { dbEntityName ->
+            if (!entities.containsKey(dbEntityName.toLowerCase())) {
+                val dropEntitySql = dbEntityExtractor.getDropEntitySql(entity, dbEntityName)
+                logger.info("Dropping ${entity.displayName} $dbEntityName")
+                session.execute(sqlQuery(dropEntitySql))
+            }
+        }
     }
 
+    /**
+     * Take the latest actual applied migration or rollback version, failing that take <migrate> or <rollback> entry version
+     */
     fun getCurrentVersion(): String? {
         return session.first(sqlQuery("""
 SELECT version FROM migrations
-WHERE rolled_back_id IS NULL AND last_problem IS NULL
+WHERE rolled_back_id IS NULL AND last_problem IS NULL AND migration_type IS NOT NULL
+ORDER BY migration_id DESC
+LIMIT 1
+""")) { row ->
+            row.string(1)
+        } ?: session.first(sqlQuery("""
+SELECT version FROM migrations
+WHERE rolled_back_id IS NULL AND last_problem IS NULL AND script_name IN ('<migrate>', '<rollback>')
 ORDER BY migration_id DESC
 LIMIT 1
 """)) { row ->
@@ -269,7 +246,7 @@ LIMIT 1
         val entity = DbEntity.TABLE
 
         val migration: MigrationSession
-        val tables = getDbEntities(entity)
+        val tables = dbEntityExtractor.getDbEntities(entity, session)
 
         if (tables.filter { it.toLowerCase() == "migrations" }.isEmpty()) {
             val useDbVersion = dbVersion ?: getLatestVersion()
@@ -385,12 +362,12 @@ LIMIT 1
     }
 
     private fun runBatchScript(
-        opType: DbEntity,
-        migration: MigrationSession,
-        migrationScriptPath: String,
-        appliedMigrations: Map<String, MigrationSession.Migration>?,
-        sqlScript: String,
-        entityScript: DbEntity.EntityScript
+            opType: DbEntity,
+            migration: MigrationSession,
+            migrationScriptPath: String,
+            appliedMigrations: Map<String, MigrationSession.Migration>?,
+            sqlScript: String,
+            entityScript: DbEntity.EntityScript
     ) {
         val sqlParts = sqlScript.replace(";\n", "\n;").split(';')
         var line = 1
@@ -516,7 +493,7 @@ LIMIT 1
 
                 // validate that current db tables and their definition matches the table list
                 val sb = StringBuilder()
-                validateTableResourceFiles(migration.version,sb)
+                validateTableResourceFiles(migration.version, sb)
                 if (!sb.isEmpty()) {
                     // insert migration line
                     migration.insertMigrationAfter("<validation failure>", sb.toString()) {}
@@ -692,8 +669,8 @@ LIMIT 1
 
                     tx.begin()
                     val migrationSql = migrationSession.getMigrationSql(
-                        migrationSession.lastScriptName ?: "",
-                        migrationSession.lastScriptSql ?: ""
+                            migrationSession.lastScriptName ?: "",
+                            migrationSession.lastScriptSql ?: ""
                     ).inParams("lastProblem" to e.message)
 
                     tx.execute(migrationSql)
