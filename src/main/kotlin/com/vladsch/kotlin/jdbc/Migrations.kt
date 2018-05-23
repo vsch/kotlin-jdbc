@@ -42,10 +42,8 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
         return entities;
     }
 
-    fun forEachTableEntity(dbDir: File, dbVersion: String, consumer: (tableFile: File, tableScript: String) -> Unit) {
+    private fun doForEachTable(tablesDir: File, tables: List<String>, consumer: (tableFile: File, tableScript: String) -> Unit) {
         val entity = DbEntity.TABLE
-        val tablesDir = entity.getEntityDirectory(dbDir, dbVersion, true)
-        val tables = getDbEntities(entity)
         val tableCaseMap = HashMap<String, String>()
         val sb = StringBuilder()
 
@@ -88,6 +86,20 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
         }
     }
 
+    fun forEachTableEntity(dbDir: File, dbVersion: String, consumer: (tableFile: File, tableScript: String) -> Unit) {
+        val entity = DbEntity.TABLE
+        val tablesDir = entity.getEntityDirectory(dbDir, dbVersion, true)
+        val tables = getDbEntities(entity)
+        doForEachTable(tablesDir, tables, consumer)
+    }
+
+    fun forEachTableEntity(dbVersion: String, consumer: (tableFile: File, tableScript: String) -> Unit) {
+        val entity = DbEntity.TABLE
+        val tablesDir = entity.getEntityResourceDirectory(dbVersion)
+        val tables = getDbEntities(entity)
+        doForEachTable(tablesDir, tables, consumer)
+    }
+
     fun forEachTableFile(dbDir: File, dbVersion: String, consumer: (tableFile: File) -> Unit) {
         val entity = DbEntity.TABLE
         val tablesDir = entity.getEntityDirectory(dbDir, dbVersion, true)
@@ -96,6 +108,18 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
         // delete all existing table sql files
         tableFiles.forEach {
             val file = File(it)
+            consumer.invoke(file)
+        }
+    }
+
+    fun forEachTableResourceFile(dbVersion: String, consumer: (tableFile: File) -> Unit) {
+        val entity = DbEntity.TABLE
+        val tablesDir = entity.getEntityResourceDirectory(dbVersion)
+        val tableFiles = entity.getEntityResourceFiles(resourceClass, dbVersion)
+
+        // delete all existing table sql files
+        tableFiles.forEach {
+            val file = tablesDir + it
             consumer.invoke(file)
         }
     }
@@ -126,7 +150,7 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
                 if (tableFile.exists()) {
                     val tableSql = getFileContent(tableFile)
                     if (tableSql.trim() != tableScript.trim()) {
-                        logger.error("Table validation failed for ${tableFile.path}, database and file versions differ")
+                        logger.error("Table validation failed for ${tableFile.path}, database and file differ")
                     }
                 } else {
                     logger.error("Table validation failed for ${tableFile.path}, file is missing")
@@ -138,6 +162,48 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
             if (tableFile.name != migrationsFileName) {
                 if (!tableSet.contains(tableFile.path)) {
                     logger.error("Table validation failed for ${tableFile.path}, no database table for file")
+                }
+            }
+        }
+    }
+
+    fun doesResourceExist(resourcePath:String):Boolean {
+        try {
+            resourceClass.getResource(resourcePath)
+            return true
+        } catch (e: Exception) {
+            return false
+        }
+    }
+
+    fun validateTableResourceFiles(dbVersion: String, errorAppendable: Appendable? = null) {
+        val tableSet = HashSet<String>()
+        val migrationsFileName = DbEntity.TABLE.addSuffix("migrations")
+        forEachTableEntity(dbVersion) { tableFile, tableScript ->
+            if (tableFile.name != migrationsFileName) {
+                tableSet.add(tableFile.path)
+
+                if (doesResourceExist(tableFile.path)) {
+                    val tableSql = getResourceAsString(resourceClass, tableFile.path)
+                    if (tableSql.trim() != tableScript.trim()) {
+                        val s = "Table validation failed for ${tableFile.path}, database and resource differ"
+                        logger.error(s)
+                        errorAppendable?.appendln(s)
+                    }
+                } else {
+                    val s = "Table validation failed for ${tableFile.path}, resource is missing"
+                    logger.error(s)
+                    errorAppendable?.appendln(s)
+                }
+            }
+        }
+
+        forEachTableResourceFile(dbVersion) { tableFile ->
+            if (tableFile.name != migrationsFileName) {
+                if (!tableSet.contains(tableFile.path)) {
+                    val s = "Table validation failed for ${tableFile.path}, no database table for resource"
+                    logger.error(s)
+                    errorAppendable?.appendln(s)
                 }
             }
         }
@@ -425,7 +491,13 @@ LIMIT 1
                     updateEntities(DbEntity.FUNCTION, prevMigration)
                     createTables(prevMigration)
 
-                    // TODO: validate that current db tables and their definition matches the table list
+                    // validate that current db tables and their definition matches the table list
+                    val sb = StringBuilder()
+                    validateTableResourceFiles(prevVersion, sb)
+                    if (!sb.isEmpty()) {
+                        // insert migration line
+                        prevMigration.insertMigrationAfter("<validation failure>", sb.toString()) {}
+                    }
 
                     updateEntities(DbEntity.VIEW, prevMigration)
                     updateEntities(DbEntity.TRIGGER, prevMigration)
@@ -442,7 +514,13 @@ LIMIT 1
 
                 createTables(migration)
 
-                // TODO: validate that current db tables and their definition matches the table list
+                // validate that current db tables and their definition matches the table list
+                val sb = StringBuilder()
+                validateTableResourceFiles(migration.version,sb)
+                if (!sb.isEmpty()) {
+                    // insert migration line
+                    migration.insertMigrationAfter("<validation failure>", sb.toString()) {}
+                }
 
                 updateEntities(DbEntity.VIEW, migration)
                 updateEntities(DbEntity.TRIGGER, migration)
@@ -530,12 +608,17 @@ LIMIT 1
                         }
 
                         "dump-tables" -> {
-                            if (dbVersion == null) dbVersion = getLatestVersion()
+                            if (dbVersion == null) dbVersion = getCurrentVersion()
                             dumpTables(dbPath, dbVersion!!)
                         }
 
+                        "validate" -> {
+                            if (dbVersion == null) dbVersion = getCurrentVersion()
+                            validateTableResourceFiles(dbVersion!!)
+                        }
+
                         "validate-tables" -> {
-                            if (dbVersion == null) dbVersion = getLatestVersion()
+                            if (dbVersion == null) dbVersion = getCurrentVersion()
                             validateTables(dbPath, dbVersion!!)
                         }
 
