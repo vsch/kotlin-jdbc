@@ -198,10 +198,18 @@ open class Session(
         }
     }
 
-    fun updateGetId(query: SqlQuery): Long? {
+    fun updateGetLongId(query: SqlQuery): Long? {
         return updateWithKeys(query) { stmt ->
             val rs = stmt.generatedKeys
             if (rs.next()) rs.getLong(1)
+            else null
+        }
+    }
+
+    fun updateGetId(query: SqlQuery): Int? {
+        return updateWithKeys(query) { stmt ->
+            val rs = stmt.generatedKeys
+            if (rs.next()) rs.getInt(1)
             else null
         }
     }
@@ -214,12 +222,24 @@ open class Session(
         }
     }
 
-    fun updateGetIds(query: SqlQuery): List<Long>? {
+    fun updateGetLongIds(query: SqlQuery): List<Long>? {
         return updateWithKeys(query) { stmt ->
             val keys = ArrayList<Long>()
             val rs = stmt.generatedKeys
             while (rs.next()) {
                 val id = rs.getLong(1)
+                if (!rs.wasNull()) keys.add(id)
+            }
+            keys
+        }
+    }
+
+    fun updateGetIds(query: SqlQuery): List<Int>? {
+        return updateWithKeys(query) { stmt ->
+            val keys = ArrayList<Int>()
+            val rs = stmt.generatedKeys
+            while (rs.next()) {
+                val id = rs.getInt(1)
                 if (!rs.wasNull()) keys.add(id)
             }
             keys

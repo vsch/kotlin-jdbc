@@ -547,6 +547,8 @@ LIMIT 1
      *     validate-functions       - validate db version functions
      *     validate-procedures      - validate db version procedures
      *     validate-triggers        - validate db version triggers
+     *
+     *     exit                     - exit application
      */
     fun dbCommand(args: Array<String>) {
         var dbVersion: String? = null
@@ -655,6 +657,10 @@ LIMIT 1
                             if (migration == null) migration = initMigrations(dbVersion)
 
                             updateEntities(DbEntity.TRIGGER, migration!!)
+                        }
+
+                        "exit" -> {
+                            System.exit(1)
                         }
 
                         else -> {

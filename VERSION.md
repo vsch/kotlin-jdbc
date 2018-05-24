@@ -12,6 +12,8 @@
 ## 0.1.8
 
 * Fix: wrong filter on get entity resource files list
+* Change: change `updateGetId` and `updateGetIds` to return `Int` and `List<Int>` respectively
+* Add: add `updateGetLongId` and `updateGetLongIds` to return `Long` and `List<Long>` respectively
 
 ## 0.1.6
 
