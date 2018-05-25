@@ -45,18 +45,14 @@ https://github.com/vsch/kotlin-jdbc/master/sample
 <dependency>
     <groupId>com.vladsch.kotlin-jdbc</groupId>
     <artifactId>kotlin-jdbc</artifactId>
-    <version>0.1.2</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
 #### Gradle
 
-```maven
-<dependency>
-    <groupId>com.vladsch.kotlin-jdbc</groupId>
-    <artifactId>kotlin-jdbc</artifactId>
-    <version>0.1.2</version>
-</dependency>
+```gradle
+compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.2.0"
 ```
 
 ### Example
@@ -68,7 +64,7 @@ https://github.com/vsch/kotlin-jdbc/master/sample
 ```kotlin
 import com.vladsch.kotlin.jdbc.*
 
-val session = sessionOf("jdbc:h2:mem:hello", "user", "pass") 
+val session = session("jdbc:h2:mem:hello", "user", "pass") 
 ```
 
 #### HikariCP
@@ -149,11 +145,10 @@ val alice: Member? = session.first(aliceQuery, toMember)
 Alternative syntax is supported to allow named parameters in all queries.
 
 ```kotlin
-sqlQuery("""select id, name, created_at 
-	from members 
-	where (:name is not null or name = :name)
-	  and (:age is not null or age = :age)""", 
-	mapOf("name" to "Alice"))
+val query = sqlQuery("""
+SELECT id, name, created_at FROM members
+WHERE (:name IS NOT NULL OR name = :name) AND (:age IS NOT NULL OR age = :age)
+""", mapOf("name" to "Alice"))
 ```
 
 In the query above, the param `age` is not supplied on purpose.
@@ -253,29 +248,76 @@ session.transaction { tx ->
 }
 ```
 
-#### Models
+#### Queries
+
+SQL queries come in two forms: `SqlQuery` for all DDL and DML. `SqlCall` is for calling stored
+procedures with in/inout/out parameters to pass to the procedure and processing inout/out
+parameters after execution with optional processing of multiple result sets returned by the
+procedure.
+
+All queries are executed through the `Session` instance or its sub-class `Transaction`. The
+session has separate methods for different types of query execution and results:
+
+* `session.query` used to execute queries and processing a result set
+* `session.execute` used to execute queries not expecting a result set
+* `session.update` used to execute update queries
+
+Convenience methods that process result sets which use an extractor which take an ResultSet Row
+and return an instance of something:
+
+* `session.list` used to return a list of extracted data from rows
+* `session.first` used to return a single instance from head of result set
+* `session.count` used to return the count of rows when you don't need more than that and are
+  too lazy to write a count query
+* `session.hashMap` same as list but used to return a hash map keyed on column(s) from the
+  result set
+* `session.jsonArray` same as list but returns an array of `JsonObjects` holding each row data
+* `session.jsonObject` same as `hashMap` except the `JsonObject` first level properties are a
+  string of the keyed column(s) from each row.
+
+Iteration helpers which will invoke a consumer for every row of result set data:
+
+* `session.forEach` to iterate over each row or a result set from an `SqlQuery` or `SqlCall`
+* `session.forEach` to iterate over each result set from a `SqlCall` and to process inout/out
+  parameters.
+
+Update and getting generated key(s):
+
+* `session.updateGetId` to execute an update query and get the first column of the first row of
+  the generated keys result set and return its integer value
+* `session.updateGetIds` to execute an update query and get the first column of all the rows of
+  the generated keys result set and return a list of integers
+* `session.updateGetKey` to execute an update query and get the keys (using an extractor) of the
+  first row of the generated keys result set and return its value
+* `session.updateGetKeys` to execute an update query and get the keys (using an extractor) of
+  all the rows of the generated keys result set and return them as a list
+
+
+#### Convenient Models
 
 A base `Model` class can be used to define models which know how to set their properties from a
-`Row` result set row, set properties from other Models, understand `auto`, `key` and `default`
-properties and can generate INSERT, UPDATE, DELETE queries for a model instance with validation
-of required fields and minimal required arguments.
+`Row` result set row, from other Models, understand `auto` generated, `key` columns and columns
+with `default` values; can generate `INSERT`, `UPDATE`, `DELETE` and `SELECT` queries for a
+model instance with validation of required fields and minimal required columns for an update.
 
-This is a convenience not a requirement to use the rest of the functionality since it does
-create overhead by building the model's properties for every instance.
+Using these models is a convenience not a requirement since it does create overhead by building
+the model's properties for every instance.
 
 * Define model's properties by using `by model`. The nullability of the property type dictates
   whether the property can be omitted or set to null
 * Key properties by: `by model.key`. These will be used for `WHERE` list for `UPDATE`, `DELETE`
   or `SELECT` for reload query generation
 * Auto generated (not updatable) properties by: `by model.auto`
-* Auto generated Key (key and not updatable) properties by: `by model.key.auto`, `by
-  model.autoKey`, `by model.auto.key`
-* Properties with default values by: `by model.default`. These won't raise an exception for
-  `INSERT` query generation if they are missing from the model's set properties.
+* Auto generated Key (key column and auto generated) by: `by model.key.auto`, `by model.autoKey`
+  or `by model.auto.key`
+* Columns which have default values by: `by model.default`. These won't raise an exception for
+  `INSERT` query generation if they are missing from the model's defined property set.
 
-By default models allow public setters on properties marked `auto` or `autoKey`, to add
+By default models allow public setters on properties marked `auto` or `autoKey`. To add
 validation forcing all `auto` properties to have no `set` method or have `private set` pass
 `true` for `allowPublicAuto` second parameter to model constructor.
+
+Any property marked as `auto` generated will not be used for value `UPDATE` or `INSERT`
 
 ```kotlin
 class ValidModel : Model<ValidModel>(tableName) {
@@ -333,49 +375,6 @@ fun useModel() {
 }
 ```
 
-#### Queries
-
-SQL queries come in two forms: `SqlQuery` for all DDL and DML. `SqlCall` is for calling stored
-procedures with in/inout/out parameters to pass to the procedure and processing inout/out
-parameters after execution with optional processing of multiple result sets returned by the
-procedure.
-
-All queries are executed through the `Session` instance or its sub-class `Transaction`. The
-session has separate methods for different types of query execution and results:
-
-* `session.query` used to execute queries and processing a result set
-* `session.execute` used to execute queries not expecting a result set
-* `session.update` used to execute update queries
-
-Convenience methods that process result sets which use an extractor which take an ResultSet Row
-and return an instance of something:
-
-* `session.list` used to return a list of extracted data from rows
-* `session.first` used to return a single instance from head of result set
-* `session.count` used to return the count of rows when you don't need more than that and are
-  too lazy to write a count query
-* `session.hashMap` same as list but used to return a hash map keyed on column(s) from the
-  result set
-* `session.jsonArray` same as list but returns an array of `JsonObjects` holding each row data
-* `session.jsonObject` same as `hashMap` except the `JsonObject` first level properties are a
-  string of the keyed column(s) from each row.
-
-Iteration helpers which will invoke a consumer for every row of result set data:
-
-* `session.forEach` to iterate over each row or a result set from an `SqlQuery` or `SqlCall`
-* `session.forEach` to iterate over each result set from a `SqlCall` and to process inout/out
-  parameters.
-
-Update and getting generated key(s):
-
-* `session.updateGetId` to execute an update query and get the first column of the first row of
-  the generated keys result set and return its integer value
-* `session.updateGetIds` to execute an update query and get the first column of all the rows of
-  the generated keys result set and return a list of integers
-* `session.updateGetKey` to execute an update query and get the keys (using an extractor) of the
-  first row of the generated keys result set and return its value
-* `session.updateGetKeys` to execute an update query and get the keys (using an extractor) of
-  all the rows of the generated keys result set and return them as a list
 
 #### Configuring SQL Language Injections
 
