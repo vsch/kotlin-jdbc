@@ -20,6 +20,8 @@
 
 ## 0.2.2
 
+* Change: refactor code to clean up duplication
+* Add: `Model.appendKeys()` to append model's keys for query generation
 * Fix: wrong conversion for jodaLocalDateTime and a few others. Added casts to catch these
   errors during compilation
 * Fix: add snapshot to `Model.update(session:Session)` after successful update.

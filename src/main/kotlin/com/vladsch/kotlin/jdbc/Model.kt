@@ -3,37 +3,37 @@ package com.vladsch.kotlin.jdbc
 import javax.json.JsonObject
 import kotlin.reflect.KProperty
 
+@Suppress("MemberVisibilityCanBePrivate")
 abstract class Model<T : Model<T>>(val sqlTable: String, allowSetAuto: Boolean = true) {
-    internal val modelProperties = ModelProperties<T>(this::class.simpleName ?: "<unknown>", allowSetAuto)
-    protected val model get() = modelProperties
+    internal val model = ModelProperties<T>(this::class.simpleName ?: "<unknown>", allowSetAuto)
 
     fun load(rs: Row): T {
-        modelProperties.load(rs)
+        model.load(rs)
         @Suppress("UNCHECKED_CAST")
         return this as T
     }
 
     fun load(json: JsonObject): T {
-        modelProperties.load(json)
+        model.load(json)
         @Suppress("UNCHECKED_CAST")
         return this as T
     }
 
     fun load(other: Model<*>): T {
-        modelProperties.load(other)
+        model.load(other)
         @Suppress("UNCHECKED_CAST")
         return this as T
     }
 
-    val insertQuery: SqlQuery get() = modelProperties.sqlInsertQuery(sqlTable)
-    val deleteQuery: SqlQuery get() = modelProperties.sqlDeleteQuery(sqlTable)
-    val updateQuery: SqlQuery get() = modelProperties.sqlUpdateQuery(sqlTable)
-    val selectQuery: SqlQuery get() = modelProperties.sqlSelectQuery(sqlTable)
-    val selectSql: String get() = modelProperties.sqlSelect(sqlTable)
+    val insertQuery: SqlQuery get() = model.sqlInsertQuery(sqlTable)
+    val deleteQuery: SqlQuery get() = model.sqlDeleteQuery(sqlTable)
+    val updateQuery: SqlQuery get() = model.sqlUpdateQuery(sqlTable)
+    val selectQuery: SqlQuery get() = model.sqlSelectQuery(sqlTable)
+    val selectSql: String get() = model.sqlSelectTable(sqlTable)
 
     fun insert(session: Session) {
         session.updateGetKeys(insertQuery) {
-            modelProperties.loadKeys(it)
+            model.loadKeys(it)
         }
     }
 
@@ -43,7 +43,7 @@ abstract class Model<T : Model<T>>(val sqlTable: String, allowSetAuto: Boolean =
 
     fun select(session: Session) {
         session.first(selectQuery) {
-            modelProperties.load(it)
+            model.load(it)
         }
     }
 
@@ -53,7 +53,7 @@ abstract class Model<T : Model<T>>(val sqlTable: String, allowSetAuto: Boolean =
     }
 
     fun clearAutoKeys() {
-        modelProperties.clearAutoKeys()
+        model.clearAutoKeys()
     }
 
     fun delete(session: Session) {
@@ -76,30 +76,49 @@ abstract class Model<T : Model<T>>(val sqlTable: String, allowSetAuto: Boolean =
         delete(session)
     }
 
+    /**
+     * set property value directly in the model property map, by passing model properties
+     *
+     * Can be used to set non-writable properties
+     */
     protected fun <V> setProperty(prop: KProperty<*>, value: V) {
         @Suppress("UNCHECKED_CAST")
-        modelProperties.setProperty(this as T, prop, value)
+        model.setProperty(this as T, prop, value)
     }
 
     fun snapshot() {
-        modelProperties.snapshot()
+        model.snapshot()
     }
 
     fun isDirty(): Boolean {
-        return modelProperties.isModified()
+        return model.isModified()
     }
 
     fun isDirty(property: KProperty<*>): Boolean {
-        return modelProperties.isModified(property)
+        return model.isModified(property)
+    }
+
+    fun appendKeys(appendable: Appendable, params: ArrayList<Any?>, delimiter: String = " AND ", sep: String = ""): String {
+        return model.appendKeys(appendable, params, delimiter, sep)
+    }
+
+    fun forEachKey(consumer: (prop: KProperty<*>, propType: PropertyType, value: Any?) -> Unit) {
+        model.forEachKey(consumer)
+    }
+
+    fun forEachProp(consumer: (prop: KProperty<*>, propType: PropertyType, value: Any?) -> Unit) {
+        model.forEachProp(consumer)
     }
 
     override fun toString(): String {
         val sb = StringBuilder()
         var sep = ""
-        sb.append(modelProperties.modelName).append("(")
-        modelProperties.forEach { prop, _, value ->
+        sb.append(model.name).append("(")
+        forEachProp { prop, propType, value ->
             if (value !== Unit) {
-                sb.append(sep).append(prop.name).append("=").append(value)
+                sb.append(sep)
+                if (propType.isKey) sb.append('*')
+                sb.append(prop.name).append("=").append(value)
                 sep = ", "
             }
         }
