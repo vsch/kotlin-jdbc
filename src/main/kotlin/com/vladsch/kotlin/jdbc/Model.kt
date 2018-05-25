@@ -5,7 +5,9 @@ import kotlin.reflect.KProperty
 
 @Suppress("MemberVisibilityCanBePrivate")
 abstract class Model<T : Model<T>>(val sqlTable: String, allowSetAuto: Boolean = true) {
-    internal val model = ModelProperties<T>(this::class.simpleName ?: "<unknown>", allowSetAuto)
+    protected val model = ModelProperties<T>(this::class.simpleName ?: "<unknown>", allowSetAuto)
+
+    internal val _model get() = model
 
     fun load(rs: Row): T {
         model.load(rs)
@@ -24,6 +26,8 @@ abstract class Model<T : Model<T>>(val sqlTable: String, allowSetAuto: Boolean =
         @Suppress("UNCHECKED_CAST")
         return this as T
     }
+
+    fun toJson() = model.toJsonObject()
 
     val insertQuery: SqlQuery get() = model.sqlInsertQuery(sqlTable)
     val deleteQuery: SqlQuery get() = model.sqlDeleteQuery(sqlTable)

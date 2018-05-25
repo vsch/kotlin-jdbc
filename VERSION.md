@@ -20,6 +20,8 @@
 
 ## 0.2.2
 
+* Fix: Apply all migrations that exist from start. First version under migrations should have
+  initial database creation without migrations.
 * Change: refactor code to clean up duplication
 * Add: `Model.appendKeys()` to append model's keys for query generation
 * Fix: wrong conversion for jodaLocalDateTime and a few others. Added casts to catch these

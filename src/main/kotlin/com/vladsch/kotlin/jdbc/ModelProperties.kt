@@ -179,7 +179,7 @@ class ModelProperties<T>(val name: String, val allowSetAuto: Boolean = false) : 
                 BigDecimal::class -> bigDecimalValue(name, prop, boxed.get(prop.name)) as BigDecimal?
                 ZonedDateTime::class -> parsedString(name, prop, boxed.get(prop.name), ZonedDateTime::parse) as ZonedDateTime?
                 OffsetDateTime::class -> parsedString(name, prop, boxed.get(prop.name), OffsetDateTime::parse) as OffsetDateTime?
-                Instant::class -> parsedString(name, prop,  boxed.get(prop.name), Instant::parse) as Instant?
+                Instant::class -> parsedString(name, prop, boxed.get(prop.name), Instant::parse) as Instant?
                 LocalDateTime::class -> parsedString(name, prop, boxed.get(prop.name), LocalDateTime::parse) as LocalDateTime?
                 LocalDate::class -> parsedString(name, prop, boxed.get(prop.name), LocalDate::parse) as LocalDate?
                 LocalTime::class -> parsedString(name, prop, boxed.get(prop.name), LocalTime::parse) as LocalTime?
@@ -214,11 +214,49 @@ class ModelProperties<T>(val name: String, val allowSetAuto: Boolean = false) : 
         // load initial properties from result set
         for (prop in kProperties) {
             properties.put(prop.name, if (prop.returnType.isMarkedNullable) {
-                other.model.properties[prop.name]
+                other._model.properties[prop.name]
             } else {
-                other.model.properties[prop.name]!!
+                other._model.properties[prop.name]!!
             })
         }
+    }
+
+    @Suppress("ReplacePutWithAssignment")
+    fun toJsonObject(): JsonObject {
+        val jsonObject = BoxedJson.of()
+        for ((name, value) in properties) {
+            if (value == null) {
+                jsonObject.putNull(name)
+            } else {
+                when (value) {
+                    is String -> jsonObject.put(name, value)
+                    is Byte -> jsonObject.put(name, value.toInt())
+                    is Boolean -> jsonObject.put(name, value)
+                    is Int -> jsonObject.put(name, value)
+                    is Long -> jsonObject.put(name, value)
+                    is Short -> jsonObject.put(name, value.toInt())
+                    is Double -> jsonObject.put(name, value)
+                    is Float -> jsonObject.put(name, value)
+                    is BigDecimal -> jsonObject.put(name, value)
+                    is ZonedDateTime -> jsonObject.put(name, value.toString())
+                    is OffsetDateTime -> jsonObject.put(name, value.toString())
+                    is Instant -> jsonObject.put(name, value.toString())
+                    is LocalDateTime -> jsonObject.put(name, value.toString())
+                    is LocalDate -> jsonObject.put(name, value.toString())
+                    is LocalTime -> jsonObject.put(name, value.toString())
+                    is org.joda.time.DateTime -> jsonObject.put(name, value.toString())
+                    is org.joda.time.LocalDateTime -> jsonObject.put(name, value.toString())
+                    is org.joda.time.LocalDate -> jsonObject.put(name, value.toString())
+                    is org.joda.time.LocalTime -> jsonObject.put(name, value.toString())
+                    is java.util.Date -> jsonObject.put(name, value.toString())
+                    is java.sql.Timestamp -> jsonObject.put(name, value.toString())
+                    is java.sql.Time -> jsonObject.put(name, value.toString())
+                    is java.sql.Date -> jsonObject.put(name, value.toString())
+                }
+            }
+        }
+
+        return jsonObject
     }
 
     fun sqlInsertQuery(tableName: String): SqlQuery {

@@ -272,10 +272,8 @@ LIMIT 1
             }
 
             // create migration table
-            migration.invokeWith { session ->
-                migration.insertMigrationAfter(scriptName, scriptSql) {
-                    session.execute(sqlQuery(scriptSql))
-                }
+            migration.insertMigrationAfter(scriptName, scriptSql) {
+                session.execute(sqlQuery(scriptSql))
             }
         } else {
             val sqlQuery = sqlQuery("SELECT MAX(batch_id) FROM migrations")
@@ -291,7 +289,7 @@ LIMIT 1
     fun migrate(migration: MigrationSession) {
         // here need to apply up migrations from current version to given version or latest in version sorted order
         val entity = DbEntity.MIGRATION;
-        val currentVersion = getCurrentVersion()
+        val currentVersion = getCurrentVersion() ?: "V0_0_0"
         if (currentVersion == null) {
             // no current version, we just update everything to given version
         } else {
@@ -345,29 +343,30 @@ LIMIT 1
                 }
             }
 
-            // run all updates from requested version
-            updateEntities(DbEntity.FUNCTION, migration)
-
-            // create all tables from current version which do not exist
-            createTables(migration)
-
-            // TODO: validate that current db tables and their definition matches the table list
-
-            updateEntities(DbEntity.VIEW, migration)
-            updateEntities(DbEntity.TRIGGER, migration)
-            updateEntities(DbEntity.PROCEDURE, migration)
-
-            migration.insertMigrationAfter("<migrate>", "") {}
         }
+
+        // run all updates from requested version
+        updateEntities(DbEntity.FUNCTION, migration)
+
+        // create all tables from current version which do not exist
+        createTables(migration)
+
+        // TODO: validate that current db tables and their definition matches the table list
+
+        updateEntities(DbEntity.VIEW, migration)
+        updateEntities(DbEntity.TRIGGER, migration)
+        updateEntities(DbEntity.PROCEDURE, migration)
+
+        migration.insertMigrationAfter("<migrate>", "") {}
     }
 
     private fun runBatchScript(
-            opType: DbEntity,
-            migration: MigrationSession,
-            migrationScriptPath: String,
-            appliedMigrations: Map<String, MigrationSession.Migration>?,
-            sqlScript: String,
-            entityScript: DbEntity.EntityScript
+        opType: DbEntity,
+        migration: MigrationSession,
+        migrationScriptPath: String,
+        appliedMigrations: Map<String, MigrationSession.Migration>?,
+        sqlScript: String,
+        entityScript: DbEntity.EntityScript
     ) {
         val sqlParts = sqlScript.replace(";\n", "\n;").split(';')
         var line = 1
@@ -675,8 +674,8 @@ LIMIT 1
 
                     tx.begin()
                     val migrationSql = migrationSession.getMigrationSql(
-                            migrationSession.lastScriptName ?: "",
-                            migrationSession.lastScriptSql ?: ""
+                        migrationSession.lastScriptName ?: "",
+                        migrationSession.lastScriptSql ?: ""
                     ).inParams("lastProblem" to e.message)
 
                     tx.execute(migrationSql)
