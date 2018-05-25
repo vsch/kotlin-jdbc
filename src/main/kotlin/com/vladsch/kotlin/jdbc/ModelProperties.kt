@@ -156,6 +156,7 @@ class ModelProperties<T>(val modelName: String, val allowSetAuto: Boolean = fals
     }
 
     override operator fun <V> getValue(thisRef: T, property: KProperty<*>): V {
+        @Suppress("UNCHECKED_CAST")
         return properties[property.name] as V
     }
 
@@ -169,6 +170,7 @@ class ModelProperties<T>(val modelName: String, val allowSetAuto: Boolean = fals
         }
     }
 
+    @Suppress("USELESS_CAST")
     private fun loadResult(_rs: Row, filter: ((KProperty<*>) -> Boolean)? = null) {
         // load initial properties from result set
         for (prop in kProperties) {
@@ -178,35 +180,36 @@ class ModelProperties<T>(val modelName: String, val allowSetAuto: Boolean = fals
             var value: Any?
 
             try {
+                // casts added to catch wrong function call errors
                 value = when (returnType) {
-                    String::class -> _rs.stringOrNull(prop.name)
-                    Byte::class -> _rs.byteOrNull(prop.name)
-                    Boolean::class -> _rs.booleanOrNull(prop.name)
-                    Int::class -> _rs.intOrNull(prop.name)
-                    Long::class -> _rs.longOrNull(prop.name)
-                    Short::class -> _rs.shortOrNull(prop.name)
-                    Double::class -> _rs.doubleOrNull(prop.name)
-                    Float::class -> _rs.floatOrNull(prop.name)
-                    ZonedDateTime::class -> _rs.zonedDateTimeOrNull(prop.name)
-                    OffsetDateTime::class -> _rs.offsetDateTimeOrNull(prop.name)
-                    Instant::class -> _rs.instantOrNull(prop.name)
-                    LocalDateTime::class -> _rs.jodaDateTimeOrNull(prop.name)
-                    LocalDate::class -> _rs.localDateOrNull(prop.name)
-                    LocalTime::class -> _rs.localTimeOrNull(prop.name)
-                    org.joda.time.DateTime::class -> _rs.jodaDateTimeOrNull(prop.name)
-                    org.joda.time.LocalDateTime::class -> _rs.localDateTimeOrNull(prop.name)
-                    org.joda.time.LocalDate::class -> _rs.localTimeOrNull(prop.name)
-                    org.joda.time.LocalTime::class -> _rs.localTimeOrNull(prop.name)
-                    java.util.Date::class -> _rs.localDateOrNull(prop.name)
-                    java.sql.Timestamp::class -> _rs.sqlTimestampOrNull(prop.name)
-                    java.sql.Time::class -> _rs.sqlTimeOrNull(prop.name)
-                    java.sql.Date::class -> _rs.sqlDateOrNull(prop.name)
-                    java.sql.SQLXML::class -> _rs.rs.getSQLXML(prop.name)
-                    ByteArray::class -> _rs.bytesOrNull(prop.name)
-                    InputStream::class -> _rs.binaryStreamOrNull(prop.name)
-                    BigDecimal::class -> _rs.bigDecimalOrNull(prop.name)
-                    java.sql.Array::class -> _rs.sqlArrayOrNull(prop.name)
-                    URL::class -> _rs.urlOrNull(prop.name)
+                    String::class -> _rs.stringOrNull(prop.name) as String?
+                    Byte::class -> _rs.byteOrNull(prop.name) as Byte?
+                    Boolean::class -> _rs.booleanOrNull(prop.name) as Boolean?
+                    Int::class -> _rs.intOrNull(prop.name) as Int?
+                    Long::class -> _rs.longOrNull(prop.name) as Long?
+                    Short::class -> _rs.shortOrNull(prop.name) as Short?
+                    Double::class -> _rs.doubleOrNull(prop.name) as Double?
+                    Float::class -> _rs.floatOrNull(prop.name) as Float?
+                    ZonedDateTime::class -> _rs.zonedDateTimeOrNull(prop.name) as ZonedDateTime?
+                    OffsetDateTime::class -> _rs.offsetDateTimeOrNull(prop.name) as OffsetDateTime?
+                    Instant::class -> _rs.instantOrNull(prop.name) as Instant?
+                    LocalDateTime::class -> _rs.localDateTimeOrNull(prop.name) as LocalDateTime?
+                    LocalDate::class -> _rs.localDateOrNull(prop.name) as LocalDate?
+                    LocalTime::class -> _rs.localTimeOrNull(prop.name) as LocalTime?
+                    org.joda.time.DateTime::class -> _rs.jodaDateTimeOrNull(prop.name) as org.joda.time.DateTime?
+                    org.joda.time.LocalDateTime::class -> _rs.jodaLocalDateTimeOrNull(prop.name) as org.joda.time.LocalDateTime?
+                    org.joda.time.LocalDate::class -> _rs.jodaLocalDateOrNull(prop.name) as org.joda.time.LocalDate?
+                    org.joda.time.LocalTime::class -> _rs.jodaLocalTimeOrNull(prop.name) as org.joda.time.LocalTime?
+                    java.util.Date::class -> _rs.sqlDateOrNull(prop.name) as java.util.Date?
+                    java.sql.Timestamp::class -> _rs.sqlTimestampOrNull(prop.name) as java.sql.Timestamp?
+                    java.sql.Time::class -> _rs.sqlTimeOrNull(prop.name) as java.sql.Time?
+                    java.sql.Date::class -> _rs.sqlDateOrNull(prop.name) as java.sql.Date?
+                    java.sql.SQLXML::class -> _rs.rs.getSQLXML(prop.name) as java.sql.SQLXML?
+                    ByteArray::class -> _rs.bytesOrNull(prop.name) as ByteArray?
+                    InputStream::class -> _rs.binaryStreamOrNull(prop.name) as InputStream?
+                    BigDecimal::class -> _rs.bigDecimalOrNull(prop.name) as BigDecimal?
+                    java.sql.Array::class -> _rs.sqlArrayOrNull(prop.name) as java.sql.Array?
+                    URL::class -> _rs.urlOrNull(prop.name) as URL?
                     else -> {
                         val className = (prop.returnType.classifier as? Class<*>)?.simpleName ?: "<unknown>"
                         throw IllegalArgumentException("$modelName.${prop.name} cannot be set from json ${_rs.rs.getObject(prop.name)}, type $className")
@@ -223,7 +226,6 @@ class ModelProperties<T>(val modelName: String, val allowSetAuto: Boolean = fals
                 // missing will not be set
                 properties.put(prop.name, value)
             } else {
-                val className = (prop.returnType.classifier as? Class<*>)?.simpleName ?: "<unknown>"
                 throw IllegalArgumentException("$modelName.${prop.name}, is not nullable but result set has null value")
             }
         }
@@ -349,6 +351,7 @@ class ModelProperties<T>(val modelName: String, val allowSetAuto: Boolean = fals
         return URL(value)
     }
 
+    @Suppress("USELESS_CAST")
     fun load(json: JsonObject) {
         // load initial properties from result set
         val _rs = BoxedJson.of(json)
@@ -356,32 +359,32 @@ class ModelProperties<T>(val modelName: String, val allowSetAuto: Boolean = fals
             val returnType = prop.returnType.classifier ?: continue
             @Suppress("IMPLICIT_CAST_TO_ANY")
             val value: Any? = when (returnType) {
-                String::class -> stringValue(prop, _rs.get(prop.name))
-                Byte::class -> integralValue(prop, _rs.get(prop.name), Byte.MIN_VALUE.toLong(), Byte.MAX_VALUE.toLong())
-                Boolean::class -> booleanLikeValue(prop, _rs.get(prop.name))
-                Int::class -> integralValue(prop, _rs.get(prop.name), Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong())
-                Long::class -> integralValue(prop, _rs.get(prop.name), Long.MIN_VALUE, Long.MAX_VALUE)
-                Short::class -> integralValue(prop, _rs.get(prop.name), Short.MIN_VALUE.toLong(), Short.MAX_VALUE.toLong())
-                Double::class -> doubleValue(prop, _rs.get(prop.name), Double.MIN_VALUE.toDouble(), Double.MAX_VALUE.toDouble())
-                Float::class -> doubleValue(prop, _rs.get(prop.name), Float.MIN_VALUE.toDouble(), Float.MAX_VALUE.toDouble())
-                BigDecimal::class -> bigDecimalValue(prop, _rs.get(prop.name))
-                ZonedDateTime::class -> parsedString(prop, _rs.get(prop.name), ZonedDateTime::parse)
-                OffsetDateTime::class -> parsedString(prop, _rs.get(prop.name), OffsetDateTime::parse)
-                Instant::class -> parsedString(prop, _rs.get(prop.name), Instant::parse)
-                LocalDateTime::class -> parsedString(prop, _rs.get(prop.name), LocalDateTime::parse)
-                LocalDate::class -> parsedString(prop, _rs.get(prop.name), LocalDate::parse)
-                LocalTime::class -> parsedString(prop, _rs.get(prop.name), LocalTime::parse)
-                org.joda.time.DateTime::class -> parsedString(prop, _rs.get(prop.name), org.joda.time.DateTime::parse)
-                org.joda.time.LocalDateTime::class -> parsedString(prop, _rs.get(prop.name), org.joda.time.LocalDateTime::parse)
-                org.joda.time.LocalDate::class -> parsedString(prop, _rs.get(prop.name), org.joda.time.LocalDate::parse)
-                org.joda.time.LocalTime::class -> parsedString(prop, _rs.get(prop.name), org.joda.time.LocalTime::parse)
-                java.util.Date::class -> parsedString(prop, _rs.get(prop.name), java.util.Date::parse)
-                java.sql.Timestamp::class -> parsedString(prop, _rs.get(prop.name), java.sql.Timestamp::parse)
-                java.sql.Time::class -> parsedString(prop, _rs.get(prop.name), java.sql.Time::parse)
-                java.sql.Date::class -> parsedString(prop, _rs.get(prop.name), java.sql.Date::parse)
-            //                java.sql.SQLXML::class -> parsedString(prop, _rs.get(prop.name).asJsNumber(), java.sql.SQLXML::parse)
-            //                ByteArray::class -> _rs.get(prop.name).asJsArray()
-            //                java.sql.Array::class -> _rs.get(prop.name).asJsArray()
+                String::class -> stringValue(prop, _rs.get(prop.name)) as String?
+                Byte::class -> integralValue(prop, _rs.get(prop.name), Byte.MIN_VALUE.toLong(), Byte.MAX_VALUE.toLong())?.toByte() as Byte?
+                Boolean::class -> booleanLikeValue(prop, _rs.get(prop.name)) as Boolean?
+                Int::class -> integralValue(prop, _rs.get(prop.name), Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong())?.toInt() as Int?
+                Long::class -> integralValue(prop, _rs.get(prop.name), Long.MIN_VALUE, Long.MAX_VALUE) as Long?
+                Short::class -> integralValue(prop, _rs.get(prop.name), Short.MIN_VALUE.toLong(), Short.MAX_VALUE.toLong())?.toShort() as Short?
+                Double::class -> doubleValue(prop, _rs.get(prop.name), Double.MIN_VALUE.toDouble(), Double.MAX_VALUE.toDouble()) as Double?
+                Float::class -> doubleValue(prop, _rs.get(prop.name), Float.MIN_VALUE.toDouble(), Float.MAX_VALUE.toDouble())?.toFloat() as Float?
+                BigDecimal::class -> bigDecimalValue(prop, _rs.get(prop.name)) as BigDecimal?
+                ZonedDateTime::class -> parsedString(prop, _rs.get(prop.name), ZonedDateTime::parse) as ZonedDateTime?
+                OffsetDateTime::class -> parsedString(prop, _rs.get(prop.name), OffsetDateTime::parse) as OffsetDateTime?
+                Instant::class -> parsedString(prop, _rs.get(prop.name), Instant::parse) as Instant?
+                LocalDateTime::class -> parsedString(prop, _rs.get(prop.name), LocalDateTime::parse) as LocalDateTime?
+                LocalDate::class -> parsedString(prop, _rs.get(prop.name), LocalDate::parse) as LocalDate?
+                LocalTime::class -> parsedString(prop, _rs.get(prop.name), LocalTime::parse) as LocalTime?
+                org.joda.time.DateTime::class -> parsedString(prop, _rs.get(prop.name), org.joda.time.DateTime::parse) as org.joda.time.DateTime?
+                org.joda.time.LocalDateTime::class -> parsedString(prop, _rs.get(prop.name), org.joda.time.LocalDateTime::parse) as org.joda.time.LocalDateTime?
+                org.joda.time.LocalDate::class -> parsedString(prop, _rs.get(prop.name), org.joda.time.LocalDate::parse) as org.joda.time.LocalDate?
+                org.joda.time.LocalTime::class -> parsedString(prop, _rs.get(prop.name), org.joda.time.LocalTime::parse) as org.joda.time.LocalTime?
+                java.util.Date::class -> parsedString(prop, _rs.get(prop.name), { java.util.Date(it) }) as java.util.Date?
+                java.sql.Timestamp::class -> parsedString(prop, _rs.get(prop.name), { java.sql.Timestamp(java.util.Date.parse(it)) }) as java.sql.Timestamp?
+                java.sql.Time::class -> parsedString(prop, _rs.get(prop.name), { java.sql.Time(java.util.Date.parse(it)) }) as java.sql.Time?
+                java.sql.Date::class -> parsedString(prop, _rs.get(prop.name), { java.sql.Date(java.util.Date.parse(it)) }) as java.sql.Date?
+            //java.sql.SQLXML::class -> parsedString(prop, _rs.get(prop.name).asJsNumber(), java.sql.SQLXML::parse)
+            //ByteArray::class -> _rs.get(prop.name).asJsArray()
+            //java.sql.Array::class -> _rs.get(prop.name).asJsArray()
                 URL::class -> urlString(prop, _rs.get(prop.name))
                 else -> {
                     val className = (prop.returnType.classifier as? Class<*>)?.simpleName ?: "<unknown>"

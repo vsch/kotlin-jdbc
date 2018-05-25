@@ -329,7 +329,7 @@ class ValidModel : Model<ValidModel>(tableName) {
     
     companion object {
         // convenience method for creating new instances from result set row
-        val fromRow: (Row) -> ValidModel = { row ->
+        val toModel: (Row) -> ValidModel = { row ->
             ValidModel().load(row)
         }
         

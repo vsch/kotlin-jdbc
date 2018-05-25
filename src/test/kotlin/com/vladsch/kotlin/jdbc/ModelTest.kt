@@ -5,6 +5,7 @@ import org.junit.Test
 import org.junit.rules.ExpectedException
 import kotlin.test.assertEquals
 
+@Suppress("UNUSED_VARIABLE")
 class ModelTest {
     @Rule
     @JvmField

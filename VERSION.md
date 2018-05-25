@@ -2,6 +2,8 @@
 
 [TOC]: # " "
 
+- [TODO](#todo)
+- [0.2.2](#022)
 - [0.2.0](#020)
 - [0.1.8](#018)
 - [0.1.6](#016)
@@ -9,6 +11,18 @@
 - [0.1.2](#012)
 - [0.1.0](#010)
 
+## TODO
+
+* [ ] Add: tests for all type conversions
+  * [ ] Result set
+  * [ ] Json
+  * [ ] Kotlin types
+
+## 0.2.2
+
+* Fix: wrong conversion for jodaLocalDateTime and a few others. Added casts to catch these
+  errors during compilation
+* Fix: add snapshot to `Model.update(session:Session)` after successful update.
 
 ## 0.2.0
 

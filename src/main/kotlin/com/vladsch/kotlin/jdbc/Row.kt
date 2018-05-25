@@ -15,6 +15,7 @@ import java.util.*
  *
  * Do Not cache, the underlying ResultSet will move to the next row and all row instance on the result set will reflect the new row
  */
+@Suppress("MemberVisibilityCanBePrivate")
 open class Row(val rs: ResultSet) {
     val rowIndex: Int get() = rs.row
 
@@ -202,6 +203,22 @@ open class Row(val rs: ResultSet) {
 
     fun jodaDateTimeOrNull(columnLabel: String): DateTime? {
         return nullable(sqlTimestampOrNull(columnLabel)) { DateTime(it) }
+    }
+
+    fun jodaLocalDateTime(columnIndex: Int): org.joda.time.LocalDateTime {
+        return jodaLocalDateTimeOrNull(columnIndex)!!
+    }
+
+    fun jodaLocalDateTimeOrNull(columnIndex: Int): org.joda.time.LocalDateTime? {
+        return nullable(sqlTimestampOrNull(columnIndex)) { DateTime(it).toLocalDateTime() }
+    }
+
+    fun jodaLocalDateTime(columnLabel: String): org.joda.time.LocalDateTime {
+        return jodaLocalDateTimeOrNull(columnLabel)!!
+    }
+
+    fun jodaLocalDateTimeOrNull(columnLabel: String): org.joda.time.LocalDateTime? {
+        return nullable(sqlTimestampOrNull(columnLabel)) { DateTime(it).toLocalDateTime() }
     }
 
     fun jodaLocalDate(columnIndex: Int): org.joda.time.LocalDate {

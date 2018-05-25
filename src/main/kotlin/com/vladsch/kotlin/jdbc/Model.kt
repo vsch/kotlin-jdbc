@@ -9,16 +9,19 @@ abstract class Model<T : Model<T>>(val sqlTable: String, allowSetAuto: Boolean =
 
     fun load(rs: Row): T {
         modelProperties.load(rs)
+        @Suppress("UNCHECKED_CAST")
         return this as T
     }
 
     fun load(json: JsonObject): T {
         modelProperties.load(json)
+        @Suppress("UNCHECKED_CAST")
         return this as T
     }
 
     fun load(other: Model<*>): T {
         modelProperties.load(other)
+        @Suppress("UNCHECKED_CAST")
         return this as T
     }
 
@@ -59,7 +62,9 @@ abstract class Model<T : Model<T>>(val sqlTable: String, allowSetAuto: Boolean =
     }
 
     fun update(session: Session) {
-        session.execute(updateQuery)
+        if (session.execute(updateQuery)) {
+            snapshot()
+        }
     }
 
     fun updateReload(session: Session) {
@@ -72,6 +77,7 @@ abstract class Model<T : Model<T>>(val sqlTable: String, allowSetAuto: Boolean =
     }
 
     protected fun <V> setProperty(prop: KProperty<*>, value: V) {
+        @Suppress("UNCHECKED_CAST")
         modelProperties.setProperty(this as T, prop, value)
     }
 
@@ -91,7 +97,7 @@ abstract class Model<T : Model<T>>(val sqlTable: String, allowSetAuto: Boolean =
         val sb = StringBuilder()
         var sep = ""
         sb.append(modelProperties.modelName).append("(")
-        modelProperties.forEach { prop, propType, value ->
+        modelProperties.forEach { prop, _, value ->
             if (value !== Unit) {
                 sb.append(sep).append(prop.name).append("=").append(value)
                 sep = ", "
