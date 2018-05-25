@@ -20,6 +20,7 @@
 
 ## 0.2.2
 
+* Add: IntelliJ Database script extension to create Models from database tables
 * Fix: Apply all migrations that exist from start. First version under migrations should have
   initial database creation without migrations.
 * Change: refactor code to clean up duplication
