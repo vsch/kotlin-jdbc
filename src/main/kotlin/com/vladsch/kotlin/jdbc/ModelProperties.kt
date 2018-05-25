@@ -530,6 +530,14 @@ class ModelProperties<T>(val modelName: String, val allowSetAuto: Boolean = fals
         return "SELECT * FROM `$tableName` "
     }
 
+    fun clearAutoKeys() {
+        for (prop in kProperties) {
+            if (propTypes[prop.name]!!.isAutoKey) {
+                properties.remove(prop.name)
+            }
+        }
+    }
+
     fun forEach(consumer: (prop: KProperty<*>, propertyType: PropertyType, value: Any?) -> Unit) {
         for (prop in kProperties) {
             if (properties.containsKey(prop.name)) {

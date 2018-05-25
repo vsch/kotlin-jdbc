@@ -28,17 +28,47 @@ abstract class Model<T : Model<T>>(val sqlTable: String, allowSetAuto: Boolean =
     val selectQuery: SqlQuery get() = modelProperties.sqlSelectQuery(sqlTable)
     val selectSql: String get() = modelProperties.sqlSelect(sqlTable)
 
-    fun insertSetKeys(session: Session) {
+    fun insert(session: Session) {
         session.updateGetKeys(insertQuery) {
             modelProperties.loadKeys(it)
         }
     }
 
-    fun insertReload(session: Session) {
-        insertSetKeys(session)
+    fun insertIgnoreKeys(session: Session) {
+        session.update(insertQuery)
+    }
+
+    fun select(session: Session) {
         session.first(selectQuery) {
             modelProperties.load(it)
         }
+    }
+
+    fun insertReload(session: Session) {
+        insert(session)
+        select(session)
+    }
+
+    fun clearAutoKeys() {
+        modelProperties.clearAutoKeys()
+    }
+
+    fun delete(session: Session) {
+        session.execute(deleteQuery)
+        clearAutoKeys()
+    }
+
+    fun update(session: Session) {
+        session.execute(updateQuery)
+    }
+
+    fun updateReload(session: Session) {
+        update(session)
+        select(session)
+    }
+
+    fun deleteKeepAutoKeys(session: Session) {
+        delete(session)
     }
 
     protected fun <V> setProperty(prop: KProperty<*>, value: V) {

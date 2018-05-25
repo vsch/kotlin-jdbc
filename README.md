@@ -3,9 +3,9 @@
 [![Build Status](https://travis-ci.org/vsch/kotlin-jdbc.svg)](https://travis-ci.org/vsch/kotlin-jdbc)
 
 A thin library that exposes JDBC API with the convenience of Kotlin and gets out of the way when
-not needed. When working with a relational database my preference is not to obfuscate SQL with cryptic
-and cumbersome ORM or syntactic sugar wrappers. I prefer my SQL to be there front and center
-where I can read it, validate it, view query plans to optimize the queries and indexes.
+not needed. When working with a relational database my preference is not to obfuscate SQL with
+cryptic and cumbersome ORM or syntactic sugar wrappers. I prefer my SQL to be there front and
+center where I can read it, validate it, view query plans to optimize the queries and indexes.
 
 Refactored from [KotliQuery](https://github.com/seratch/kotliquery) which is an excellent idea
 but for my use I needed to simplify its implementation to make adding functionality easier
@@ -17,6 +17,23 @@ If you are using [IntelliJ IDEA](https://www.jetbrains.com/idea/) IDE then defin
 Injection for the sql factory functions will automatically apply syntax highlighting,
 completions and annotations to the SQL strings, making it even easier to work with SQL queries.
 See [Configuring SQL Language Injections](#configuring-sql-language-injections)
+
+Added `Model` class which can be used as a base class to create convenient models with simple
+syntax aware of keys, auto generated columns, columns with defaults and nullable columns. Uses
+protected property `model` to define properties via `provideDelegate`:
+
+```kotlin
+import java.sql.Timestamp
+
+class ValidModel : Model<ValidModel>("tableName") {
+    var processId: Long? by model.auto.key
+    var title: String by model
+    var version: String by model
+    var optional: Int? by model           
+    var updatedAt: Timestamp? by model.auto
+    var createdAt: Timestamp? by model.auto
+}
+```
 
 ### Getting Started
 
@@ -243,28 +260,33 @@ A base `Model` class can be used to define models which know how to set their pr
 properties and can generate INSERT, UPDATE, DELETE queries for a model instance with validation
 of required fields and minimal required arguments.
 
-* Define model's properties by using `by prop`. The nullability of the property type dictates
-  whether the property can be omitted or set to null
-* Key properties by: `by prop.key`, `by key`. These will be used for `WHERE` list for `UPDATE`
-  or `DELETE` query generation
-* Auto generated (not updatable) properties by: `by prop.auto`, `by auto`
-* Auto generated Key (not updatable) properties by: `by prop.key.auto`, `by prop.autoKey`, `by auto.key`, `by
-  key.auto` or `by autoKey`
-* Properties with default values by: `by prop.default`, `by default`. These won't raise an
-  exception for `INSERT` query generation if they are missing from the model's set properties.
+This is a convenience not a requirement to use the rest of the functionality since it does
+create overhead by building the model's properties for every instance.
 
-By default models allow public setters on properties marked `auto` or `autoKey`, to add a
+* Define model's properties by using `by model`. The nullability of the property type dictates
+  whether the property can be omitted or set to null
+* Key properties by: `by model.key`. These will be used for `WHERE` list for `UPDATE`, `DELETE`
+  or `SELECT` for reload query generation
+* Auto generated (not updatable) properties by: `by model.auto`
+* Auto generated Key (key and not updatable) properties by: `by model.key.auto`, `by
+  model.autoKey`, `by model.auto.key`
+* Properties with default values by: `by model.default`. These won't raise an exception for
+  `INSERT` query generation if they are missing from the model's set properties.
+
+By default models allow public setters on properties marked `auto` or `autoKey`, to add
 validation forcing all `auto` properties to have no `set` method or have `private set` pass
 `true` for `allowPublicAuto` second parameter to model constructor.
 
 ```kotlin
-class ValidModel() : Model<ValidModel>(tableName) {
-    var processId: Long? by model.auto.key; private set
+class ValidModel : Model<ValidModel>(tableName) {
+    var processId: Long? by model.auto.key
     var title: String by model
     var version: String by model
-    var createdAt: String? by model.auto; private set
-
+    var updatedAt: String? by model.auto
+    var createdAt: String? by model.auto
+    
     companion object {
+        // convenience method for creating new instances from result set row
         val fromRow: (Row) -> ValidModel = { row ->
             ValidModel().load(row)
         }
@@ -281,12 +303,35 @@ fun useModel() {
         model.title = "title text"
         model.version = "V1.0"
         
-        session.execute(model.insertQuery)
+        // execute an insert and set model's key properties from the keys returned by the database
+        model.insert(session)
+        
+        // this will delete the model and clear auto.key properties
+        model.delete(session) 
+        
+        // this will delete the model but not clear auto.key properties
+        model.deleteKeepAutoKeys(session) 
+        
+        // execute select query for model (based on keys) and load model
+        model.select(session)
+        
+        // just insert, don't bother getting keys
+        model.insertIgnoreKeys(session)
+        
+        // take a snapshot of current properties
+        model.snapshot()
+        model.version = "V2.0"
+        
+        // will only update version since it is the only one changed, does automatic snapshot after update
+        model.update(session)
+        
+        // will only update version since it is the only one changed but will reload model from database 
+        // if updatedAt field is timestamped on update then it will be loaded with a new value
+        model.version = "V3.0"
+        model.updateReload(session)
     }
 }
-
 ```
-
 
 #### Queries
 
