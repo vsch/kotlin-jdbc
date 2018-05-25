@@ -52,6 +52,10 @@ open class SqlQuery(
         return this
     }
 
+    override fun toString(): String {
+        return "SqlQuery(statement='$statement', params=$params, inputParams=$inputParams, replacementMap=$replacementMap, cleanStatement='$cleanStatement')"
+    }
+
     companion object {
         private val regex = Regex(""":\w+""")
     }

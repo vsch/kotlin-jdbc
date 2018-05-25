@@ -600,6 +600,24 @@ open class Row(val rs: ResultSet) {
         return rs.getTimestamp(columnLabel, cal)
     }
 
+    fun sqlSqlXml(columnIndex: Int): java.sql.SQLXML {
+        return sqlSqlXmlOrNull(columnIndex)!!
+    }
+
+    fun sqlSqlXmlOrNull(columnIndex: Int): java.sql.SQLXML? {
+        // not sure if already returns null if column is null
+        return nullable(rs.getSQLXML(columnIndex))
+    }
+
+    fun sqlSqlXml(columnLabel: String): java.sql.SQLXML {
+        return sqlSqlXmlOrNull(columnLabel)!!
+    }
+
+    fun sqlSqlXmlOrNull(columnLabel: String): java.sql.SQLXML? {
+        // not sure if already returns null if column is null
+        return nullable(rs.getSQLXML(columnLabel))
+    }
+
     fun ref(columnIndex: Int): Ref {
         return refOrNull(columnIndex)!!
     }

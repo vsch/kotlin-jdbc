@@ -236,6 +236,58 @@ session.transaction { tx ->
 }
 ```
 
+#### Models
+
+A base `Model` class can be used to define models which know how to set their properties from a
+`Row` result set row, set properties from other Models, understand `auto`, `key` and `default`
+properties and can generate INSERT, UPDATE, DELETE queries for a model instance with validation
+of required fields and minimal required arguments.
+
+* Define model's properties by using `by prop`. The nullability of the property type dictates
+  whether the property can be omitted or set to null
+* Key properties by: `by prop.key`, `by key`. These will be used for `WHERE` list for `UPDATE`
+  or `DELETE` query generation
+* Auto generated (not updatable) properties by: `by prop.auto`, `by auto`
+* Auto generated Key (not updatable) properties by: `by prop.key.auto`, `by prop.autoKey`, `by auto.key`, `by
+  key.auto` or `by autoKey`
+* Properties with default values by: `by prop.default`, `by default`. These won't raise an
+  exception for `INSERT` query generation if they are missing from the model's set properties.
+
+By default models allow public setters on properties marked `auto` or `autoKey`, to add a
+validation forcing all `auto` properties to have no `set` method or have `private set` pass
+`true` for `allowPublicAuto` second parameter to model constructor.
+
+```kotlin
+class ValidModel() : Model<ValidModel>(tableName) {
+    var processId: Long? by model.auto.key; private set
+    var title: String by model
+    var version: String by model
+    var createdAt: String? by model.auto; private set
+
+    companion object {
+        val fromRow: (Row) -> ValidModel = { row ->
+            ValidModel().load(row)
+        }
+        
+        val tableName = "tableName"
+    }
+}
+
+fun useModel() {
+    using(session(HikariCP.default())) { session ->
+        val modelList = session.list("", ValidModel.fromRow)
+        
+        val model = ValidModel()
+        model.title = "title text"
+        model.version = "V1.0"
+        
+        session.execute(model.insertQuery)
+    }
+}
+
+```
+
+
 #### Queries
 
 SQL queries come in two forms: `SqlQuery` for all DDL and DML. `SqlCall` is for calling stored

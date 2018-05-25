@@ -86,6 +86,10 @@ fun sqlQuery(statement: String, vararg params: Any?): SqlQuery {
     return SqlQuery(statement, params = params.toList())
 }
 
+fun sqlQuery(statement: String, params: List<Any?>): SqlQuery {
+    return SqlQuery(statement, params = params)
+}
+
 fun sqlQuery(statement: String, inputParams: Map<String, Any?>): SqlQuery {
     return SqlQuery(statement, inputParams = inputParams)
 }
@@ -199,7 +203,7 @@ val toJsonObject: (Row) -> JsonObject = {
     jsonObject
 }
 
-fun getResourceFiles(resourceClass:Class<*>, path: String): List<String> {
+fun getResourceFiles(resourceClass: Class<*>, path: String): List<String> {
     val filenames = ArrayList<String>()
 
     getResourceAsStream(resourceClass, path)?.use { inputStream ->
@@ -223,7 +227,7 @@ fun StringBuilder.streamAppend(inputStream: InputStream) {
     }
 }
 
-fun getResourceAsString(resourceClass:Class<*>, path: String): String {
+fun getResourceAsString(resourceClass: Class<*>, path: String): String {
     val sb = StringBuilder()
 
     getResourceAsStream(resourceClass, path)?.use { inputStream ->
@@ -233,14 +237,14 @@ fun getResourceAsString(resourceClass:Class<*>, path: String): String {
     return sb.toString()
 }
 
-fun getFileContent(file:File):String {
+fun getFileContent(file: File): String {
     val inputStream = FileInputStream(file)
     val sb = StringBuilder()
     sb.streamAppend(inputStream)
     return sb.toString()
 }
 
-fun getResourceAsStream(resourceClass:Class<*>, resource: String): InputStream? {
+fun getResourceAsStream(resourceClass: Class<*>, resource: String): InputStream? {
     return resourceClass.getResourceAsStream(resource)
 }
 
@@ -269,7 +273,7 @@ fun File.ensureCreateDirectory(paramName: String = "directory"): File {
     return this
 }
 
-fun String.versionCompare(other:String):Int {
+fun String.versionCompare(other: String): Int {
     val theseParts = this.removePrefix("V").split('_', limit = 4)
     val otherParts = other.removePrefix("V").split('_', limit = 4)
 

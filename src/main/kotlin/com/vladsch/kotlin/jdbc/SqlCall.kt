@@ -66,4 +66,8 @@ class SqlCall(
         outputParams.putAll(params)
         return this
     }
+
+    override fun toString(): String {
+        return "SqlCall(outputParams=$outputParams) ${super.toString()}"
+    }
 }
