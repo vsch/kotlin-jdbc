@@ -327,6 +327,8 @@ LIMIT 1
                 val versionList = getVersions().filter { it.compareTo(currentVersion) > 0 }.sortedWith(Comparator(String::versionCompare))
 
                 versionList.forEach { version ->
+                    if (version.versionCompare(migration.version) > 0) return
+
                     val versionMigrations = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, version).values.toList().sortedBy { it.entityResourcePath }
                     val versionMigration = migration.withVersion(version)
 
