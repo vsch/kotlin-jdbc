@@ -55,6 +55,7 @@ def generate(out, className, fields) {
     out.println "\n)"
     out.println ""
     // model class
+    out.println "@Suppress(\"MemberVisibilityCanBePrivate\")"
     out.println "class ${className}Model() : Model<${className}Model>(tableName) {"
     def maxWidth = 0
     def lines = []
