@@ -3,9 +3,11 @@
 [![Build Status](https://travis-ci.org/vsch/kotlin-jdbc.svg)](https://travis-ci.org/vsch/kotlin-jdbc)
 
 A thin library that exposes JDBC API with the convenience of Kotlin and gets out of the way when
-not needed. When working with a relational database my preference is not to obfuscate SQL with
-cryptic and cumbersome ORM or syntactic sugar wrappers. I prefer my SQL to be there front and
-center where I can read it, validate it, view query plans to optimize the queries and indexes.
+not needed.
+
+For developers who prefer to have their database access through SQL where they can read it,
+validate it and view query plans instead of working through cumbersome ORM, cryptic and limited
+frameworks which obfuscate SQL with their non-standard cryptic syntax.
 
 Refactored from [KotliQuery](https://github.com/seratch/kotliquery) which is an excellent idea
 but for my use I needed to simplify its implementation to make adding functionality easier
@@ -22,18 +24,53 @@ Added `Model` class which can be used as a base class to create convenient model
 syntax aware of keys, auto generated columns, columns with defaults and nullable columns. Uses
 protected property `model` to define properties via `provideDelegate`:
 
+
+If column names are the same as the property names then pass `dbCase = true` to `Model`
+constructor or leave it out. If column names are snake-case versions of camelCase property names
+(lowercase with underscores between words) then you can set `dbCase = false` in the model
+constructor and the model definition does not change. the model will look like:
+
 ```kotlin
 import java.sql.Timestamp
 
+// database columns same as properties
 class ValidModel : Model<ValidModel>("tableName") {
     var processId: Long? by model.auto.key
     var title: String by model
     var version: String by model
     var optional: Int? by model           
+    var hasOwnColumnName: Int? by model.column("own_name")           
     var updatedAt: Timestamp? by model.auto
     var createdAt: Timestamp? by model.auto
 }
 ```
+
+```kotlin
+import java.sql.Timestamp
+
+// database columns are snake-case versions of property names
+class ValidModel : Model<ValidModel>("table_name", dbCase = false) {
+    var processId: Long? by model.auto.key
+    var title: String by model
+    var version: String by model
+    var optional: Int? by model           
+    var hasOwnColumnName: Int? by model.column("own_name")           
+    var updatedAt: Timestamp? by model.auto
+    var createdAt: Timestamp? by model.auto
+}
+```
+
+IntelliJ Ultimate Database Tools extension script for conversion of SQL tables to a Model:
+[Generate Kotlin-Model.groovy](Generate%20Kotlin-Model.groovy). Installation instructions:
+
+#### Installing IntelliJ Database Tools Extension Script
+
+Download the groovy script for generating a `kotlin-jdbc` model: [Generate Kotlin-Model.groovy](Generate%20Kotlin-Model.groovy)
+
+In database tool window, right click on a table and select Scripted Extensions > Go to scripts
+directory and copy the script to this location. It will appear
+
+![image](assets/images/image.png)
 
 ### Getting Started
 

@@ -4,40 +4,41 @@ import javax.json.JsonObject
 import kotlin.reflect.KProperty
 
 @Suppress("MemberVisibilityCanBePrivate")
-abstract class Model<T : Model<T>>(val sqlTable: String, allowSetAuto: Boolean = true) {
-    protected val model = ModelProperties<T>(this::class.simpleName ?: "<unknown>", allowSetAuto)
+abstract class Model<T : Model<T>>(val sqlTable: String, dbCase: Boolean, allowSetAuto: Boolean = true) {
 
-    internal val _model get() = model
+    protected val model: ModelPropertyProvider<T> get() = _model
+
+    internal val _model = ModelProperties<T>(this::class.simpleName ?: "<unknown>", dbCase, allowSetAuto)
 
     fun load(rs: Row): T {
-        model.load(rs)
+        _model.load(rs)
         @Suppress("UNCHECKED_CAST")
         return this as T
     }
 
     fun load(json: JsonObject): T {
-        model.load(json)
+        _model.load(json)
         @Suppress("UNCHECKED_CAST")
         return this as T
     }
 
     fun load(other: Model<*>): T {
-        model.load(other)
+        _model.load(other)
         @Suppress("UNCHECKED_CAST")
         return this as T
     }
 
-    fun toJson() = model.toJsonObject()
+    fun toJson() = _model.toJsonObject()
 
-    val insertQuery: SqlQuery get() = model.sqlInsertQuery(sqlTable)
-    val deleteQuery: SqlQuery get() = model.sqlDeleteQuery(sqlTable)
-    val updateQuery: SqlQuery get() = model.sqlUpdateQuery(sqlTable)
-    val selectQuery: SqlQuery get() = model.sqlSelectQuery(sqlTable)
-    val selectSql: String get() = model.sqlSelectTable(sqlTable)
+    val insertQuery: SqlQuery get() = _model.sqlInsertQuery(sqlTable)
+    val deleteQuery: SqlQuery get() = _model.sqlDeleteQuery(sqlTable)
+    val updateQuery: SqlQuery get() = _model.sqlUpdateQuery(sqlTable)
+    val selectQuery: SqlQuery get() = _model.sqlSelectQuery(sqlTable)
+    val selectSql: String get() = _model.sqlSelectTable(sqlTable)
 
     fun insert(session: Session) {
         session.updateGetKeys(insertQuery) {
-            model.loadKeys(it)
+            _model.loadKeys(it)
         }
     }
 
@@ -47,7 +48,7 @@ abstract class Model<T : Model<T>>(val sqlTable: String, allowSetAuto: Boolean =
 
     fun select(session: Session) {
         session.first(selectQuery) {
-            model.load(it)
+            _model.load(it)
         }
     }
 
@@ -57,7 +58,7 @@ abstract class Model<T : Model<T>>(val sqlTable: String, allowSetAuto: Boolean =
     }
 
     fun clearAutoKeys() {
-        model.clearAutoKeys()
+        _model.clearAutoKeys()
     }
 
     fun delete(session: Session) {
@@ -81,43 +82,51 @@ abstract class Model<T : Model<T>>(val sqlTable: String, allowSetAuto: Boolean =
     }
 
     /**
-     * set property value directly in the model property map, by passing model properties
+     * set property value directly in the _model property map, by passing _model properties
      *
      * Can be used to set non-writable properties
      */
     protected fun <V> setProperty(prop: KProperty<*>, value: V) {
         @Suppress("UNCHECKED_CAST")
-        model.setProperty(this as T, prop, value)
+        _model.setProperty(this as T, prop, value)
     }
 
     fun snapshot() {
-        model.snapshot()
+        _model.snapshot()
     }
 
     fun isDirty(): Boolean {
-        return model.isModified()
+        return _model.isModified()
     }
 
     fun isDirty(property: KProperty<*>): Boolean {
-        return model.isModified(property)
+        return _model.isModified(property)
     }
 
     fun appendKeys(appendable: Appendable, params: ArrayList<Any?>, delimiter: String = " AND ", sep: String = ""): String {
-        return model.appendKeys(appendable, params, delimiter, sep)
+        return _model.appendKeys(appendable, params, delimiter, sep)
     }
 
     fun forEachKey(consumer: (prop: KProperty<*>, propType: PropertyType, value: Any?) -> Unit) {
-        model.forEachKey(consumer)
+        _model.forEachKey(consumer)
     }
 
     fun forEachProp(consumer: (prop: KProperty<*>, propType: PropertyType, value: Any?) -> Unit) {
-        model.forEachProp(consumer)
+        _model.forEachProp(consumer)
+    }
+
+    fun forEachKey(consumer: (prop: KProperty<*>, propType: PropertyType, columnName: String, value: Any?) -> Unit) {
+        _model.forEachKey(consumer)
+    }
+
+    fun forEachProp(consumer: (prop: KProperty<*>, propType: PropertyType, columnName: String, value: Any?) -> Unit) {
+        _model.forEachProp(consumer)
     }
 
     override fun toString(): String {
         val sb = StringBuilder()
         var sep = ""
-        sb.append(model.name).append("(")
+        sb.append(_model.name).append("(")
         forEachProp { prop, propType, value ->
             if (value !== Unit) {
                 sb.append(sep)

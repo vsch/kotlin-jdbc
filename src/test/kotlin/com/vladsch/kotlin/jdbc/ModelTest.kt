@@ -7,11 +7,12 @@ import kotlin.test.assertEquals
 
 @Suppress("UNUSED_VARIABLE")
 class ModelTest {
+
     @Rule
     @JvmField
     var thrown = ExpectedException.none()
 
-    class InvalidModelPublicAutoKey() : Model<InvalidModelPublicAutoKey>("tests", false) {
+    class InvalidModelPublicAutoKey() : Model<InvalidModelPublicAutoKey>("tests", true, false) {
         var processId: Long? by model.auto.key
         var title: String by model
         var version: String by model
@@ -25,7 +26,7 @@ class ModelTest {
         }
     }
 
-    class InvalidModelPublicAuto() : Model<InvalidModelPublicAuto>("tests", false) {
+    class InvalidModelPublicAuto() : Model<InvalidModelPublicAuto>("tests", true, false) {
         var processId: Long? by model.auto.key; private set
         var title: String by model
         var version: String by model
@@ -39,7 +40,7 @@ class ModelTest {
         }
     }
 
-    class ValidModelPublicAuto : Model<ValidModelPublicAuto>("tests") {
+    class ValidModelPublicAuto : Model<ValidModelPublicAuto>("tests", true) {
         var processId: Long? by model.auto.key
         var title: String by model
         var version: String by model
@@ -53,7 +54,7 @@ class ModelTest {
         }
     }
 
-    class ValidModel() : Model<ValidModel>("tests", false) {
+    class ValidModel() : Model<ValidModel>("tests", true, false) {
         var processId: Long? by model.key.auto; private set
         val noSetter: String by model.auto
         val noSetter2: String by model.auto.key
@@ -70,7 +71,25 @@ class ModelTest {
         }
     }
 
-    class TestModel() : Model<TestModel>("tests", false) {
+    class DatabaseModel() : Model<DatabaseModel>("tests", false, true) {
+        var processId: Long? by model.key.auto
+        var modelName: String? by model.key.auto
+        var title: String by model
+        var version: String by model
+        var ownName: String by model.column("hasOwnName")
+        var CappedName: Int by model
+        var ALLCAPS: Int by model
+        var withDigits2: Int by model
+        var createdAt: String? by model.auto
+
+        companion object {
+            val fromRow: (Row) -> ValidModel = { row ->
+                ValidModel().load(row)
+            }
+        }
+    }
+
+    class TestModel() : Model<TestModel>("tests", true, false) {
         constructor(
             processId: Long? = null,
             title: String,
@@ -240,5 +259,77 @@ class ModelTest {
 
         val sql = model.updateQuery
         assertEquals(sqlQuery("UPDATE `tests` SET `title` = ?, `version` = ?, `batch` = ? WHERE `processId` = ?", listOf("title text", "V2.0", 4, 5)).toString(), sql.toString());
+    }
+
+    @Test
+    fun test_dbCase() {
+        val model = DatabaseModel()
+        val columns = ArrayList<String>()
+        model.forEachProp { prop, propType, columnName, value -> columns += columnName }
+
+        assertEquals(arrayListOf("process_id", "model_name", "title", "version", "hasOwnName", "capped_name", "allcaps", "with_digits2", "created_at"), columns)
+    }
+
+    @Test
+    fun test_dbCaseKeys() {
+        val model = DatabaseModel()
+        val columns = ArrayList<String>()
+        model.forEachKey { prop, propType, columnName, value -> columns += columnName }
+
+        assertEquals(arrayListOf("process_id", "model_name"), columns)
+    }
+
+    @Test
+    fun test_dbCaseInsert() {
+        val model = DatabaseModel()
+
+        model.processId = 5L
+        model.modelName = "name"
+        model.title = "title"
+        model.version = "version"
+        model.ownName = "ownName"
+        model.CappedName = 5
+        model.ALLCAPS = 4
+        model.withDigits2 = 3
+        model.createdAt = "createdAt"
+
+        val sql = model.insertQuery
+        assertEquals(sqlQuery("INSERT INTO `tests` (`title`, `version`, `hasOwnName`, `capped_name`, `allcaps`, `with_digits2`) VALUES (?, ?, ?, ?, ?, ?)", listOf("title", "version", "ownName", 5, 4, 3)).toString(), sql.toString());
+    }
+
+    @Test
+    fun test_dbCaseDelete() {
+        val model = DatabaseModel()
+
+        model.processId = 5L
+        model.modelName = "name"
+        model.title = "title"
+        model.version = "version"
+        model.ownName = "ownName"
+        model.CappedName = 5
+        model.ALLCAPS = 4
+        model.withDigits2 = 3
+        model.createdAt = "createdAt"
+
+        val sql = model.deleteQuery
+        assertEquals(sqlQuery("DELETE FROM `tests` WHERE `process_id` = ? AND `model_name` = ?", listOf(5, "name")).toString(), sql.toString());
+    }
+
+    @Test
+    fun test_dbCaseUpdate() {
+        val model = DatabaseModel()
+
+        model.processId = 5L
+        model.modelName = "name"
+        model.title = "title"
+        model.version = "version"
+        model.ownName = "ownName"
+        model.CappedName = 5
+        model.ALLCAPS = 4
+        model.withDigits2 = 3
+        model.createdAt = "createdAt"
+
+        val sql = model.updateQuery
+        assertEquals(sqlQuery("UPDATE `tests` SET `title` = ?, `version` = ?, `hasOwnName` = ?, `capped_name` = ?, `allcaps` = ?, `with_digits2` = ? WHERE `process_id` = ? AND `model_name` = ?", listOf("title", "version", "ownName", 5, 4, 3, 5, "name")).toString(), sql.toString());
     }
 }

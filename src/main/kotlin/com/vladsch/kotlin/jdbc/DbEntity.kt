@@ -106,18 +106,33 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
         return getEntityFile(entityDir, entityName)
     }
 
-    data class EntityScript(val entityName: String, val entityResourceName: String, val entityResourcePath: String, val entitySql: String)
+    data class EntityData(val entityName: String, val entityResourceName: String, val entityResourcePath: String, val entitySql: String)
+
+    object MIGRATIONS_COMPARATOR : Comparator<DbEntity.EntityData> {
+        override fun compare(o1: DbEntity.EntityData?, o2: DbEntity.EntityData?): Int {
+            val (num1, name1) = o1?.entityResourceName.extractLeadingDigits()
+            val (num2, name2) = o2?.entityResourceName.extractLeadingDigits()
+
+            return if (num1 != null && num2 != null) {
+                val nums = num1.compareTo(num2)
+                if (nums == 0) name1.compareTo(name2)
+                else nums
+            } else {
+                name1.compareTo(name2)
+            }
+        }
+    }
 
     /**
      * Get entity to EntityScript
      *
      * @return Map<String,EntityScript>
      */
-    fun getEntityResourceScripts(resourceClass: Class<*>, dbEntityExtractor: DbEntityExtractor, entityDir: File): Map<String, EntityScript> {
+    fun getEntityResourceScripts(resourceClass: Class<*>, dbEntityExtractor: DbEntityExtractor, entityDir: File): Map<String, EntityData> {
         val entityNameRegEx = dbEntityExtractor.getExtractEntityNameRegEx(this);
         val files = getResourceFiles(resourceClass, entityDir.path)
 
-        val entities = HashMap<String, EntityScript>()
+        val entities = HashMap<String, EntityData>()
         for (file in files) {
             if (file.endsWith(fileSuffix)) {
                 val entityNameFile = file.substring(0, file.length - this.fileSuffix.length)
@@ -126,7 +141,7 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
                     // no name check
                     val entityName = this.removeSuffix(entityNameFile)
                     val entityLowercaseName = entityName.toLowerCase()
-                    entities[entityLowercaseName] = EntityScript(entityName, file, (entityDir + file).path, entitySql);
+                    entities[entityLowercaseName] = EntityData(entityName, file, (entityDir + file).path, entitySql);
                 } else {
                     val matchGroup = entityNameRegEx.find(entitySql)
                     if (matchGroup != null) {
@@ -141,7 +156,7 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
                             throw IllegalStateException("Duplicate SQL $displayName in File $file, $entityName already defined in ${entities[entityName]}")
                         }
 
-                        entities[entityLowercaseName] = EntityScript(entityName, file, (entityDir + file).path, entitySql);
+                        entities[entityLowercaseName] = EntityData(entityName, file, (entityDir + file).path, entitySql);
                     } else {
                         throw IllegalStateException("Invalid SQL $displayName file $file, cannot find $displayName name")
                     }
@@ -151,7 +166,7 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
         return entities
     }
 
-    fun getEntityResourceScripts(resourceClass: Class<*>, dbEntityExtractor: DbEntityExtractor, dbVersion: String): Map<String, EntityScript> {
+    fun getEntityResourceScripts(resourceClass: Class<*>, dbEntityExtractor: DbEntityExtractor, dbVersion: String): Map<String, EntityData> {
         val entityDir = getEntityDirectory(File("/db"), dbVersion, null)
         return getEntityResourceScripts(resourceClass, dbEntityExtractor, entityDir)
     }

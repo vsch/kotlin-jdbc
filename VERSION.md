@@ -3,6 +3,10 @@
 [TOC]: # " "
 
 - [TODO](#todo)
+- [0.2.10](#0210)
+- [0.2.8](#028)
+- [0.2.6](#026)
+- [0.2.4](#024)
 - [0.2.2](#022)
 - [0.2.0](#020)
 - [0.1.8](#018)
@@ -11,12 +15,56 @@
 - [0.1.2](#012)
 - [0.1.0](#010)
 
+
 ## TODO
 
 * [ ] Add: tests for all type conversions
   * [ ] Result set
   * [ ] Json
   * [ ] Kotlin types
+
+## 0.2.10
+
+* Add: migration convenience commands
+  * new-major - create a new version directory with major version incremented.
+
+  * new-minor - create a new version directory with minor version incremented.
+
+  * new-patch - create a new version directory with patch version incremented.
+
+  * new-version - create a new version directory with minor version incremented. The directory
+    cannot already exist. If the version is not provided then the next version with its minor
+    version number incremented will be used.
+
+    All entity directories will be created, including migrations.
+
+    If there is a previous version to the one requested then its entity scripts will be copied
+    to the new version directory, including tables which are used for validation after
+    rollback/migration
+
+  * new-migration "title" - create a new up/down migration script files in the requested (or
+    current) version's migrations directory. The file name will be in the form: N.title.D.sql
+    where N is numeric integer 1..., D is up or down and title is the title passed command.
+
+## 0.2.8
+
+* Add: `Model(val sqlTable: String, dbCase: Boolean, allowSetAuto: Boolean = true)`, `dbCase` to
+  mark all properties without specific column name as having database case. When false, database
+  columns are assumed to be (snake case) versions of the property names. Available on all
+  property providers: `auto`, `key`, `default`
+
+* Add: `model.column(String)` to provide arbitrary column name for the property. Available on
+  all property providers: `auto`, `key`, `default`
+
+## 0.2.6
+
+* Add: migration table compare will match if differences are out of order lines between two
+  tables. This addresses validation failure for tables which are changed due to rollback causing
+  keys and constraints to be in a different order.
+
+## 0.2.4
+
+* Add: `Model.toJson()` method for converting a model to `JsonObject`
 
 ## 0.2.2
 
@@ -38,7 +86,8 @@
 
 * Fix: wrong filter on get entity resource files list
 * Change: change `updateGetId` and `updateGetIds` to return `Int` and `List<Int>` respectively
-* Add: add `updateGetLongId` and `updateGetLongIds` to return `Long` and `List<Long>` respectively
+* Add: add `updateGetLongId` and `updateGetLongIds` to return `Long` and `List<Long>`
+  respectively
 
 ## 0.1.6
 

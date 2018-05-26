@@ -34,10 +34,10 @@ FILES.chooseDirectoryAndSave("Choose directory", "Choose where to store generate
 def generate(table, dir) {
     def className = javaName(table.getName(), true)
     def fields = calcFields(table)
-    new File(dir, className + ".kt").withPrintWriter { out -> generate(out, className, fields) }
+    new File(dir, className + ".kt").withPrintWriter { out -> generate(out, table.getName(), className, fields) }
 }
 
-def generate(out, className, fields) {
+def generate(out, tableName, className, fields) {
     out.println "package $packageName"
     out.println ""
     out.println "import com.vladsch.kotlin.jdbc.*"
@@ -54,9 +54,15 @@ def generate(out, className, fields) {
     }
     out.println "\n)"
     out.println ""
+
+    def dbCase = true
+    fields.each() {
+        if (it.name != it.column) dbCase = false
+    }
+
     // model class
     out.println "@Suppress(\"MemberVisibilityCanBePrivate\")"
-    out.println "class ${className}Model() : Model<${className}Model>(tableName) {"
+    out.println "class ${className}Model() : Model<${className}Model>(tableName, dbCase = ${dbCase}) {"
     def maxWidth = 0
     def lines = []
     fields.each() {
@@ -77,7 +83,7 @@ def generate(out, className, fields) {
     lines.each() { it ->
         out.print it
         out.print "                                                                                                              ".substring(0, maxWidth - it.length())
-        out.println "// ${fields[i].spec}"
+        out.println "// ${fields[i].column} ${fields[i].spec}"
         i++
     }
 
@@ -102,7 +108,7 @@ def generate(out, className, fields) {
     out.println ""
 
     out.println "  companion object {"
-    out.println "    const val tableName = \"${className}\""
+    out.println "    const val tableName = \"${tableName}\""
     out.println ""
     out.println "    val toModel: (Row) -> ${className}Model = { row ->"
     out.println "      ${className}Model().load(row)"
@@ -128,6 +134,7 @@ def calcFields(table) {
         def colNameLower = (String)Case.LOWER.apply(colName)
         fields += [[
                            name : javaName(colName, false),
+                           column: colName,
                            type : typeStr == "Long" && DasUtil.isPrimary(col) || DasUtil.isForeign(col) && colNameLower.endsWith("id") ? "Int" : typeStr,
                            col  : col,
                            spec : spec,

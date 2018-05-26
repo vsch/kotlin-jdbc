@@ -291,7 +291,12 @@ fun String.versionCompare(other: String): Int {
             return theseParts[i].compareTo(otherParts[i])
         }
     }
-    return 0
+
+    return when {
+        theseParts.size > iMax -> 1
+        otherParts.size > iMax -> -1
+        else -> 0
+    }
 }
 
 fun getVersionDirectory(dbDir: File, dbVersion: String, createDir: Boolean?): File {
@@ -307,5 +312,40 @@ fun getVersionDirectory(dbDir: File, dbVersion: String, createDir: Boolean?): Fi
         dbVersionDir.ensureExistingDirectory("dbDir/dbVersion")
     }
     return dbVersionDir
+}
+
+fun String.toSnakeCase(): String {
+    var lastWasUpper = true
+    val sb = StringBuilder()
+    for (i in 0 until length) {
+        val c = this[i]
+        if (c.isUpperCase()) {
+            if (!lastWasUpper) {
+                sb.append('_')
+            }
+            sb.append(c.toLowerCase())
+            lastWasUpper = true
+        } else {
+            lastWasUpper = false
+            sb.append(c)
+        }
+    }
+    return sb.toString()
+}
+
+fun String?.extractLeadingDigits(): Pair<Int?, String> {
+    if (this == null) return Pair(null, "")
+
+    val text = this
+    var value: Int? = null
+    var start = 0
+    for (i in 0 until text.length) {
+        val c = text[i]
+        if (!c.isDigit()) break
+        val digit = c - '0'
+        value = (value ?: 0) * 10 + digit
+        start = i + 1
+    }
+    return Pair(value, text.substring(start))
 }
 

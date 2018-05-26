@@ -2,9 +2,9 @@ package com.vladsch.kotlin.jdbc
 
 import kotlin.reflect.KProperty
 
-abstract class ModelPropertyProviderBase<T>(val provider: ModelProperties<T>, val propType: PropertyType) : ModelPropertyProvider<T> {
-    final override fun provideDelegate(thisRef: T, prop: KProperty<*>): ModelPropertyProvider<T> {
-        return provider.registerProp(prop, propType)
+open class ModelPropertyProviderBase<T>(val provider: ModelProperties<T>, val propType: PropertyType, override val columnName: String?) : InternalModelPropertyProvider<T> {
+    final override fun provideDelegate(thisRef: T, prop: KProperty<*>): ModelProperties<T> {
+        return provider.registerProp(prop, propType, columnName)
     }
 
     final override val autoKey: ModelPropertyProvider<T>
@@ -26,9 +26,21 @@ abstract class ModelPropertyProviderBase<T>(val provider: ModelProperties<T>, va
     final override operator fun <V> setValue(thisRef: T, property: KProperty<*>, value: V) {
         provider.setValue(thisRef, property, value)
     }
+
+    override fun column(columnName: String?): ModelPropertyProvider<T> {
+        return if (this.columnName == columnName) {
+            this
+        } else {
+            if (columnName == null) {
+                provider
+            } else {
+                ModelPropertyProviderBase<T>(provider, propType, columnName)
+            }
+        }
+    }
 }
 
-class ModelPropertyProviderAutoKey<T>(provider: ModelProperties<T>) : ModelPropertyProviderBase<T>(provider, PropertyType.AUTO_KEY) {
+class ModelPropertyProviderAutoKey<T>(provider: ModelProperties<T>, columnName: String?) : ModelPropertyProviderBase<T>(provider, PropertyType.AUTO_KEY, columnName) {
     override val key: ModelPropertyProvider<T>
         get() = this
 
@@ -37,9 +49,21 @@ class ModelPropertyProviderAutoKey<T>(provider: ModelProperties<T>) : ModelPrope
 
     override val default: ModelPropertyProvider<T>
         get() = this
+
+    override fun column(columnName: String?): ModelPropertyProvider<T> {
+        return if (this.columnName == columnName) {
+            this
+        } else {
+            if (columnName == null) {
+                provider.autoKey
+            } else {
+                ModelPropertyProviderAutoKey<T>(provider, columnName)
+            }
+        }
+    }
 }
 
-class ModelPropertyProviderKey<T>(provider: ModelProperties<T>) : ModelPropertyProviderBase<T>(provider, PropertyType.KEY) {
+class ModelPropertyProviderKey<T>(provider: ModelProperties<T>, columnName: String?) : ModelPropertyProviderBase<T>(provider, PropertyType.KEY, columnName) {
     override val key: ModelPropertyProvider<T>
         get() = this
 
@@ -48,9 +72,21 @@ class ModelPropertyProviderKey<T>(provider: ModelProperties<T>) : ModelPropertyP
 
     override val default: ModelPropertyProvider<T>
         get() = provider.autoKey
+
+    override fun column(columnName: String?): ModelPropertyProvider<T> {
+        return if (this.columnName == columnName) {
+            this
+        } else {
+            if (columnName == null) {
+                provider.autoKey
+            } else {
+                ModelPropertyProviderKey<T>(provider, columnName)
+            }
+        }
+    }
 }
 
-class ModelPropertyProviderAuto<T>(provider: ModelProperties<T>) : ModelPropertyProviderBase<T>(provider, PropertyType.AUTO) {
+class ModelPropertyProviderAuto<T>(provider: ModelProperties<T>, columnName: String?) : ModelPropertyProviderBase<T>(provider, PropertyType.AUTO, columnName) {
     override val key: ModelPropertyProvider<T>
         get() = provider.autoKey
 
@@ -59,9 +95,21 @@ class ModelPropertyProviderAuto<T>(provider: ModelProperties<T>) : ModelProperty
 
     override val default: ModelPropertyProvider<T>
         get() = provider.default
+
+    override fun column(columnName: String?): ModelPropertyProvider<T> {
+        return if (this.columnName == columnName) {
+            this
+        } else {
+            if (columnName == null) {
+                provider.autoKey
+            } else {
+                ModelPropertyProviderAuto<T>(provider, columnName)
+            }
+        }
+    }
 }
 
-class ModelPropertyProviderDefault<T>(provider: ModelProperties<T>) : ModelPropertyProviderBase<T>(provider, PropertyType.DEFAULT) {
+class ModelPropertyProviderDefault<T>(provider: ModelProperties<T>, columnName: String?) : ModelPropertyProviderBase<T>(provider, PropertyType.DEFAULT, columnName) {
     override val key: ModelPropertyProvider<T>
         get() = provider.autoKey
 
@@ -70,5 +118,17 @@ class ModelPropertyProviderDefault<T>(provider: ModelProperties<T>) : ModelPrope
 
     override val default: ModelPropertyProvider<T>
         get() = this
+
+    override fun column(columnName: String?): ModelPropertyProvider<T> {
+        return if (this.columnName == columnName) {
+            this
+        } else {
+            if (columnName == null) {
+                provider.autoKey
+            } else {
+                ModelPropertyProviderDefault<T>(provider, columnName)
+            }
+        }
+    }
 }
 

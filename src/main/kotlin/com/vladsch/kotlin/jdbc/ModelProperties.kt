@@ -11,20 +11,39 @@ import kotlin.reflect.KMutableProperty
 import kotlin.reflect.KProperty
 import kotlin.reflect.KVisibility
 
-class ModelProperties<T>(val name: String, val allowSetAuto: Boolean = false) : ModelPropertyProvider<T> {
+class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto: Boolean = false) : InternalModelPropertyProvider<T> {
     private val properties = HashMap<String, Any?>()
     private val kProperties = ArrayList<KProperty<*>>()
     private val propertyTypes = HashMap<String, PropertyType>()
     private val keyProperties = ArrayList<KProperty<*>>()
     private val modified = HashSet<String>()
+    private val columnNames = HashMap<String, String>()
 
     internal fun snapshot() {
         modified.clear()
     }
 
-    internal fun registerProp(prop: KProperty<*>, propType: PropertyType): ModelProperties<T> {
+    override val columnName: String?
+        get() = null
+
+    internal fun registerProp(prop: KProperty<*>, propType: PropertyType, columnName: String?): ModelProperties<T> {
         kProperties.add(prop)
         propertyTypes[prop.name] = propType
+
+        if (columnName == null) {
+            if (!dbCase) {
+                // dbCase, convert camelHumps to _
+                val snakeCase = prop.name.toSnakeCase()
+
+                if (snakeCase != prop.name) {
+                    columnNames[prop.name] = snakeCase
+                }
+            }
+        } else {
+            if (columnName != prop.name) {
+                columnNames[prop.name] = columnName
+            }
+        }
 
         if (propType.isKey) {
             keyProperties.add(prop)
@@ -40,7 +59,7 @@ class ModelProperties<T>(val name: String, val allowSetAuto: Boolean = false) : 
     }
 
     override operator fun provideDelegate(thisRef: T, prop: KProperty<*>): ModelProperties<T> {
-        return registerProp(prop, PropertyType.PROPERTY)
+        return registerProp(prop, PropertyType.PROPERTY, columnName)
     }
 
     // can be used to set immutable properties behind the scenes
@@ -64,10 +83,26 @@ class ModelProperties<T>(val name: String, val allowSetAuto: Boolean = false) : 
         return !modified.isEmpty()
     }
 
-    override val autoKey = ModelPropertyProviderAutoKey<T>(this)
-    override val key = ModelPropertyProviderKey<T>(this)
-    override val auto = ModelPropertyProviderAuto<T>(this)
-    override val default = ModelPropertyProviderDefault<T>(this)
+    fun columnName(property: KProperty<*>): String {
+        if (!propertyTypes.containsKey(property.name)) {
+            throw IllegalStateException("Attempt to get column name of undefined $name.${property.name} property")
+        }
+
+        return columnNames[property.name] ?: property.name
+    }
+
+    override val autoKey = ModelPropertyProviderAutoKey<T>(this, null)
+    override val key = ModelPropertyProviderKey<T>(this, null)
+    override val auto = ModelPropertyProviderAuto<T>(this, null)
+    override val default = ModelPropertyProviderDefault<T>(this, null)
+
+    override fun column(columnName: String?): ModelPropertyProvider<T> {
+        return if (columnName == null) {
+            this
+        } else {
+            ModelPropertyProviderBase<T>(this, PropertyType.PROPERTY, columnName)
+        }
+    }
 
     override operator fun <V> getValue(thisRef: T, property: KProperty<*>): V {
         @Suppress("UNCHECKED_CAST")
@@ -95,38 +130,40 @@ class ModelProperties<T>(val name: String, val allowSetAuto: Boolean = false) : 
 
             try {
                 // casts added to catch wrong function call errors
+                val columnName = columnNames[prop.name] ?: prop.name
+
                 value = when (returnType) {
-                    String::class -> row.stringOrNull(prop.name) as String?
-                    Byte::class -> row.byteOrNull(prop.name) as Byte?
-                    Boolean::class -> row.booleanOrNull(prop.name) as Boolean?
-                    Int::class -> row.intOrNull(prop.name) as Int?
-                    Long::class -> row.longOrNull(prop.name) as Long?
-                    Short::class -> row.shortOrNull(prop.name) as Short?
-                    Double::class -> row.doubleOrNull(prop.name) as Double?
-                    Float::class -> row.floatOrNull(prop.name) as Float?
-                    ZonedDateTime::class -> row.zonedDateTimeOrNull(prop.name) as ZonedDateTime?
-                    OffsetDateTime::class -> row.offsetDateTimeOrNull(prop.name) as OffsetDateTime?
-                    Instant::class -> row.instantOrNull(prop.name) as Instant?
-                    LocalDateTime::class -> row.localDateTimeOrNull(prop.name) as LocalDateTime?
-                    LocalDate::class -> row.localDateOrNull(prop.name) as LocalDate?
-                    LocalTime::class -> row.localTimeOrNull(prop.name) as LocalTime?
-                    org.joda.time.DateTime::class -> row.jodaDateTimeOrNull(prop.name) as org.joda.time.DateTime?
-                    org.joda.time.LocalDateTime::class -> row.jodaLocalDateTimeOrNull(prop.name) as org.joda.time.LocalDateTime?
-                    org.joda.time.LocalDate::class -> row.jodaLocalDateOrNull(prop.name) as org.joda.time.LocalDate?
-                    org.joda.time.LocalTime::class -> row.jodaLocalTimeOrNull(prop.name) as org.joda.time.LocalTime?
-                    java.util.Date::class -> row.sqlDateOrNull(prop.name) as java.util.Date?
-                    java.sql.Timestamp::class -> row.sqlTimestampOrNull(prop.name) as java.sql.Timestamp?
-                    java.sql.Time::class -> row.sqlTimeOrNull(prop.name) as java.sql.Time?
-                    java.sql.Date::class -> row.sqlDateOrNull(prop.name) as java.sql.Date?
-                    java.sql.SQLXML::class -> row.rs.getSQLXML(prop.name) as java.sql.SQLXML?
-                    ByteArray::class -> row.bytesOrNull(prop.name) as ByteArray?
-                    InputStream::class -> row.binaryStreamOrNull(prop.name) as InputStream?
-                    BigDecimal::class -> row.bigDecimalOrNull(prop.name) as BigDecimal?
-                    java.sql.Array::class -> row.sqlArrayOrNull(prop.name) as java.sql.Array?
-                    URL::class -> row.urlOrNull(prop.name) as URL?
+                    String::class -> row.stringOrNull(columnName) as String?
+                    Byte::class -> row.byteOrNull(columnName) as Byte?
+                    Boolean::class -> row.booleanOrNull(columnName) as Boolean?
+                    Int::class -> row.intOrNull(columnName) as Int?
+                    Long::class -> row.longOrNull(columnName) as Long?
+                    Short::class -> row.shortOrNull(columnName) as Short?
+                    Double::class -> row.doubleOrNull(columnName) as Double?
+                    Float::class -> row.floatOrNull(columnName) as Float?
+                    ZonedDateTime::class -> row.zonedDateTimeOrNull(columnName) as ZonedDateTime?
+                    OffsetDateTime::class -> row.offsetDateTimeOrNull(columnName) as OffsetDateTime?
+                    Instant::class -> row.instantOrNull(columnName) as Instant?
+                    LocalDateTime::class -> row.localDateTimeOrNull(columnName) as LocalDateTime?
+                    LocalDate::class -> row.localDateOrNull(columnName) as LocalDate?
+                    LocalTime::class -> row.localTimeOrNull(columnName) as LocalTime?
+                    org.joda.time.DateTime::class -> row.jodaDateTimeOrNull(columnName) as org.joda.time.DateTime?
+                    org.joda.time.LocalDateTime::class -> row.jodaLocalDateTimeOrNull(columnName) as org.joda.time.LocalDateTime?
+                    org.joda.time.LocalDate::class -> row.jodaLocalDateOrNull(columnName) as org.joda.time.LocalDate?
+                    org.joda.time.LocalTime::class -> row.jodaLocalTimeOrNull(columnName) as org.joda.time.LocalTime?
+                    java.util.Date::class -> row.sqlDateOrNull(columnName) as java.util.Date?
+                    java.sql.Timestamp::class -> row.sqlTimestampOrNull(columnName) as java.sql.Timestamp?
+                    java.sql.Time::class -> row.sqlTimeOrNull(columnName) as java.sql.Time?
+                    java.sql.Date::class -> row.sqlDateOrNull(columnName) as java.sql.Date?
+                    java.sql.SQLXML::class -> row.rs.getSQLXML(columnName) as java.sql.SQLXML?
+                    ByteArray::class -> row.bytesOrNull(columnName) as ByteArray?
+                    InputStream::class -> row.binaryStreamOrNull(columnName) as InputStream?
+                    BigDecimal::class -> row.bigDecimalOrNull(columnName) as BigDecimal?
+                    java.sql.Array::class -> row.sqlArrayOrNull(columnName) as java.sql.Array?
+                    URL::class -> row.urlOrNull(columnName) as URL?
                     else -> {
                         val className = (prop.returnType.classifier as? Class<*>)?.simpleName ?: "<unknown>"
-                        throw IllegalArgumentException("$name.${prop.name} cannot be set from json ${row.rs.getObject(prop.name)}, type $className")
+                        throw IllegalArgumentException("$name.${columnName} cannot be set from json ${row.rs.getObject(columnName)}, type $className")
                     }
                 }
             } catch (e: SQLException) {
@@ -269,9 +306,11 @@ class ModelProperties<T>(val name: String, val allowSetAuto: Boolean = false) : 
 
         for (prop in kProperties) {
             val propType = propertyTypes[prop.name] ?: PropertyType.PROPERTY
+
             if (!propType.isAuto) {
                 if (properties.containsKey(prop.name)) {
-                    sb.append(sep).append("`").append(prop.name).append("`")
+                    val columnName = columnNames[prop.name] ?: prop.name
+                    sb.append(sep).append("`").append(columnName).append("`")
                     sbValues.append(sep).append("?")
                     sep = ", "
                     params.add(properties[prop.name])
@@ -291,7 +330,9 @@ class ModelProperties<T>(val name: String, val allowSetAuto: Boolean = false) : 
 
         for (prop in keyProperties) {
             if (properties.containsKey(prop.name)) {
-                appendable.append(useSep).append("`").append(prop.name).append("` = ?")
+                val columnName = columnNames[prop.name] ?: prop.name
+
+                appendable.append(useSep).append("`").append(columnName).append("` = ?")
                 useSep = delimiter
                 params.add(properties[prop.name])
             } else {
@@ -339,7 +380,9 @@ class ModelProperties<T>(val name: String, val allowSetAuto: Boolean = false) : 
             val propType = propertyTypes[prop.name] ?: PropertyType.PROPERTY
             if (!propType.isAuto && modified.contains(prop.name)) {
                 if (properties.containsKey(prop.name)) {
-                    sb.append(sep).append("`").append(prop.name).append("` = ?")
+                    val columnName = columnNames[prop.name] ?: prop.name
+
+                    sb.append(sep).append("`").append(columnName).append("` = ?")
                     sep = ", "
                     params.add(properties[prop.name])
                 }
@@ -379,6 +422,28 @@ class ModelProperties<T>(val name: String, val allowSetAuto: Boolean = false) : 
                 consumer.invoke(prop, propertyTypes[prop.name]!!, properties[prop.name])
             } else {
                 consumer.invoke(prop, propertyTypes[prop.name]!!, Unit)
+            }
+        }
+    }
+
+    fun forEachKey(consumer: (prop: KProperty<*>, propType: PropertyType, columnName: String, value: Any?) -> Unit) {
+        for (prop in keyProperties) {
+            val columnName = columnNames[prop.name] ?: prop.name
+            if (properties.containsKey(prop.name)) {
+                consumer.invoke(prop, propertyTypes[prop.name]!!, columnName, properties[prop.name])
+            } else {
+                consumer.invoke(prop, propertyTypes[prop.name]!!, columnName, Unit)
+            }
+        }
+    }
+
+    fun forEachProp(consumer: (prop: KProperty<*>, propType: PropertyType, columnName: String, value: Any?) -> Unit) {
+        for (prop in kProperties) {
+            val columnName = columnNames[prop.name] ?: prop.name
+            if (properties.containsKey(prop.name)) {
+                consumer.invoke(prop, propertyTypes[prop.name]!!, columnName, properties[prop.name])
+            } else {
+                consumer.invoke(prop, propertyTypes[prop.name]!!, columnName, Unit)
             }
         }
     }
