@@ -324,11 +324,11 @@ LIMIT 1
 
             if (versionCompare < 0) {
                 // need to run all migrations from later versions up to requested version
-                val versionList = getVersions().filter { it.compareTo(currentVersion) > 0 }.sortedWith(Comparator(String::versionCompare))
+                val versionList = getVersions()
+                    .filter { it.compareTo(currentVersion) > 0 && (it.versionCompare(migration.version) <= 0) }
+                    .sortedWith(Comparator(String::versionCompare))
 
                 versionList.forEach { version ->
-                    if (version.versionCompare(migration.version) > 0) return
-
                     val versionMigrations = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, version).values.toList().sortedBy { it.entityResourcePath }
                     val versionMigration = migration.withVersion(version)
 
@@ -350,9 +350,6 @@ LIMIT 1
 
         // run all updates from requested version
         updateEntities(DbEntity.FUNCTION, migration)
-
-        // // do not create any tables, this has to be done in migrations
-        // createTables(migration)
 
         // validate that current db tables and their definition matches the table list
         val sb = StringBuilder()
@@ -472,18 +469,16 @@ LIMIT 1
             if (versionCompare == 0) {
                 val prevVersion = getPreviousVersion(migration.version)
                 if (prevVersion != null) {
-                    // create all tables from the version before the requested which do not exist, this will happen when a table is deleted in a later version
                     val prevMigration = migration.withVersion(prevVersion)
 
                     updateEntities(DbEntity.FUNCTION, prevMigration)
-                    createTables(prevMigration)
 
                     // validate that current db tables and their definition matches the table list
                     val sb = StringBuilder()
                     validateTableResourceFiles(prevVersion, sb)
                     if (!sb.isEmpty()) {
                         // insert migration line
-                        prevMigration.insertMigrationAfter("<validation failure>", sb.toString()) {}
+                        prevMigration.insertMigrationAfter("<table validation failure>", sb.toString()) {}
                     }
 
                     updateEntities(DbEntity.VIEW, prevMigration)
@@ -498,9 +493,6 @@ LIMIT 1
                 }
             } else {
                 updateEntities(DbEntity.FUNCTION, migration)
-
-                // // do not create any tables, this has to be done in migrations
-                // createTables(migration)
 
                 // validate that current db tables and their definition matches the table list
                 val sb = StringBuilder()
