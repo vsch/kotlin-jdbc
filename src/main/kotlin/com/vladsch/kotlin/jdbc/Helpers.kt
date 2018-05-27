@@ -112,6 +112,28 @@ fun session(dataSource: DataSource): Session {
     return Session(Connection(dataSource.connection))
 }
 
+/**
+ * Session default data source factory needs to be set first
+ *
+ * @return Session
+ */
+fun session(): Session {
+    val dataSource = Session.defaultDataSource
+        ?: throw IllegalStateException("Session.defaultDataSource needs to be set to generate default data source connections before use.")
+    return Session(Connection(dataSource.invoke().connection))
+}
+
+/**
+ * Direct use of session using
+ *
+ * @param consumer Function1<Session, T>
+ * @return T
+ */
+@Suppress("NOTHING_TO_INLINE")
+inline fun <T> usingSession(noinline consumer: (Session) -> T): T {
+    return using(session(), consumer)
+}
+
 fun <A : AutoCloseable, R> using(closeable: A?, f: (A) -> R): R {
     try {
         if (closeable != null) {

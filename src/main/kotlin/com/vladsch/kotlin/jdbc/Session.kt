@@ -9,6 +9,7 @@ import java.sql.ResultSet
 import java.sql.Statement
 import javax.json.JsonArray
 import javax.json.JsonObject
+import javax.sql.DataSource
 
 open class Session(
     val connection: Connection,
@@ -17,6 +18,8 @@ open class Session(
 
     companion object {
         private val logger = LoggerFactory.getLogger(Session::class.java)
+
+        var defaultDataSource: (() -> DataSource)? = null
     }
 
     override fun close() {

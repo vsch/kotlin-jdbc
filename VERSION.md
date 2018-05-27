@@ -3,6 +3,7 @@
 [TOC]: # " "
 
 - [TODO](#todo)
+- [0.2.20](#0220)
 - [0.2.18](#0218)
 - [0.2.16](#0216)
 - [0.2.14](#0214)
@@ -26,6 +27,11 @@
   * [ ] Result set
   * [ ] Json
   * [ ] Kotlin types
+
+## 0.2.20
+
+* Add: `Session.defaultDataSource` lambda to generate default data source for use with
+  `session()` version of the function to reduce default session arguments
 
 ## 0.2.18
 
