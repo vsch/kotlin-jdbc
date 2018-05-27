@@ -57,14 +57,14 @@ functions, procedures, tables, triggers and views. See [Migrations](#migrations)
 <dependency>
     <groupId>com.vladsch.kotlin-jdbc</groupId>
     <artifactId>kotlin-jdbc</artifactId>
-    <version>0.2.20</version>
+    <version>0.2.22</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```gradle
-compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.2.20"
+compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.2.22"
 ```
 
 ### Example
@@ -101,7 +101,7 @@ HikariCP.default("jdbc:h2:mem:hello", "user", "pass")
 // define default data source factory to allow use of session() for default
 Session.defaultDataSource = { HikariCP.dataSource() }
 
-usingSession { session ->
+usingDefault { session ->
    // working with the session
 }
 ```

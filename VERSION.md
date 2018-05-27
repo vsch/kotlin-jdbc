@@ -3,6 +3,7 @@
 [TOC]: # " "
 
 - [TODO](#todo)
+- [0.2.22](#0222)
 - [0.2.20](#0220)
 - [0.2.18](#0218)
 - [0.2.16](#0216)
@@ -27,6 +28,10 @@
   * [ ] Result set
   * [ ] Json
   * [ ] Kotlin types
+
+## 0.2.22
+
+* Change: `usingSession` to `usingDefault` as a short form of `using(session())`
 
 ## 0.2.20
 

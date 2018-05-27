@@ -130,7 +130,7 @@ fun session(): Session {
  * @return T
  */
 @Suppress("NOTHING_TO_INLINE")
-inline fun <T> usingSession(noinline consumer: (Session) -> T): T {
+inline fun <T> usingDefault(noinline consumer: (Session) -> T): T {
     return using(session(), consumer)
 }
 
