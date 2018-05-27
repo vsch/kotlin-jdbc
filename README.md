@@ -437,13 +437,13 @@ It will appear in the `Scripted Extensions` pop-up menu.
 
 ## Migrations
 
-:warning: Migrations require knowledge of specific database details, which in this library is
+:warning: Migrations require specific database details, which in this library is
 provided by `DbEntityExtractor` interface. Currently only MySql version is implemented by
 `MySqlEntityExtractor` limiting migration functionality to MySql data sources.
 
-Migrations are implemented by the `Migrations.dbCommand(String[])` function. The instance is
-provided with the database session, `DbEntityExtractor` and resourceClass instance holding the
-database migration versions.
+Migrations are implemented by the `Migrations.dbCommand(String[])` function. `Migrations`
+constructor is provided with the database session, `DbEntityExtractor` instance and
+resourceClass instance holding the database migration version resource files.
 
 When a migration command is run for the first time, it will create a `migration` table where all
 migration operation will be stored and used for determining which operations should be performed
@@ -478,13 +478,21 @@ db/
 
 Database Entities:
 
-| Database Entity | Directory  | File Extension |
-|-----------------|------------|----------------|
-| function        | functions  | `.udf.sql`     |
-| procedure       | procedures | `.prc.sql`     |
-| table           | tables     | `.tbl.sql`     |
-| trigger         | triggers   | `.trg.sql`     |
-| view            | views      | `.view.sql`    |
+| Database Entity  | Directory  | File Extension |
+|------------------|------------|----------------|
+| function         | functions  | `.udf.sql`     |
+| stored procedure | procedures | `.prc.sql`     |
+| table            | tables     | `.tbl.sql`     |
+| trigger          | triggers   | `.trg.sql`     |
+| view             | views      | `.view.sql`    |
+
+All entity scripts for a particular version will be run when the database is migrated (up or
+down) to that version as the final version. Any entities in the database which do not have a
+corresponding script file, will be deleted from the database.
+
+For example, if the database is migrated from `V1` to `V5` with intermediate versions: `V2`,
+`V3` and `V4` then up migration scripts for versions `V2`, `V3`, `V4` and `V5` will be run and
+only the scripts for database entities of `V5` will be run.
 
 Migration Scripts:
 
@@ -508,6 +516,12 @@ entity scripts (excluding tables) for the resulting version will be run. This me
 migrations are only required to migrate the table schema and table data. Other entities will be
 updated via their own scripts.
 
+:warning: The migration scripts should not assume a particular version of other entities than
+tables because function, procedure, view or trigger scripts will only be applied after all
+migration/rollback scripts for all intervening versions are run and only the entity scripts for
+the final version will be executed. If you require as specific version of these entities in the
+migration scripts then you will need to include these in the migration scripts.
+
 To make debugging of rollback/migration scripts easier, after each migration/rollback the
 resulting database tables are validated against the corresponding version's `tables/` directory
 contents and an error is recorded if the validation fails. The validation will ignore
@@ -525,33 +539,36 @@ Commands:
 
 * version "versionID" - set specific version for following commands
 
-  "versionID" must be of the regex form V\d+(_\d+(_\d+(_.*)?)?)?"
+  "versionID" must be of the regex form `V\d+(_\d+(_\d+(_.*)?)?)?`
 
-  where the \d+ are major, minor, patch versions with the trailing .* being the version
+  where the `\d+` are major, minor, patch versions with the trailing `.*` being the version
   metadata. Versions are compared using numeric comparison for major, minor and patch.
 
   The metadata if present will be compared using regular string comparison, ie. normal sort.
 
-* new-major - create a new version directory with major version incremented.
+* new-major - create a new version directory with major version incremented, from current or
+  requested version.
 
-* new-minor - create a new version directory with minor version incremented.
+* new-minor - create a new version directory with minor version incremented, from current or
+  requested version.
 
-* new-patch - create a new version directory with patch version incremented.
+* new-patch - create a new version directory with patch version incremented, from current or
+  requested version.
 
-* new-version - create a new version directory with minor version incremented. The directory
-  cannot already exist. If the version is not provided then the next version with its minor
-  version number incremented will be used.
+* new-version - create a new version directory for the requested version. The directory cannot
+  already exist. If the version is not provided then the current version with its patch version
+  number incremented will be used.
 
   All entity directories will be created, including migrations.
 
-  If there is a previous version to the one requested then its all its entity scripts will be
+  If there is a previous version to the one requested then all its entity scripts will be
   copied to the new version directory.
 
 * new-migration "title" - create a new up/down migration script files in the requested (or
   current) version's migrations directory. The file name will be in the form: N.title.D.sql
   where N is numeric integer 1..., D is up or down and title is the title passed command.
 
-* migrate - migrate to given version or to latest version and validate-all
+* migrate - migrate to given version or to latest version
 
 * rollback - rollback to given version or to previous version
 
@@ -563,7 +580,7 @@ Commands:
 * validate-tables - validate that version table scripts and database agree
 
 * update-all - update all: functions, views, procedures, triggers. This runs the scripts
-  corresponding to the database object.
+  corresponding to the database object for the requested version.
 
 * update-procedures  
   update-procs - update stored procedures

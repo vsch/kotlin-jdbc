@@ -625,9 +625,9 @@ LIMIT 1
      *     new-minor                - create a new version directory with minor version incremented.
      *     new-patch                - create a new version directory with patch version incremented.
      *
-     *     new-version              - create a new version directory with minor version incremented.
+     *     new-version              - create a new version directory for the requested version.
      *                                The directory cannot already exist. If the version is not provided
-     *                                then the next version with its minor version number incremented will be used.
+     *                                then the current version with its patch version number incremented will be used.
      *
      *                                All entity directories will be created, including migrations.
      *
@@ -638,7 +638,7 @@ LIMIT 1
      *                                directory. The file name will be in the form: N.title.D.sql where N is numeric integer 1...,
      *                                D is up or down and title is the title passed command.
      *
-     *     migrate                  - migrate to given version or to latest version and validate-all
+     *     migrate                  - migrate to given version or to latest version
      *
      *     rollback                 - rollback to given version or to previous version
      *
