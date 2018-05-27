@@ -860,6 +860,7 @@ LIMIT 1
                         }
 
                         "exit" -> {
+                            tx.commit()
                             System.exit(1)
                         }
 

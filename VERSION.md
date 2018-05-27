@@ -3,6 +3,7 @@
 [TOC]: # " "
 
 - [TODO](#todo)
+- [0.2.18](#0218)
 - [0.2.16](#0216)
 - [0.2.14](#0214)
 - [0.2.12](#0212)
@@ -25,6 +26,10 @@
   * [ ] Result set
   * [ ] Json
   * [ ] Kotlin types
+
+## 0.2.18
+
+* Fix: commit before doing `System.exit(1)` for exit command
 
 ## 0.2.16
 

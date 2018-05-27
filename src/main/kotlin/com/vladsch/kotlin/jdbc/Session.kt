@@ -274,6 +274,10 @@ open class Session(
                 connection.rollback()
             }
             throw e
+        } finally {
+            if (!connection.autoCommit) {
+                connection.commit()
+            }
         }
     }
 }
