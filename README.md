@@ -1,12 +1,12 @@
-## Kotlin-JDBC
+# Kotlin-JDBC
 
 [![Build Status](https://travis-ci.org/vsch/kotlin-jdbc.svg)](https://travis-ci.org/vsch/kotlin-jdbc)
 
-A thin library that exposes JDBC API with the convenience of Kotlin and gets out of the way when
-not needed.
+A light weight library that exposes JDBC API with the convenience of Kotlin and gets out of the
+way when it is not needed.
 
 For developers who prefer to have their database access through SQL where they can read it,
-validate it and view query plans instead of working through cumbersome ORM, cryptic and limited
+validate it and view its query plans instead of working through cumbersome ORM or limited
 frameworks which obfuscate SQL with their non-standard cryptic syntax.
 
 Refactored from [KotliQuery](https://github.com/seratch/kotliquery) which is an excellent idea
@@ -15,66 +15,41 @@ without having to create a ton of intermediate classes, add result set to JSON c
 without intermediate objects, add stored procedure calls with `in`/`inout`/`out` parameters and
 ability to process multiple result sets.
 
+A convenient models with simple syntax which is aware of primary key columns, auto generated
+columns, columns with defaults and nullable columns. Uses protected property `model` to define
+properties via `provideDelegate`. See [Convenient Models](#convenient-models)
+
+```kotlin
+import java.sql.Timestamp
+
+// dbCase = true if database columns same as properties
+// dbCase = false if database columns are snake-case versions of property names
+class ValidModel : Model<ValidModel>("tableName", dbCase = true) {
+    var processId: Long? by model.auto.key
+    var title: String by model
+    var version: String by model
+    var optional: Int? by model           
+    var hasOwnColumnName: Int? by model.column("own_name")           
+    var updatedAt: Timestamp? by model.auto
+    var createdAt: Timestamp? by model.auto
+}
+```
+
 If you are using [IntelliJ IDEA](https://www.jetbrains.com/idea/) IDE then defining a Language
 Injection for the sql factory functions will automatically apply syntax highlighting,
-completions and annotations to the SQL strings, making it even easier to work with SQL queries.
-See [Configuring SQL Language Injections](#configuring-sql-language-injections)
+completions and annotations to the SQL strings passed to `sqlQuery()` and `sqlCall()`, making it
+even easier to work with SQL queries. See
+[Configuring SQL Language Injections](#configuring-sql-language-injections)
 
-Added `Model` class which can be used as a base class to create convenient models with simple
-syntax aware of keys, auto generated columns, columns with defaults and nullable columns. Uses
-protected property `model` to define properties via `provideDelegate`:
+IntelliJ Ultimate Database Tools extension script for conversion of SQL tables to a Model is
+also available. See
+[Installing IntelliJ Ultimate Database Tools Extension Script](#installing-intellij-ultimate-database-tools-extension-script).
 
+The library provides a simple migration command processor to implement migrate/rollback
+functionality with version tracking with each version containing a copy of database entities:
+functions, procedures, tables, triggers and views. See [Migrations](#migrations)
 
-If column names are the same as the property names then pass `dbCase = true` to `Model`
-constructor or leave it out. If column names are snake-case versions of camelCase property names
-(lowercase with underscores between words) then you can set `dbCase = false` in the model
-constructor and the model definition does not change. the model will look like:
-
-```kotlin
-import java.sql.Timestamp
-
-// database columns same as properties
-class ValidModel : Model<ValidModel>("tableName") {
-    var processId: Long? by model.auto.key
-    var title: String by model
-    var version: String by model
-    var optional: Int? by model           
-    var hasOwnColumnName: Int? by model.column("own_name")           
-    var updatedAt: Timestamp? by model.auto
-    var createdAt: Timestamp? by model.auto
-}
-```
-
-```kotlin
-import java.sql.Timestamp
-
-// database columns are snake-case versions of property names
-class ValidModel : Model<ValidModel>("table_name", dbCase = false) {
-    var processId: Long? by model.auto.key
-    var title: String by model
-    var version: String by model
-    var optional: Int? by model           
-    var hasOwnColumnName: Int? by model.column("own_name")           
-    var updatedAt: Timestamp? by model.auto
-    var createdAt: Timestamp? by model.auto
-}
-```
-
-IntelliJ Ultimate Database Tools extension script for conversion of SQL tables to a Model:
-[Generate Kotlin-Model.groovy](Generate%20Kotlin-Model.groovy). Installation instructions:
-
-#### Installing IntelliJ Database Tools Extension Script
-
-Download the groovy script for generating a `kotlin-jdbc` model: [Generate Kotlin-Model.groovy](Generate%20Kotlin-Model.groovy)
-
-In database tool window, right click on a table and select Scripted Extensions > Go to scripts
-directory and copy the script to this location. It will appear
-
-![image](assets/images/image.png)
-
-### Getting Started
-
-https://github.com/vsch/kotlin-jdbc/master/sample
+## Getting Started
 
 #### Maven
 
@@ -82,21 +57,23 @@ https://github.com/vsch/kotlin-jdbc/master/sample
 <dependency>
     <groupId>com.vladsch.kotlin-jdbc</groupId>
     <artifactId>kotlin-jdbc</artifactId>
-    <version>0.2.0</version>
+    <version>0.2.10</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```gradle
-compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.2.0"
+compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.2.10"
 ```
 
 ### Example
 
 #### Creating DB Session
 
-`Session` object, thin wrapper of `java.sql.Connection` instance, runs queries.
+`Session` object, thin wrapper of `java.sql.Connection` instance, runs queries, optionally
+converts results into instances, lists, hash maps with corresponding json versions as json
+objects or json arrays.
 
 ```kotlin
 import com.vladsch.kotlin.jdbc.*
@@ -203,7 +180,7 @@ parameters pass the name in both maps.
 ```kotlin
 sqlCall("""call storedProc(:inParam,:inOutParam,:outParam)""",
 	mapOf("inParam" to "Alice", "inOutParam" to "Bob"), 
-	mapOf("inOutParam" to "","outParam" to ""))
+	mapOf("inOutParam" to "", "outParam" to ""))
 ```
 
 For convenience there are methods to pass parameters as in, inout, out as a list of pairs or
@@ -263,10 +240,11 @@ This library uses the [`boxed-json`](https://github.com/vsch/boxed-json) library
 `MutableJsObject` and `MutableJsArray` which allow modifications to the `JsonValue`s without
 having to copy the object.
 
-#### Transaction
+#### Transactions
 
-`Session` object provides transaction block. Transactions are not automatically committed
-however any uncaught exceptions will cause the transaction to be automatically rolled back.
+`Session` object provides transaction block. Transactions are automatically committed if not
+explicitly committed or cancelled inside the block. Any uncaught exceptions will cause the
+transaction to be automatically rolled back.
 
 The `Transaction` instance is a session with added `java.sql.Connection` transaction methods for
 convenience.
@@ -275,7 +253,6 @@ convenience.
 session.transaction { tx ->
   // begin
   tx.update(sqlQuery("insert into members (name,  created_at) values (?, ?)", "Alice", Date()))
-  tx.commit() // commit must be explicitly specified
 }
 
 session.transaction { tx ->
@@ -329,7 +306,6 @@ Update and getting generated key(s):
 * `session.updateGetKeys` to execute an update query and get the keys (using an extractor) of
   all the rows of the generated keys result set and return them as a list
 
-
 #### Convenient Models
 
 A base `Model` class can be used to define models which know how to set their properties from a
@@ -350,14 +326,26 @@ the model's properties for every instance.
 * Columns which have default values by: `by model.default`. These won't raise an exception for
   `INSERT` query generation if they are missing from the model's defined property set.
 
+If column names are the same as the property names then set `dbCase = true` for the `Model`
+constructor argument. If column names are snake-case versions of camelcase property names
+(lowercase with underscores between words) then set `dbCase = false` and the model will generate
+correct column names automatically. When needed, you can provide a column name explicitly via
+`.column("columnName")` making it independent of the property name. This function is available
+on any delegate provider so it can be combined with key, auto and default properties: `model`,
+`model.key`, `model.auto`, `model.default`
+
 By default models allow public setters on properties marked `auto` or `autoKey`. To add
 validation forcing all `auto` properties to have no `set` method or have `private set` pass
 `true` for `allowPublicAuto` second parameter to model constructor.
 
 Any property marked as `auto` generated will not be used for value `UPDATE` or `INSERT`
 
+For IntelliJ Ultimate a Database extension script can be installed which will generate models
+from the context menu of any table in the database tools window. See
+[Installing IntelliJ Ultimate Database Tools Extension Script](#installing-intellij-ultimate-database-tools-extension-script)
+
 ```kotlin
-class ValidModel : Model<ValidModel>(tableName) {
+class ValidModel : Model<ValidModel>(tableName, dbCase = true) {
     var processId: Long? by model.auto.key
     var title: String by model
     var version: String by model
@@ -412,6 +400,7 @@ fun useModel() {
 }
 ```
 
+### IntelliJ Configuration
 
 #### Configuring SQL Language Injections
 
@@ -431,6 +420,162 @@ The places patterns text is:
 To get full benefit of SQL completions you should also define a database source to the database
 against which you are developing (or a local clone of it) and configure the SQL dialect for the
 database you are using.
+
+#### Installing IntelliJ Ultimate Database Tools Extension Script
+
+Download the groovy script for generating a `kotlin-jdbc` model:
+[Generate Kotlin-Model.groovy](Generate%20Kotlin-Model.groovy)
+
+In database tool window, right click on a table and select Scripted Extensions > Go to scripts
+directory and copy the script to this location.
+
+![Scripted Extensions Goto Script Dir](assets/images/Scripted_Extensions_Goto_Script_Dir.png)
+
+It will appear in the `Scripted Extensions` pop-up menu.
+
+![Scripted Extensions Generate Kotlin Model](assets/images/Scripted_Extensions_Generate_Kotlin-Model.png)
+
+## Migrations
+
+:warning: Migrations require knowledge of specific database details, which in this library is
+provided by `DbEntityExtractor` interface. Currently only MySql version is implemented by
+`MySqlEntityExtractor` limiting migration functionality to MySql data sources.
+
+Migrations are implemented by the `Migrations.dbCommand(String[])` function. The instance is
+provided with the database session, `DbEntityExtractor` and resourceClass instance holding the
+database migration versions.
+
+When a migration command is run for the first time, it will create a `migration` table where all
+migration operation will be stored and used for determining which operations should be performed
+to bring the database to a specific version.
+
+Each version of the database entities is stored in a sub-directory with the version format:
+Vv_m_p_meta, where v is version number integer, m is minor version integer, p is patch version
+integer and meta is any string. Only the Vv portion is required. Minor, patch and meta are
+optional. The underscore separating version parts belongs to the next element. i.e. the correct
+version is `V1` not `V1_`, `V1_2` and not `V1_2_`, etc.
+
+Each version has the following directory structure and database entity script naming
+conventions:
+
+```
+db/
+└── V0_0_0
+    ├── functions
+    │   └── sample-function.udf.sql
+    ├── migrations
+    │   ├── 0.sample-migration.down.sql
+    │   └── 0.sample-migration.up.sql
+    ├── procedures
+    │   └── sample-stored-procedure.prc.sql
+    ├── tables
+    │   └── sample-table.tbl.sql
+    ├── triggers
+    │   └── sample-trigger.trg.sql
+    └── views
+        └── sample-view.view.sql
+```
+
+Database Entities:
+
+| Database Entity | Directory  | File Extension |
+|-----------------|------------|----------------|
+| function        | functions  | `.udf.sql`     |
+| procedure       | procedures | `.prc.sql`     |
+| table           | tables     | `.tbl.sql`     |
+| trigger         | triggers   | `.trg.sql`     |
+| view            | views      | `.view.sql`    |
+
+Migration Scripts:
+
+Both up/down migration scripts are located in the `migrations` directory and are distinguished
+by their extension: `.up.sql` and `.down.sql`.
+
+The files in this directory are executed in sorted order and all files should have an integer
+prefix, optionally followed by descriptive text. Files which have an integer prefix will be
+sorted in numerical order, otherwise alphabetic order.
+
+When applying up migration scripts these are executed in increasing file name order.
+
+During a rollback operation, only down scripts whose up script execution has been recorded in
+the `migrations` table will be executed. All down scripts are executed in decreasing file name order.
+
+The a migration script files is split on `;` delimiters and each part run as a separate query,
+if successful then an entry for this fact is added to the migration table.
+
+After all migrations/rollback scripts have been applied for all required versions, the database
+entity scripts (excluding tables) for the resulting version will be run. This means that
+migrations are only required to migrate the table schema and table data. Other entities will be
+updated via their own scripts.
+
+To make debugging of rollback/migration scripts easier, after each migration/rollback the
+resulting database tables are validated against the corresponding version's `tables/` directory
+contents and an error is recorded if the validation fails. The validation will ignore
+differences caused by re-ordering of lines, this is used to eliminate column, key and constraint
+order changes from causing validation failures.
+
+To generate contents for the `tables/` directory run the `dump-tables` command.
+
+Commands:
+
+* init - initialize migrations table and migrate all to given version or latest version
+
+* path "resources/db" - set path to resources/db directory of the project where version
+  information is stored.
+
+* version "versionID" - set specific version for following commands
+
+  "versionID" must be of the regex form V\d+(_\d+(_\d+(_.*)?)?)?"
+
+  where the \d+ are major, minor, patch versions with the trailing .* being the version
+  metadata. Versions are compared using numeric comparison for major, minor and patch.
+
+  The metadata if present will be compared using regular string comparison, ie. normal sort.
+
+* new-major - create a new version directory with major version incremented.
+
+* new-minor - create a new version directory with minor version incremented.
+
+* new-patch - create a new version directory with patch version incremented.
+
+* new-version - create a new version directory with minor version incremented. The directory
+  cannot already exist. If the version is not provided then the next version with its minor
+  version number incremented will be used.
+
+  All entity directories will be created, including migrations.
+
+  If there is a previous version to the one requested then its all its entity scripts will be
+  copied to the new version directory.
+
+* new-migration "title" - create a new up/down migration script files in the requested (or
+  current) version's migrations directory. The file name will be in the form: N.title.D.sql
+  where N is numeric integer 1..., D is up or down and title is the title passed command.
+
+* migrate - migrate to given version or to latest version and validate-all
+
+* rollback - rollback to given version or to previous version
+
+* dump-tables - dump database tables
+
+* create-tables - create all tables which exist in the version tables directory and which do not
+  exist in the database
+
+* validate-tables - validate that version table scripts and database agree
+
+* update-all - update all: functions, views, procedures, triggers. This runs the scripts
+  corresponding to the database object.
+
+* update-procedures  
+  update-procs - update stored procedures
+
+* update-functions  
+  update-funcs - update functions
+
+* update-triggers - update triggers
+
+* update-views - update views
+
+* exit - exit application
 
 ## License
 
