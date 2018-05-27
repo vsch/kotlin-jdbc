@@ -218,8 +218,19 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
         }
     }
 
-    fun copyEntities(entity: DbEntity, sourceVersionDir: File, destinationVersionDir: File, excludeFilter: ((String) -> Boolean)? = null) {
+    fun copyEntities(entity: DbEntity, sourceVersionDir: File, destinationVersionDir: File, deleteDestinationFiles: Boolean, excludeFilter: ((String) -> Boolean)? = null) {
         // may need to create table directory
+        if (deleteDestinationFiles) {
+            val destEntities = entity.getEntityFiles(destinationVersionDir + entity.dbEntityDirectory)
+            destEntities.forEach {
+                if (excludeFilter == null || !excludeFilter.invoke(it)) {
+                    val fileName = File(it).name
+                    val destinationFile = (destinationVersionDir + entity.dbEntityDirectory) + fileName
+                    destinationFile.delete()
+                }
+            }
+        }
+
         val entities = entity.getEntityFiles(sourceVersionDir + entity.dbEntityDirectory)
         entities.forEach {
             if (excludeFilter == null || !excludeFilter.invoke(it)) {
@@ -531,6 +542,39 @@ LIMIT 1
         }
     }
 
+    fun updateSchema(dbDir: File, dbVersion: String) {
+        dbDir.ensureExistingDirectory("dbDir")
+        val versionDir = getVersionDirectory(dbDir, dbVersion, false)
+
+        val schemaDir = dbDir + "schema"
+        schemaDir.ensureCreateDirectory("dbDir/schema")
+        val versionFile = schemaDir + "version.txt"
+        versionFile.writeText("""# Version: ${dbVersion}""".trimIndent())
+
+        val functionsDir = schemaDir + DbEntity.FUNCTION.dbEntityDirectory
+        //val migrationsDir = schemaDir + DbEntity.MIGRATION.dbEntityDirectory
+        val proceduresDir = schemaDir + DbEntity.PROCEDURE.dbEntityDirectory
+        val tablesDir = schemaDir + DbEntity.TABLE.dbEntityDirectory
+        val triggerDir = schemaDir + DbEntity.TRIGGER.dbEntityDirectory
+        val viewsDir = schemaDir + DbEntity.VIEW.dbEntityDirectory
+
+        functionsDir.ensureCreateDirectory("db/schema/" + DbEntity.FUNCTION.dbEntityDirectory)
+        // migrationsDir.ensureCreateDirectory("db/schema/" + DbEntity.MIGRATION.dbEntityDirectory)
+        proceduresDir.ensureCreateDirectory("db/schema/" + DbEntity.PROCEDURE.dbEntityDirectory)
+        tablesDir.ensureCreateDirectory("db/schema/" + DbEntity.TABLE.dbEntityDirectory)
+        triggerDir.ensureCreateDirectory("db/schema/" + DbEntity.TRIGGER.dbEntityDirectory)
+        viewsDir.ensureCreateDirectory("db/schema/" + DbEntity.VIEW.dbEntityDirectory)
+
+        // copy all entities from given version except migrations to snapshot dir
+        copyEntities(DbEntity.FUNCTION, versionDir, schemaDir, true)
+        //copyEntities(DbEntity.MIGRATION, versionDir, snapshotDir)
+        //copyEntities(DbEntity.ROLLBACK, versionDir, snapshotDir)
+        copyEntities(DbEntity.PROCEDURE, versionDir, schemaDir, true)
+        copyEntities(DbEntity.TABLE, versionDir, schemaDir, true) { it.toLowerCase() == MIGRATIONS_FILE_NAME }
+        copyEntities(DbEntity.TRIGGER, versionDir, schemaDir, true)
+        copyEntities(DbEntity.VIEW, versionDir, schemaDir, true)
+    }
+
     fun newVersion(dbDir: File, dbVersion: String) {
         val versionDir = getVersionDirectory(dbDir, dbVersion, null)
 
@@ -542,27 +586,30 @@ LIMIT 1
             throw IllegalStateException("Version directory '${versionDir.path}' could not be created")
         }
 
-        val functionsDir = versionDir + "functions"
-        val migrationsDir = versionDir + "migrations"
-        val proceduresDir = versionDir + "procedures"
-        val tablesDir = versionDir + "tables"
-        val viewsDir = versionDir + "views"
+        val functionsDir = versionDir + DbEntity.FUNCTION.dbEntityDirectory
+        val migrationsDir = versionDir + DbEntity.MIGRATION.dbEntityDirectory
+        val proceduresDir = versionDir + DbEntity.PROCEDURE.dbEntityDirectory
+        val tablesDir = versionDir + DbEntity.TABLE.dbEntityDirectory
+        val triggerDir = versionDir + DbEntity.TRIGGER.dbEntityDirectory
+        val viewsDir = versionDir + DbEntity.VIEW.dbEntityDirectory
 
-        functionsDir.ensureCreateDirectory("db/$dbVersion/functions")
-        migrationsDir.ensureCreateDirectory("db/$dbVersion/migrations")
-        proceduresDir.ensureCreateDirectory("db/$dbVersion/procedures")
-        tablesDir.ensureCreateDirectory("db/$dbVersion/tables")
-        viewsDir.ensureCreateDirectory("db/$dbVersion/views")
+        functionsDir.ensureCreateDirectory("db/$dbVersion/" + DbEntity.FUNCTION.dbEntityDirectory)
+        migrationsDir.ensureCreateDirectory("db/$dbVersion/" + DbEntity.MIGRATION.dbEntityDirectory)
+        proceduresDir.ensureCreateDirectory("db/$dbVersion/" + DbEntity.PROCEDURE.dbEntityDirectory)
+        tablesDir.ensureCreateDirectory("db/$dbVersion/" + DbEntity.TABLE.dbEntityDirectory)
+        triggerDir.ensureCreateDirectory("db/$dbVersion/" + DbEntity.TRIGGER.dbEntityDirectory)
+        viewsDir.ensureCreateDirectory("db/$dbVersion/" + DbEntity.VIEW.dbEntityDirectory)
 
         // copy all entities from previous version except migrations
         val previousVersion = getPreviousVersion(dbVersion)
         if (previousVersion != null) {
-            copyEntities(DbEntity.FUNCTION, getVersionDirectory(dbDir, previousVersion, true), versionDir)
+            copyEntities(DbEntity.FUNCTION, getVersionDirectory(dbDir, previousVersion, true), versionDir, true)
             //            copyEntities(DbEntity.MIGRATION, getVersionDirectory(dbDir, previousVersion, true), versionDir)
             //            copyEntities(DbEntity.ROLLBACK, getVersionDirectory(dbDir, previousVersion, true), versionDir)
-            copyEntities(DbEntity.PROCEDURE, getVersionDirectory(dbDir, previousVersion, true), versionDir)
-            copyEntities(DbEntity.TABLE, getVersionDirectory(dbDir, previousVersion, true), versionDir) { it.toLowerCase() == MIGRATIONS_FILE_NAME }
-            copyEntities(DbEntity.VIEW, getVersionDirectory(dbDir, previousVersion, true), versionDir)
+            copyEntities(DbEntity.PROCEDURE, getVersionDirectory(dbDir, previousVersion, true), versionDir, true)
+            copyEntities(DbEntity.TABLE, getVersionDirectory(dbDir, previousVersion, true), versionDir, true) { it.toLowerCase() == MIGRATIONS_FILE_NAME }
+            copyEntities(DbEntity.TRIGGER, getVersionDirectory(dbDir, previousVersion, true), versionDir, true)
+            copyEntities(DbEntity.VIEW, getVersionDirectory(dbDir, previousVersion, true), versionDir, true)
         }
     }
 
@@ -657,6 +704,8 @@ LIMIT 1
      *     update-functions
      *     update-funcs             - update functions
      *
+     *     update-schema            - update db/schema directory with entities from selected version (or current if none given)
+     *
      *     update-triggers          - update triggers
      *
      *     update-views             - update views
@@ -702,6 +751,11 @@ LIMIT 1
                         "dump-tables" -> {
                             if (dbVersion == null) dbVersion = getCurrentVersion()
                             dumpTables(dbPath, dbVersion!!)
+                        }
+
+                        "update-schema" -> {
+                            if (dbVersion == null) dbVersion = getCurrentVersion()
+                            updateSchema(dbPath, dbVersion!!)
                         }
 
                         "validate-tables", "validate" -> {

@@ -3,6 +3,8 @@
 [TOC]: # " "
 
 - [TODO](#todo)
+- [0.2.14](#0214)
+- [0.2.12](#0212)
 - [0.2.10](#0210)
 - [0.2.8](#028)
 - [0.2.6](#026)
@@ -22,6 +24,15 @@
   * [ ] Result set
   * [ ] Json
   * [ ] Kotlin types
+
+## 0.2.14
+
+* Add: migrations `update-schema` command to copy all current version entities to the `schema`
+  version directory to allow VCS version to version change tracking.
+
+## 0.2.12
+
+* Fix: npe when trying to access non existent resource
 
 ## 0.2.10
 

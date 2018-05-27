@@ -70,12 +70,14 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
 
     fun getEntityFiles(entityDir: File): List<String> {
         val entityList = ArrayList<String>()
-        entityDir.list(FilenameFilter { file, name -> name.endsWith(this.fileSuffix) })
-            .map { entityDir + it }
-            .filter { it.isFile }
-            .forEach {
-                entityList.add(it.path)
-            }
+        if (entityDir.exists()) {
+            entityDir.list(FilenameFilter { file, name -> name.endsWith(this.fileSuffix) })
+                .map { entityDir + it }
+                .filter { it.isFile }
+                .forEach {
+                    entityList.add(it.path)
+                }
+        }
         return entityList
     }
 

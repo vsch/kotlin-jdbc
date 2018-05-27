@@ -57,14 +57,14 @@ functions, procedures, tables, triggers and views. See [Migrations](#migrations)
 <dependency>
     <groupId>com.vladsch.kotlin-jdbc</groupId>
     <artifactId>kotlin-jdbc</artifactId>
-    <version>0.2.10</version>
+    <version>0.2.14</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```gradle
-compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.2.10"
+compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.2.14"
 ```
 
 ### Example
@@ -522,6 +522,12 @@ migration/rollback scripts for all intervening versions are run and only the ent
 the final version will be executed. If you require as specific version of these entities in the
 migration scripts then you will need to include these in the migration scripts.
 
+After migration/rollback it is a good idea to run `update-schema` command to copy all the entity
+scripts to the `schema` directory, located on the same level as the version sub-directories.
+Contents of this directory are intended to be under VCS and used to track changes to database
+from version to version. Individual version directories are immutable for a given version and
+therefore not useful for VCS based modification tracking tools.
+
 To make debugging of rollback/migration scripts easier, after each migration/rollback the
 resulting database tables are validated against the corresponding version's `tables/` directory
 contents and an error is recorded if the validation fails. The validation will ignore
@@ -589,6 +595,9 @@ Commands:
   update-funcs - update functions
 
 * update-triggers - update triggers
+
+* update-schema - update `schema` directory with entities from selected version (or current
+  if none given)
 
 * update-views - update views
 

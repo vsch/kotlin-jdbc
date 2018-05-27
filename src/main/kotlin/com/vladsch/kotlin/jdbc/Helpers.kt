@@ -246,7 +246,14 @@ fun getFileContent(file: File): String {
 }
 
 fun getResourceAsStream(resourceClass: Class<*>, resource: String): InputStream? {
-    return resourceClass.getResourceAsStream(resource)
+    try {
+        val inputStream = resourceClass.getResourceAsStream(resource)
+        inputStream.available()
+        return inputStream
+    } catch (e: Exception) {
+
+    }
+    return null
 }
 
 operator fun File.plus(name: String): File {
