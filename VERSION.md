@@ -3,6 +3,7 @@
 [TOC]: # " "
 
 - [TODO](#todo)
+- [0.2.16](#0216)
 - [0.2.14](#0214)
 - [0.2.12](#0212)
 - [0.2.10](#0210)
@@ -24,6 +25,10 @@
   * [ ] Result set
   * [ ] Json
   * [ ] Kotlin types
+
+## 0.2.16
+
+* Fix: migrations rollback filter condition reversed for multiple version rollback
 
 ## 0.2.14
 

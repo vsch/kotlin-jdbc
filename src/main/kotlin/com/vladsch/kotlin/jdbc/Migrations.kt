@@ -471,12 +471,16 @@ LIMIT 1
 
                 if (versionCompare > 0) {
                     // need to run all migrations from earlier versions down up to but not including requested version
-                    val versionList = getVersions().filter { it.compareTo(currentVersion) > 0 && it.compareTo(migration.version) < 0 }.sortedWith(Comparator(String::versionCompare)).reversed()
+                    val versionList = getVersions()
+                        .filter { it.compareTo(currentVersion) < 0 && it.compareTo(migration.version) > 0 }
+                        .sortedWith(Comparator(String::versionCompare))
+                        .reversed()
 
                     versionList.forEach { version ->
                         val versionMigrations = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, version)
                             .values.toList()
                             .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
+                            .reversed()
 
                         val versionMigration = migration.withVersion(version)
 
