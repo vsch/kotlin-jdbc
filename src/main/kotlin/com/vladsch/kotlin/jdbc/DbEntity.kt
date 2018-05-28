@@ -62,7 +62,7 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
         }
 
         if (sampleText == null) {
-            val samplesResourcePath = "/sample-db/V0_0_0/$dbEntityDirectory${getEntitySampleName()}"
+            val samplesResourcePath = "/sample-db/V0_0_0/$dbEntityDirectory/${getEntitySampleName()}"
             sampleText = getResourceAsString(resourceClass, samplesResourcePath)
         }
         return sampleText

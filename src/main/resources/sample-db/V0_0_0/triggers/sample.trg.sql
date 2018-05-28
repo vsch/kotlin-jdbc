@@ -1,1 +1,1 @@
--- Trigger
+CREATE TRIGGER __NAME__
