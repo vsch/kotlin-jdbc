@@ -1,0 +1,2 @@
+-- Version: __VERSION__
+-- Up Migration: __TITLE__

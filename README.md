@@ -449,8 +449,8 @@ It will appear in the `Scripted Extensions` pop-up menu.
 
 ## Migrations
 
-:warning: Migrations require specific database details, which in this library is
-provided by `DbEntityExtractor` interface. Currently only MySql version is implemented by
+:warning: Migrations require specific database details, which in this library is provided by
+`DbEntityExtractor` interface. Currently only MySql version is implemented by
 `MySqlEntityExtractor` limiting migration functionality to MySql data sources.
 
 Migrations are implemented by the `Migrations.dbCommand(String[])` function. `Migrations`
@@ -518,7 +518,8 @@ sorted in numerical order, otherwise alphabetic order.
 When applying up migration scripts these are executed in increasing file name order.
 
 During a rollback operation, only down scripts whose up script execution has been recorded in
-the `migrations` table will be executed. All down scripts are executed in decreasing file name order.
+the `migrations` table will be executed. All down scripts are executed in decreasing file name
+order.
 
 The a migration script files is split on `;` delimiters and each part run as a separate query,
 if successful then an entry for this fact is added to the migration table.
@@ -579,12 +580,34 @@ Commands:
 
   All entity directories will be created, including migrations.
 
-  If there is a previous version to the one requested then all its entity scripts will be
-  copied to the new version directory.
+  If there is a previous version to the one requested then all its entity scripts will be copied
+  to the new version directory.
 
 * new-migration "title" - create a new up/down migration script files in the requested (or
   current) version's migrations directory. The file name will be in the form: N.title.D.sql
   where N is numeric integer 1..., D is up or down and title is the title passed command.
+  Placeholders in the file: `__VERSION__` will be replaced with the version for which this file
+  is generated and `__TITLE__` with the "title" passed to the command.
+
+* new-function "name" - create a new function file using resources/db/templates customized
+  template or built-in if none
+  Placeholders in the file: `__VERSION__` will be replaced with the version for which this file
+  is generated and `__NAME__` with the "name" passed to the command.
+
+* new-procedure "name" - create a new procedure file using resources/db/templates customized
+  template or built-in if none
+  Placeholders in the file: `__VERSION__` will be replaced with the version for which this file
+  is generated and `__NAME__` with the "name" passed to the command.
+
+* new-trigger "name" - create a new trigger file using resources/db/templates customized
+  template or built-in if none
+  Placeholders in the file: `__VERSION__` will be replaced with the version for which this file
+  is generated and `__NAME__` with the "name" passed to the command.
+
+* new-view "name" - create a new view file using resources/db/templates customized template or
+  built-in if none
+  Placeholders in the file: `__VERSION__` will be replaced with the version for which this file
+  is generated and `__NAME__` with the "name" passed to the command.
 
 * migrate - migrate to given version or to latest version
 
@@ -608,12 +631,34 @@ Commands:
 
 * update-triggers - update triggers
 
-* update-schema - update `schema` directory with entities from selected version (or current
-  if none given)
+* update-schema - update `schema` directory with entities from selected version (or current if
+  none given)
 
 * update-views - update views
 
 * exit - exit application
+
+
+#### Customizing Templates used by `new-...` command
+
+Place your files in the `resources/db` directory and name it `templates` the layout is the same
+as a version directory with the template files named `sample`:
+
+```text
+db/
+└── templates/
+    ├── functions/
+    │   └── sample.udf.sql
+    ├── migrations/
+    │   ├── 0.sample.down.sql
+    │   └── 0.sample.up.sql
+    ├── procedures/
+    │   └── sample.prc.sql
+    ├── triggers/
+    │   └── sample.trg.sql
+    └── views/
+        └── sample.view.sql
+```
 
 ## License
 

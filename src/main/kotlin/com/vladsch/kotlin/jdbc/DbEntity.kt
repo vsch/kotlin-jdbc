@@ -3,11 +3,13 @@ package com.vladsch.kotlin.jdbc
 import java.io.File
 import java.io.FilenameFilter
 
+@Suppress("MemberVisibilityCanBePrivate")
 enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityDirectory: String, val fileSuffix: String) {
+
     FUNCTION("FUNCTION", "function", "functions", ".udf.sql"),
     PROCEDURE("PROCEDURE", "procedure", "procedures", ".prc.sql"),
     TABLE("TABLE", "table", "tables", ".tbl.sql"),
-    TRIGGER("TRIGGER", "insert trigger", "triggers", ".ins.trg.sql"),
+    TRIGGER("TRIGGER", "insert trigger", "triggers", ".trg.sql"),
     VIEW("VIEW", "view", "views", ".view.sql"),
     MIGRATION("", "migration", "migrations", ".up.sql"),
     ROLLBACK("", "rollback", "migrations", ".down.sql"),
@@ -51,6 +53,21 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
         return entityDir
     }
 
+    fun getEntitySample(dbDir: File, resourceClass: Class<*>): String {
+        val templateFile = ((dbDir + "templates") + dbEntityDirectory) + getEntitySampleName()
+        var sampleText: String? = null
+
+        if (templateFile.exists()) {
+            sampleText = getFileContent(templateFile)
+        }
+
+        if (sampleText == null) {
+            val samplesResourcePath = "/sample-db/V0_0_0/$dbEntityDirectory${getEntitySampleName()}"
+            sampleText = getResourceAsString(resourceClass, samplesResourcePath)
+        }
+        return sampleText
+    }
+
     fun isEntityFile(file: String): Boolean {
         return file.endsWith(this.fileSuffix)
     }
@@ -59,13 +76,28 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
         return file.name.endsWith(this.fileSuffix)
     }
 
-    fun getEntityName(file: String): String {
-        return file.substring(0, file.length - this.fileSuffix.length)
+    fun getEntitySampleName(): String {
+        return if (this === MIGRATION || this === ROLLBACK) {
+            "0.sample$fileSuffix"
+        } else {
+            "sample$fileSuffix"
+        }
+    }
+
+    fun getEntityName(fileName: String): String {
+        var entityName = fileName
+
+        if (this === MIGRATION || this === ROLLBACK) {
+            // has optional leading count with .
+            val (count, name) = fileName.extractLeadingDigits()
+            entityName = name
+        }
+
+        return entityName.substring(0, entityName.length - this.fileSuffix.length)
     }
 
     fun getEntityName(file: File): String {
-        val fileName = file.name
-        return fileName.substring(0, fileName.length - this.fileSuffix.length)
+        return getEntityName(file.name)
     }
 
     fun getEntityFiles(entityDir: File): List<String> {

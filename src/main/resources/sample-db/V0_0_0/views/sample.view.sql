@@ -1,0 +1,1 @@
+CREATE VIEW __NAME_ AS

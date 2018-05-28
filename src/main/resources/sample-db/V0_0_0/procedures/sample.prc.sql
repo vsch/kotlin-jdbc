@@ -1,0 +1,4 @@
+CREATE PROCEDURE __NAME__()
+  BEGIN
+
+  END

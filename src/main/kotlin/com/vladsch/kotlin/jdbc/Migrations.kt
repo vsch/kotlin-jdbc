@@ -617,41 +617,46 @@ LIMIT 1
         }
     }
 
-    fun newMigration(dbDir: File, dbVersion: String, title: String) {
+    fun newEntityFile(entity: DbEntity, dbDir: File, dbVersion: String, entityName: String) {
         val versionDir = getVersionDirectory(dbDir, dbVersion, false)
 
-        val migrationsDir = versionDir + DbEntity.MIGRATION.dbEntityDirectory
+        val entityDir = versionDir + entity.dbEntityDirectory
 
-        migrationsDir.ensureCreateDirectory("db/$dbVersion/migrations")
-        var lastMigration: Int = 0
+        entityDir.ensureCreateDirectory("db/$dbVersion/${entity.dbEntityDirectory}")
 
-        DbEntity.MIGRATION.getEntityFiles(migrationsDir).forEach {
-            val (num, name) = File(it).name.extractLeadingDigits()
-            if (num != null && num > lastMigration) {
-                lastMigration = num
+        if (entity == DbEntity.MIGRATION || entity == DbEntity.ROLLBACK) {
+            var lastMigration: Int = 0
+
+            entity.getEntityFiles(entityDir).forEach {
+                val (num, name) = File(it).name.extractLeadingDigits()
+                if (num != null && num > lastMigration) {
+                    lastMigration = num
+                }
             }
-        }
 
-        DbEntity.ROLLBACK.getEntityFiles(migrationsDir).forEach {
-            val (num, name) = File(it).name.extractLeadingDigits()
-            if (num != null && num > lastMigration) {
-                lastMigration = num
+            entity.getEntityFiles(entityDir).forEach {
+                val (num, name) = File(it).name.extractLeadingDigits()
+                if (num != null && num > lastMigration) {
+                    lastMigration = num
+                }
             }
+
+            lastMigration++
+
+            val migrationFile = entityDir + "$lastMigration.$entityName${DbEntity.MIGRATION.fileSuffix}"
+            val rollbackFile = entityDir + "$lastMigration.$entityName${DbEntity.ROLLBACK.fileSuffix}"
+
+            val migrationSample = DbEntity.MIGRATION.getEntitySample(dbDir, resourceClass)
+            val rollbackSample = DbEntity.ROLLBACK.getEntitySample(dbDir, resourceClass)
+
+            migrationFile.writeText(migrationSample.replace("__VERSION__".toRegex(), dbVersion).replace("__TITLE__".toRegex(), entityName))
+            rollbackFile.writeText(rollbackSample.replace("__VERSION__".toRegex(), dbVersion).replace("__TITLE__".toRegex(), entityName))
+        } else {
+            val entityFile = entityDir + "$entityName${entity.fileSuffix}"
+
+            val entitySample = entity.getEntitySample(dbDir, resourceClass)
+            entityFile.writeText(entitySample.replace("__VERSION__".toRegex(), dbVersion).replace("__NAME__".toRegex(), entityName))
         }
-
-        lastMigration++
-
-        val migrationFile = migrationsDir + "$lastMigration.$title${DbEntity.MIGRATION.fileSuffix}"
-        val rollbackFile = migrationsDir + "$lastMigration.$title${DbEntity.ROLLBACK.fileSuffix}"
-
-        migrationFile.writeText("""# Version: $dbVersion
-# Up Migration: $title
-
-""")
-        rollbackFile.writeText("""# Version: $dbVersion
-# Down Migration: $title
-
-""")
     }
 
     /**
@@ -688,6 +693,11 @@ LIMIT 1
      *     new-migration "title"    - create a new up/down migration script files in the requested (or current) version's migrations
      *                                directory. The file name will be in the form: N.title.D.sql where N is numeric integer 1...,
      *                                D is up or down and title is the title passed command.
+     *
+     *     new-function "name"      - create a new function file using resources/db/templates customized template or built-in if none
+     *     new-procedure "name"     - create a new procedure file using resources/db/templates customized template or built-in if none
+     *     new-trigger "name"       - create a new trigger file using resources/db/templates customized template or built-in if none
+     *     new-view "name"          - create a new view file using resources/db/templates customized template or built-in if none
      *
      *     migrate                  - migrate to given version or to latest version
      *
@@ -856,7 +866,48 @@ LIMIT 1
                             val title = args[i++].trim()
                             if (migration == null) migration = initMigrations(dbVersion)
                             val version = dbVersion ?: migration!!.version
-                            newMigration(dbPath, version, title)
+                            newEntityFile(DbEntity.MIGRATION, dbPath, version, title)
+                        }
+
+                        "new-function" -> {
+                            if (args.size < i || args[i].isBlank()) {
+                                throw IllegalArgumentException("new-function option requires a non-blank name argument")
+                            }
+                            val title = args[i++].trim()
+                            if (migration == null) migration = initMigrations(dbVersion)
+                            val version = dbVersion ?: migration!!.version
+                            newEntityFile(DbEntity.FUNCTION, dbPath, version, title)
+                        }
+
+                        "new-procedure" -> {
+                            if (args.size < i || args[i].isBlank()) {
+                                throw IllegalArgumentException("new-procedure option requires a non-blank name argument")
+                            }
+                            val title = args[i++].trim()
+                            if (migration == null) migration = initMigrations(dbVersion)
+                            val version = dbVersion ?: migration!!.version
+                            newEntityFile(DbEntity.PROCEDURE, dbPath, version, title)
+                        }
+
+                        "new-trigger" -> {
+                            if (args.size < i || args[i].isBlank()) {
+                                throw IllegalArgumentException("new-trigger option requires a non-blank name argument")
+                            }
+                            val title = args[i++].trim()
+                            if (migration == null) migration = initMigrations(dbVersion)
+                            val version = dbVersion ?: migration!!.version
+                            newEntityFile(DbEntity.TRIGGER, dbPath, version, title)
+                        }
+
+
+                        "new-view" -> {
+                            if (args.size < i || args[i].isBlank()) {
+                                throw IllegalArgumentException("new-view option requires a non-blank name argument")
+                            }
+                            val title = args[i++].trim()
+                            if (migration == null) migration = initMigrations(dbVersion)
+                            val version = dbVersion ?: migration!!.version
+                            newEntityFile(DbEntity.VIEW, dbPath, version, title)
                         }
 
                         "exit" -> {

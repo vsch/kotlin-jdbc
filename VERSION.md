@@ -3,6 +3,7 @@
 [TOC]: # " "
 
 - [TODO](#todo)
+- [0.2.24](#0224)
 - [0.2.22](#0222)
 - [0.2.20](#0220)
 - [0.2.18](#0218)
@@ -28,6 +29,15 @@
   * [ ] Result set
   * [ ] Json
   * [ ] Kotlin types
+
+## 0.2.24
+
+* Fix: model generating script to convert table name to singular form for use as the model class
+  name.
+* Add: `new-...` commands for: function, procedure, trigger and view.
+* Add: built in templates for creating new entities with placeholders `__VERSION__` replaced by
+  the version for which they are created and `__TITLE__` for migration/rollback or `__NAME__`
+  for all others to reflect the parameter passed to the command
 
 ## 0.2.22
 
