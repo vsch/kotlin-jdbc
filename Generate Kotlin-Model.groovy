@@ -10,8 +10,15 @@ import com.intellij.database.util.DasUtil
  *   PROJECT     project
  *   FILES       files helper
  */
+packageName = "com.sample;" // package used for generated class files
+classFileNameSuffix = "Model" // appended to class file name
 
-packageName = "com.sample;"
+// KLUDGE: the DasTable and columns does implement a way to get whether column is nullable, has default or is computed
+forceNullable = (~/^(?:createdAt|created_at|updatedAt|updated_at)/) // regex for column names which are forced to nullable Kotlin type
+forceAuto = (~/^(?:createdAt|created_at|updatedAt|updated_at)/) // column names marked auto generated
+
+downsizeLongIdToInt = true // if true changes id columns which would be declared Long to Int, change this to false to leave them as Long
+
 typeMapping = [
         (~/(?i)tinyint\(1\)/)             : "Boolean",
         (~/(?i)bigint/)                   : "Long",
@@ -24,8 +31,6 @@ typeMapping = [
         (~/(?i)/)                         : "String"
 ]
 
-forceNullable = (~/^(?:createdAt|created_at|updatedAt|updated_at)/)
-forceAuto = (~/^(?:createdAt|created_at|updatedAt|updated_at)/)
 
 FILES.chooseDirectoryAndSave("Choose directory", "Choose where to store generated files") { dir ->
     SELECTION.filter { it instanceof DasTable && it.getKind() == ObjectKind.TABLE }.each { generate(it, dir) }
@@ -34,7 +39,7 @@ FILES.chooseDirectoryAndSave("Choose directory", "Choose where to store generate
 def generate(table, dir) {
     def className = javaName(singularize(table.getName()), true)
     def fields = calcFields(table)
-    new File(dir, className + ".kt").withPrintWriter { out -> generate(out, table.getName(), className, fields) }
+    new File(dir, className + "${classFileNameSuffix}.kt").withPrintWriter { out -> generate(out, table.getName(), className, fields) }
 }
 
 def generate(out, tableName, className, fields) {
@@ -136,7 +141,7 @@ def calcFields(table) {
         fields += [[
                            name : javaName(colName, false),
                            column: colName,
-                           type : typeStr == "Long" && DasUtil.isPrimary(col) || DasUtil.isForeign(col) && colNameLower.endsWith("id") ? "Int" : typeStr,
+                           type : downsizeLongIdToInt && typeStr == "Long" && DasUtil.isPrimary(col) || DasUtil.isForeign(col) && colNameLower.endsWith("id") ? "Int" : typeStr,
                            col  : col,
                            spec : spec,
 //                           constraints : constraints.reduce("") { all, constraint ->
