@@ -98,12 +98,7 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
     }
 
     fun doesResourceExist(resourcePath: String): Boolean {
-        try {
-            resourceClass.getResource(resourcePath)
-            return true
-        } catch (e: Exception) {
-            return false
-        }
+        return getResourceAsStream(resourceClass, resourcePath) != null
     }
 
     fun equalWithOutOfOrderLines(text1: String, text2: String): Boolean {
@@ -128,8 +123,10 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
         return false
     }
 
-    fun validateTableResourceFiles(dbVersion: String, errorAppendable: Appendable? = null) {
+    fun validateTableResourceFiles(dbVersion: String, errorAppendable: Appendable? = null): Boolean {
         val tableSet = HashSet<String>()
+        var validationPassed = true
+
         forEachEntity(DbEntity.TABLE, dbVersion, { tableFile, tableScript ->
             if (tableFile.name != MIGRATIONS_FILE_NAME) {
                 tableSet.add(tableFile.path)
@@ -140,14 +137,20 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
                         // see if rearranging lines will make them equal
                         if (!equalWithOutOfOrderLines(tableSql, tableScript)) {
                             val s = "Table validation failed for ${tableFile.path}, database and resource differ"
-                            logger.error(s)
-                            errorAppendable?.appendln(s)
+                            if (errorAppendable != null) {
+                                logger.error(s)
+                                errorAppendable.appendln(s)
+                            }
+                            validationPassed = false
                         }
                     }
                 } else {
                     val s = "Table validation failed for ${tableFile.path}, resource is missing"
-                    logger.error(s)
-                    errorAppendable?.appendln(s)
+                    if (errorAppendable != null) {
+                        logger.error(s)
+                        errorAppendable.appendln(s)
+                    }
+                    validationPassed = false
                 }
             }
         })
@@ -156,11 +159,16 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
             if (tableFile.name != MIGRATIONS_FILE_NAME) {
                 if (!tableSet.contains(tableFile.path)) {
                     val s = "Table validation failed for ${tableFile.path}, no database table for resource"
-                    logger.error(s)
-                    errorAppendable?.appendln(s)
+                    if (errorAppendable != null) {
+                        logger.error(s)
+                        errorAppendable.appendln(s)
+                    }
+                    validationPassed = false
                 }
             }
         })
+
+        return validationPassed
     }
 
     /**
@@ -270,7 +278,27 @@ LIMIT 1
         val tables = dbEntityExtractor.getDbEntities(entity, session)
 
         if (tables.filter { it.toLowerCase() == "migrations" }.isEmpty()) {
-            val useDbVersion = dbVersion ?: "V0_0_0"
+            var latestMatchedVersion: String? = null
+
+            if (dbVersion == null) {
+                val versionList = getVersions()
+                    .sortedWith(Comparator(String::versionCompare))
+
+
+                versionList.forEach { it ->
+                    if (validateTableResourceFiles(it, null)) {
+                        latestMatchedVersion = it
+                    }
+                }
+
+                if (latestMatchedVersion != null) {
+                    logger.info("Matched version $latestMatchedVersion based on table schema")
+                } else {
+                    logger.info("No version matched based on table schema, setting version to V0_0_0")
+                }
+            }
+
+            val useDbVersion = dbVersion ?: latestMatchedVersion ?: "V0_0_0"
 
             val dbTableResourceDir = entity.getEntityResourceDirectory(useDbVersion)
             val tableEntities = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, useDbVersion)
@@ -659,6 +687,70 @@ LIMIT 1
         }
     }
 
+    fun newEvolution(evolutionsDir: File, dbVersion: String) {
+        evolutionsDir.ensureExistingDirectory("evolutions path")
+
+        logger.info("Generated new play evolution in ${evolutionsDir.path}")
+
+        val sb = StringBuilder()
+        val versionMigrations = DbEntity.MIGRATION.getEntityResourceScripts(resourceClass, dbEntityExtractor, dbVersion)
+            .values.toList()
+            .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
+
+        val cleanComment = "(?<=^|\n)#".toRegex()
+
+        if (!versionMigrations.isEmpty()) {
+            sb.appendln("# --- !Ups")
+            versionMigrations.forEach { entityScript ->
+                // apply the migration
+                val sqlScript = getResourceAsString(resourceClass, entityScript.entityResourcePath)
+                logger.info("Adding to !Ups ${entityScript.entityResourcePath}")
+                sb.append("-- ").appendln(entityScript.entityResourcePath)
+                sb.appendln(sqlScript.replace(cleanComment, "-- "))
+            }
+        } else {
+            logger.info("Migrate: no up migrations in version $dbVersion")
+        }
+
+        val versionRollbacks = DbEntity.ROLLBACK.getEntityResourceScripts(resourceClass, dbEntityExtractor, dbVersion)
+            .values.toList()
+            .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
+            .reversed()
+
+        if (!versionRollbacks.isEmpty()) {
+            sb.appendln("# --- !Downs")
+            versionRollbacks.forEach { entityScript ->
+                // apply the migration
+                val sqlScript = getResourceAsString(resourceClass, entityScript.entityResourcePath)
+                logger.info("Adding to !Downs ${entityScript.entityResourcePath}")
+                sb.append("-- ").appendln(entityScript.entityResourcePath)
+                sb.appendln(sqlScript.replace(cleanComment, "-- "))
+            }
+        } else {
+            logger.info("Migrate: no down migrations in version $dbVersion")
+        }
+
+        if (!sb.isEmpty()) {
+            var lastMigration: Int = 0
+
+            evolutionsDir.list { dir, name ->
+                val (num, ext) = name.extractLeadingDigits()
+                if (num != null && ext == ".sql" && num > lastMigration) {
+                    lastMigration = num
+                }
+                false
+            }
+
+            lastMigration++
+
+            val evolutionFile = evolutionsDir + "$lastMigration.sql"
+            evolutionFile.writeText(sb.toString())
+            logger.info("Generated new play evolution $lastMigration.sql in ${evolutionsDir.path}")
+        } else {
+            logger.info("No migrations in $dbVersion for generating play evolution")
+        }
+    }
+
     /**
      * Execute db command
      *
@@ -680,6 +772,8 @@ LIMIT 1
      *     new-major                - create a new version directory with major version incremented.
      *     new-minor                - create a new version directory with minor version incremented.
      *     new-patch                - create a new version directory with patch version incremented.
+     *
+     *     new-evolution "play/evolutions/directory/path"         - create a new evolution from requested versions migrations and add this to the given play evolutions path
      *
      *     new-version              - create a new version directory for the requested version.
      *                                The directory cannot already exist. If the version is not provided
@@ -760,6 +854,21 @@ LIMIT 1
                             val path = args[i++]
                             val pathDir = File(path).ensureExistingDirectory("path")
                             dbPath = pathDir
+                        }
+
+                        "new-evolution" -> {
+                            if (args.size < i) {
+                                throw IllegalArgumentException("new-evolution option requires a path argument")
+                            }
+                            val path = args[i++]
+                            val pathDir = File(path).ensureExistingDirectory("evolutions path")
+                            if (dbVersion == null) dbVersion = getCurrentVersion()
+
+                            if (dbVersion != null) {
+                                newEvolution(pathDir, dbVersion!!)
+                            } else {
+                                throw IllegalArgumentException("new-evolution option requires a database which has a current migration version")
+                            }
                         }
 
                         "dump-tables" -> {
@@ -898,7 +1007,6 @@ LIMIT 1
                             val version = dbVersion ?: migration!!.version
                             newEntityFile(DbEntity.TRIGGER, dbPath, version, title)
                         }
-
 
                         "new-view" -> {
                             if (args.size < i || args[i].isBlank()) {

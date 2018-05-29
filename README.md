@@ -551,7 +551,8 @@ To generate contents for the `tables/` directory run the `dump-tables` command.
 
 Commands:
 
-* init - initialize migrations table and migrate all to given version or latest version
+* init - initialize migrations table and migrate all to given version or latest version based on
+  database table match to table schemas contained in versions
 
 * path "resources/db" - set path to resources/db directory of the project where version
   information is stored.
@@ -582,6 +583,9 @@ Commands:
 
   If there is a previous version to the one requested then all its entity scripts will be copied
   to the new version directory.
+
+* new-evolution "play/evolutions/directory" create a new play evolution file from current or
+  requested version migrations and rollbacks in the requested directory.
 
 * new-migration "title" - create a new up/down migration script files in the requested (or
   current) version's migrations directory. The file name will be in the form: N.title.D.sql

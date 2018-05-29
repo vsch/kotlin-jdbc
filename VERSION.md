@@ -3,6 +3,7 @@
 [TOC]: # " "
 
 - [TODO](#todo)
+- [0.2.26](#0226)
 - [0.2.24](#0224)
 - [0.2.22](#0222)
 - [0.2.20](#0220)
@@ -29,6 +30,15 @@
   * [ ] Result set
   * [ ] Json
   * [ ] Kotlin types
+
+## 0.2.26
+
+* Fix: init command when run on a database without `migrations` table will use db versions table
+  schema to determine latest matched version as the current version
+* Fix: table validation to properly detect when resource is missing
+* Add: migrations to play evolutions conversion command: `new-evolution
+  "play/evolutions/directory"` which will convert the current or requested version migrations
+  and rollbacks to the next play evolutions file in the requested directory.
 
 ## 0.2.24
 
