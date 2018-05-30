@@ -33,6 +33,8 @@
 
 ## 0.2.26
 
+* Fix: table validation for out of order lines to ignore trailing , otherwise the last line out
+  of order does not match.
 * Fix: init command when run on a database without `migrations` table will use db versions table
   schema to determine latest matched version as the current version
 * Add: validation for table names in table sql to match file name when doing init.

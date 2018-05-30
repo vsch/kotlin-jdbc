@@ -10,6 +10,8 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
         val MIGRATIONS_FILE_NAME = DbEntity.TABLE.addSuffix("migrations")
     }
 
+    var verbose = false
+
     fun getVersions(): List<String> {
         val files = getResourceFiles(resourceClass, "/db").filter { it.matches(DbVersion.regex) }.map { it.toUpperCase() }.sorted()
         return files
@@ -102,8 +104,8 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
     }
 
     fun equalWithOutOfOrderLines(text1: String, text2: String): Boolean {
-        val textLines1 = text1.split('\n').filter { !it.isBlank() }.map { it.trim() }
-        val textLines2 = text2.split('\n').filter { !it.isBlank() }.map { it.trim() }
+        val textLines1 = text1.split('\n').filter { !it.isBlank() }.map { it.trim().removeSuffix(",").trim() }
+        val textLines2 = text2.split('\n').filter { !it.isBlank() }.map { it.trim().removeSuffix(",").trim() }
         if (textLines1.size == textLines2.size) {
             val textLinesMap = HashMap<String, Int>()
             textLines2.forEach {
@@ -177,8 +179,12 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
                             // see if rearranging lines will make them equal
                             if (!equalWithOutOfOrderLines(tableSql, tableScript)) {
                                 val s = "Table validation failed for ${tableFile.path}, database and resource differ"
+                                if (validationPassed) {
+                                    val tmp = 0
+                                }
+                                if (verbose) logger.error(s)
                                 if (errorAppendable != null) {
-                                    logger.error(s)
+                                    if (!verbose) logger.error(s)
                                     errorAppendable.appendln(s)
                                 }
                                 validationPassed = false
@@ -187,8 +193,9 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
                     }
                 } else {
                     val s = "Table validation failed for ${tableFile.path}, resource is missing"
+                    if (verbose) logger.error(s)
                     if (errorAppendable != null) {
-                        logger.error(s)
+                        if (!verbose) logger.error(s)
                         errorAppendable.appendln(s)
                     }
                     validationPassed = false
@@ -201,8 +208,9 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
                 if (tableFile.name != MIGRATIONS_FILE_NAME) {
                     if (!tableSet.contains(tableFile.path)) {
                         val s = "Table validation failed for ${tableFile.path}, no database table for resource"
+                        if (verbose) logger.error(s)
                         if (errorAppendable != null) {
-                            logger.error(s)
+                            if (!verbose) logger.error(s)
                             errorAppendable.appendln(s)
                         }
                         validationPassed = false
@@ -879,6 +887,10 @@ LIMIT 1
                 while (i < args.size) {
                     val option = args[i++]
                     when (option) {
+                        "-v" -> {
+                            verbose = true
+                        }
+
                         "version" -> {
                             if (args.size <= i) {
                                 throw IllegalArgumentException("version option requires a version argument")
