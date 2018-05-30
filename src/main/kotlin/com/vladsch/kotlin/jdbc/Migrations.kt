@@ -126,22 +126,63 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
     fun validateTableResourceFiles(dbVersion: String, errorAppendable: Appendable? = null): Boolean {
         val tableSet = HashSet<String>()
         var validationPassed = true
+        val entity = DbEntity.TABLE
 
-        forEachEntity(DbEntity.TABLE, dbVersion, { tableFile, tableScript ->
+        // validate that all table resources are valid
+        forEachEntityResourceFile(entity, dbVersion) { tableFile ->
+            if (tableFile.name != MIGRATIONS_FILE_NAME) {
+                val tableSql = getResourceAsString(resourceClass, tableFile.path)
+                val tableName = entity.extractEntityName(dbEntityExtractor, tableSql)
+                if (tableName == null) {
+                    val s = "Invalid SQL ${entity.displayName} file ${tableFile.path}, cannot find ${entity.displayName} name"
+                    logger.error(s)
+                    if (errorAppendable != null) {
+                        errorAppendable.appendln(s)
+                    }
+                    validationPassed = false
+                } else if (tableName + entity.fileSuffix != tableFile.name) {
+                    val s = "File ${tableFile.path} for ${entity.displayName} $tableName should be named $tableName${entity.fileSuffix}"
+                    logger.error(s)
+                    if (errorAppendable != null) {
+                        errorAppendable.appendln(s)
+                    }
+                    validationPassed = false
+                }
+            }
+        }
+
+        forEachEntity(entity, dbVersion, { tableFile, tableScript ->
             if (tableFile.name != MIGRATIONS_FILE_NAME) {
                 tableSet.add(tableFile.path)
 
                 if (doesResourceExist(tableFile.path)) {
                     val tableSql = getResourceAsString(resourceClass, tableFile.path)
-                    if (tableSql.trim() != tableScript.trim()) {
-                        // see if rearranging lines will make them equal
-                        if (!equalWithOutOfOrderLines(tableSql, tableScript)) {
-                            val s = "Table validation failed for ${tableFile.path}, database and resource differ"
-                            if (errorAppendable != null) {
-                                logger.error(s)
-                                errorAppendable.appendln(s)
+                    val tableName = entity.extractEntityName(dbEntityExtractor, tableSql)
+                    if (tableName == null) {
+                        val s = "Invalid SQL ${entity.displayName} file ${tableFile.path}, cannot find ${entity.displayName} name"
+                        logger.error(s)
+                        if (errorAppendable != null) {
+                            errorAppendable.appendln(s)
+                        }
+                        validationPassed = false
+                    } else if (tableName + entity.fileSuffix != tableFile.name) {
+                        val s = "File ${tableFile.path} for ${entity.displayName} $tableName should be named $tableName${entity.fileSuffix}"
+                        logger.error(s)
+                        if (errorAppendable != null) {
+                            errorAppendable.appendln(s)
+                        }
+                        validationPassed = false
+                    } else {
+                        if (tableSql.trim() != tableScript.trim()) {
+                            // see if rearranging lines will make them equal
+                            if (!equalWithOutOfOrderLines(tableSql, tableScript)) {
+                                val s = "Table validation failed for ${tableFile.path}, database and resource differ"
+                                if (errorAppendable != null) {
+                                    logger.error(s)
+                                    errorAppendable.appendln(s)
+                                }
+                                validationPassed = false
                             }
-                            validationPassed = false
                         }
                     }
                 } else {
@@ -155,18 +196,20 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
             }
         })
 
-        forEachEntityResourceFile(DbEntity.TABLE, dbVersion, { tableFile ->
-            if (tableFile.name != MIGRATIONS_FILE_NAME) {
-                if (!tableSet.contains(tableFile.path)) {
-                    val s = "Table validation failed for ${tableFile.path}, no database table for resource"
-                    if (errorAppendable != null) {
-                        logger.error(s)
-                        errorAppendable.appendln(s)
+        if (validationPassed) {
+            forEachEntityResourceFile(DbEntity.TABLE, dbVersion, { tableFile ->
+                if (tableFile.name != MIGRATIONS_FILE_NAME) {
+                    if (!tableSet.contains(tableFile.path)) {
+                        val s = "Table validation failed for ${tableFile.path}, no database table for resource"
+                        if (errorAppendable != null) {
+                            logger.error(s)
+                            errorAppendable.appendln(s)
+                        }
+                        validationPassed = false
                     }
-                    validationPassed = false
                 }
-            }
-        })
+            })
+        }
 
         return validationPassed
     }
@@ -284,7 +327,6 @@ LIMIT 1
                 val versionList = getVersions()
                     .sortedWith(Comparator(String::versionCompare))
 
-
                 versionList.forEach { it ->
                     if (validateTableResourceFiles(it, null)) {
                         latestMatchedVersion = it
@@ -298,7 +340,7 @@ LIMIT 1
                 }
             }
 
-            val useDbVersion = dbVersion ?: latestMatchedVersion ?: "V0_0_0"
+            val useDbVersion = dbVersion ?: "V0_0_0"
 
             val dbTableResourceDir = entity.getEntityResourceDirectory(useDbVersion)
             val tableEntities = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, useDbVersion)
@@ -326,7 +368,12 @@ LIMIT 1
             }
 
             // switch to latest if none given
-            migration = migration.withVersion(dbVersion ?: getLatestVersion())
+            migration = migration.withVersion(latestMatchedVersion ?: dbVersion ?: getLatestVersion())
+
+            if (latestMatchedVersion != null || dbVersion != null) {
+               // insert <migrated> line so the rest know what version it is
+                migration.insertUpMigrationAfter("<migrate>", "") {}
+            }
         } else {
             val sqlQuery = sqlQuery("SELECT MAX(batch_id) FROM migrations")
             val batchId = session.first(sqlQuery) {

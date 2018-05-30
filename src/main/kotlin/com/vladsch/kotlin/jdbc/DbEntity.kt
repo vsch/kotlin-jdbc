@@ -157,6 +157,26 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
         }
     }
 
+    fun extractEntityName(dbEntityExtractor: DbEntityExtractor, entitySql: String):String? {
+        val entityNameRegEx = dbEntityExtractor.getExtractEntityNameRegEx(this) ?: return null
+        return extractEntityName(entityNameRegEx, entitySql)
+    }
+
+    fun extractEntityName(entityNameRegEx: Regex, entitySql: String): String? {
+        val matchGroup = entityNameRegEx.find(entitySql)
+        if (matchGroup != null) {
+            return matchGroup.groupValues[1].removeSurrounding("`")
+        }
+        return null
+    }
+
+    fun validEntityFileName(entityName: String, entityNameFile: String): String? {
+        if (entityName != entityNameFile) {
+            return "$entityName${this.fileSuffix}"
+        }
+        return null
+    }
+
     /**
      * Get entity to EntityScript
      *
@@ -183,7 +203,7 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
                         val entityLowercaseName = entityName.toLowerCase()
 
                         if (entityName != entityNameFile) {
-                            throw IllegalStateException("File $file for $displayName $entityName should be named $entityName.udf.sql")
+                            throw IllegalStateException("File $file for $displayName $entityName should be named $entityName${this.fileSuffix}")
                         }
 
                         if (entities.contains(entityLowercaseName)) {

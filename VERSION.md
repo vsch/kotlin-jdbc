@@ -35,6 +35,7 @@
 
 * Fix: init command when run on a database without `migrations` table will use db versions table
   schema to determine latest matched version as the current version
+* Add: validation for table names in table sql to match file name when doing init.
 * Fix: table validation to properly detect when resource is missing
 * Add: migrations to play evolutions conversion command: `new-evolution
   "play/evolutions/directory"` which will convert the current or requested version migrations
