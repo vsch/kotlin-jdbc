@@ -43,7 +43,7 @@ even easier to work with SQL queries. See
 
 IntelliJ Ultimate Database Tools extension script for conversion of SQL tables to a Model is
 also available. See
-[Installing IntelliJ Ultimate Database Tools Extension Script](#installing-intellij-ultimate-database-tools-extension-script).
+[Installing IntelliJ Ultimate Database Tools Extension Script](#installing-intellij-ultimate-database-tools-extension-scripts).
 
 The library provides a simple migration command processor to implement migrate/rollback
 functionality with version tracking with each version containing a copy of database entities:
@@ -354,7 +354,7 @@ Any property marked as `auto` generated will not be used for value `UPDATE` or `
 
 For IntelliJ Ultimate a Database extension script can be installed which will generate models
 from the context menu of any table in the database tools window. See
-[Installing IntelliJ Ultimate Database Tools Extension Script](#installing-intellij-ultimate-database-tools-extension-script)
+[Installing IntelliJ Ultimate Database Tools Extension Script](#installing-intellij-ultimate-database-tools-extension-scripts)
 
 ```kotlin
 class ValidModel : Model<ValidModel>(tableName, dbCase = true) {
@@ -433,7 +433,7 @@ To get full benefit of SQL completions you should also define a database source 
 against which you are developing (or a local clone of it) and configure the SQL dialect for the
 database you are using.
 
-#### Installing IntelliJ Ultimate Database Tools Extension Script
+#### Installing IntelliJ Ultimate Database Tools Extension Scripts
 
 Download the groovy script for generating a `kotlin-jdbc` model:
 [Generate Kotlin-Model.groovy](Generate%20Kotlin-Model.groovy)
@@ -446,6 +446,50 @@ directory and copy the script to this location.
 It will appear in the `Scripted Extensions` pop-up menu.
 
 ![Scripted Extensions Generate Kotlin Model](assets/images/Scripted_Extensions_Generate_Kotlin-Model.png)
+
+You can also add the [Kotlin-Enum.kt.js](Kotlin-Enum.kt.js) to convert result set data to Kotlin
+Enum definition. You need to add it to the `data/extractors` directory
+
+![Scripted_Extensions_Generate-Kotlin-Model](assets/images/Scripted_Extensions_Data_Extractors.png)
+
+It uses the first column name as the enum name (id suffix stripped and last word pluralized).
+The first column which contains all non-numeric values will be used for names of the enum values
+(converted to screaming snake case), if no such column exists then the names will be the
+screaming snake case of the enum name with id values appended.
+
+All columns will be included in the enum value constructor and search functions in companion
+object for an enum value of a given column. Easier to show than explain:
+
+Result set:
+
+| changeHistoryTypeId |      type       |
+|---------------------|-----------------|
+| 1                   | Process         |
+| 2                   | File            |
+| 3                   | Client          |
+| 4                   | User            |
+| 5                   | ProcessInstance |
+
+Generated Kotlin enum:
+
+```kotlin
+enum class ChangeHistoryTypes(val id: Int, val type: String) {
+  PROCESS(1, "Process"),
+  FILE(2, "File"),
+  CLIENT(3, "Client"),
+  USER(4, "User"),
+  PROCESS_INSTANCE(5, "ProcessInstance");
+
+  companion object {
+    fun changeHistoryTypeId(id: Int): ChangeHistoryTypes? = values().find { it.id == id }
+    fun type(type: String): ChangeHistoryTypes? = values().find { it.type == type }
+  }
+}
+```
+
+A script for generating a JavaScript enum based on [`enumerated-type`] npm package will generate
+an enum usable in JavaScript
+[JavaScript-Enumerated-Value-Type.kt.js](JavaScript-Enumerated-Value-Type.kt.js)
 
 ## Migrations
 
@@ -594,24 +638,20 @@ Commands:
   is generated and `__TITLE__` with the "title" passed to the command.
 
 * new-function "name" - create a new function file using resources/db/templates customized
-  template or built-in if none
-  Placeholders in the file: `__VERSION__` will be replaced with the version for which this file
-  is generated and `__NAME__` with the "name" passed to the command.
+  template or built-in if none Placeholders in the file: `__VERSION__` will be replaced with the
+  version for which this file is generated and `__NAME__` with the "name" passed to the command.
 
 * new-procedure "name" - create a new procedure file using resources/db/templates customized
-  template or built-in if none
-  Placeholders in the file: `__VERSION__` will be replaced with the version for which this file
-  is generated and `__NAME__` with the "name" passed to the command.
+  template or built-in if none Placeholders in the file: `__VERSION__` will be replaced with the
+  version for which this file is generated and `__NAME__` with the "name" passed to the command.
 
 * new-trigger "name" - create a new trigger file using resources/db/templates customized
-  template or built-in if none
-  Placeholders in the file: `__VERSION__` will be replaced with the version for which this file
-  is generated and `__NAME__` with the "name" passed to the command.
+  template or built-in if none Placeholders in the file: `__VERSION__` will be replaced with the
+  version for which this file is generated and `__NAME__` with the "name" passed to the command.
 
 * new-view "name" - create a new view file using resources/db/templates customized template or
-  built-in if none
-  Placeholders in the file: `__VERSION__` will be replaced with the version for which this file
-  is generated and `__NAME__` with the "name" passed to the command.
+  built-in if none Placeholders in the file: `__VERSION__` will be replaced with the version for
+  which this file is generated and `__NAME__` with the "name" passed to the command.
 
 * migrate - migrate to given version or to latest version
 
@@ -642,7 +682,6 @@ Commands:
 
 * exit - exit application
 
-
 #### Customizing Templates used by `new-...` command
 
 Place your files in the `resources/db` directory and name it `templates` the layout is the same
@@ -670,3 +709,6 @@ db/
 
 Copyright (c) 2018 - Vladimir Schneider  
 Copyright (c) 2015 - Kazuhiro Sera
+
+[`enumerated-type`]: https://github.com/vsch/enumerated-type
+
