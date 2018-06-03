@@ -14,7 +14,12 @@ open class SqlQuery(
     val cleanStatement: String = replaceNamedParams(statement)
 
     private fun extractNamedParamsIndexed(stmt: String): Map<String, List<Int>> {
-        return regex.findAll(stmt).mapIndexed { index, group ->
+        // TODO: add comment scanning as optional step to not penalize queries that cannot have comments
+        return regex.findAll(stmt).filter { group ->
+            val pos = stmt.lastIndexOf('\n', group.range.first)
+            val lineStart = if (pos == -1) 0 else pos + 1;
+            !regexSqlComment.containsMatchIn(stmt.subSequence(lineStart, stmt.length))
+        }.mapIndexed { index, group ->
             Pair(group, index)
         }.groupBy({ it.first.value.substring(1) }, { it.second })
     }
@@ -42,12 +47,12 @@ open class SqlQuery(
         return this
     }
 
-    open fun inParams(params:Map<String,Any?>): SqlQuery {
+    open fun inParams(params: Map<String, Any?>): SqlQuery {
         inputParams.putAll(params)
         return this
     }
 
-    open fun inParams(vararg params:Pair<String,Any?>): SqlQuery {
+    open fun inParams(vararg params: Pair<String, Any?>): SqlQuery {
         inputParams.putAll(params)
         return this
     }
@@ -58,5 +63,6 @@ open class SqlQuery(
 
     companion object {
         private val regex = Regex(""":\w+""")
+        private val regexSqlComment = Regex("""^\s*(?:--\s|#)""")
     }
 }

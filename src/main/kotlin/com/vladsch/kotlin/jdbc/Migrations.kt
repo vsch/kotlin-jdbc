@@ -3,6 +3,7 @@ package com.vladsch.kotlin.jdbc
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.FileWriter
+import java.sql.SQLException
 
 class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor, val resourceClass: Class<*>) {
     companion object {
@@ -442,10 +443,11 @@ LIMIT 1
                     if (!versionMigrations.isEmpty()) {
                         versionMigrations.forEach { entityScript ->
                             // apply the migration
+                            val appliedMigrations = versionMigration.getVersionBatchesNameMap()
                             val sqlScript = getResourceAsString(resourceClass, entityScript.entityResourcePath)
                             versionMigration.insertUpMigrationAfter(entityScript.entityResourcePath, sqlScript) {
                                 logger.info("Migrate ${entityScript.entityResourcePath}")
-                                runBatchScript(entity, versionMigration, entityScript.entityResourcePath, null, sqlScript, entityScript)
+                                runBatchScript(entity, versionMigration, entityScript.entityResourcePath, appliedMigrations, sqlScript, entityScript)
                             }
                         }
                     } else {
@@ -491,18 +493,24 @@ LIMIT 1
                 val startLine = line
                 line += partLines
                 val migrationPartName = "$migrationScriptPath[${index}:$startLine-${line - 1}]"
+                val query = sqlQuery(sql)
                 if (opType == DbEntity.MIGRATION) {
                     if (appliedMigrations == null || !appliedMigrations.containsKey(migrationPartName)) {
                         migration.insertUpMigrationAfter(migrationPartName, sql) {
                             logger.info("Migrate ${entityData.entityResourcePath} part [${index}:$startLine-${line - 1}]")
-                            session.execute(sqlQuery(sql))
+                            try {
+                                session.execute(query)
+                            } catch (e: SQLException) {
+                                logger.error("SQLException: ${e.message} on SQL:\n$sql\n")
+                                throw e;
+                            }
                         }
                     }
                 } else {
                     if (appliedMigrations == null || appliedMigrations.containsKey(migrationPartName)) {
                         migration.insertDownMigrationAfter(migrationPartName, sql) {
                             logger.info("Rollback ${entityData.entityResourcePath} part [${index}:$startLine-${line - 1}]")
-                            session.execute(sqlQuery(sql))
+                            session.execute(query)
                         }
                     }
                 }

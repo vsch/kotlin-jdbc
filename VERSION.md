@@ -33,6 +33,9 @@
 
 ## 0.2.26
 
+* Add: ignoring named param pattern in query lines that are commented out with `-- ` or `#` as
+  first non-blank of the line. Otherwise too many parameters will be passed for the query since
+  SQL will not see the named param uses or comments in sql might me interpreted as parameter names.
 * Add: IntelliJ Ultimate Database Tools data extraction script to generate JavaScript enum from
   table data. See:
 * Add: IntelliJ Ultimate Database Tools data extraction script to generate Kotlin enum from

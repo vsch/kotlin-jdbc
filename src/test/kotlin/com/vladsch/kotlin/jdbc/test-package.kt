@@ -15,5 +15,5 @@ fun withQueries(vararg stmts: String, assertions: (SqlQuery) -> Unit) {
 }
 
 fun String.normalizeSpaces(): String {
-    return Regex("[ \\n\\t]+").replace(this, " ")
+    return Regex("[ \\t]+").replace(this, " ")
 }

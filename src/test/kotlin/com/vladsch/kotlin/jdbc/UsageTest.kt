@@ -216,16 +216,16 @@ create table members (
                 "param3" to true))
         ) { preparedStmt ->
             assertEquals("""SELECT * FROM dual t
-            WHERE (? IS NULL OR ? = ?) AND (? IS NULL OR ? = ?) AND (? IS NULL OR ? = ?)
-            {1: '1', 2: 2, 3: 2, 4: 2, 5: '1', 6: TRUE, 7: TRUE, 8: TRUE, 9: '1'}""".normalizeSpaces(),
+            WHERE (? IS NULL OR ? = ?)
+            AND (? IS NULL OR ? = ?)
+            AND (? IS NULL OR ? = ?) {1: '1', 2: 2, 3: 2, 4: 2, 5: '1', 6: TRUE, 7: TRUE, 8: TRUE, 9: '1'}""".normalizeSpaces(),
                 preparedStmt.toString().extractQueryFromPreparedStmt())
         }
 
         withPreparedStmt(sqlQuery("""SELECT * FROM dual t WHERE (:param1 IS NULL OR :param2 = :param2)""",
             inputParams = mapOf("param2" to 2))
         ) { preparedStmt ->
-            assertEquals("""SELECT * FROM dual t WHERE (? IS NULL OR ? = ?)
-            {1: NULL, 2: 2, 3: 2}""".normalizeSpaces(),
+            assertEquals("""SELECT * FROM dual t WHERE (? IS NULL OR ? = ?) {1: NULL, 2: 2, 3: 2}""".normalizeSpaces(),
                 preparedStmt.toString().extractQueryFromPreparedStmt())
         }
     }

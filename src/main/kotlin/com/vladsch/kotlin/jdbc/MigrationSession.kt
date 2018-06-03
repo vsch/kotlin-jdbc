@@ -94,6 +94,11 @@ INSERT INTO migrations (
 UPDATE migrations SET rolled_back_id = :transId WHERE (script_name = :scriptName OR script_name LIKE :scriptNameLike) AND version = :version AND migration_type = -1 AND rolled_back_id IS NULL
 """, mapOf("transId" to transId, "version" to version, "scriptName" to rollBackScriptName, "scriptNameLike" to "$rollBackScriptName[%]"))
         migrations.session.execute(updateSql)
+        if (!migrations.session.connection.autoCommit) {
+            // commit changes so the last success is not lost on next failure
+            migrations.session.connection.commit()
+            migrations.session.connection.begin()
+        }
     }
 
     fun insertDownMigrationAfter(scriptName: String, scriptSql: String, action: () -> Unit) {
