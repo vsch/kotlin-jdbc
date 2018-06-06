@@ -241,10 +241,9 @@ var columnTypes = enumNames.map(function (value) {
     }
 });
 
-
 /**
  *
- * @param callback      (name, type, isId, colIndex) return
+ * @param callback      (name, type, colIndex) return
  * @param prefix        will be output iff enumNames is not empty and have output
  * @param delimiter     will be used between outputs
  * @param suffix        will be output iff enumNames is not empty and have output
@@ -257,7 +256,7 @@ function forAllEnumParams(callback, prefix, delimiter, suffix) {
     enumNames.forEach(function (value) {
         var enumNameColumn = enumNameColumns[value];
         var type = columnTypes[enumNameColumn];
-        var out = callback(value,  type,  enumNameColumn === enumNameColumn, enumNameColumn);
+        var out = callback(value, type, enumNameColumn);
         if (out !== undefined && out !== null) {
             output(sep);
             sep = delimiter;
@@ -292,14 +291,14 @@ enumValueNames.forEach(function (value, enumValueIndex) {
     sep = ",\n";
     output("  ", value);
 
-    forAllEnumParams(function (name, type, isId, colIndex) {
+    forAllEnumParams(function (name, type, colIndex) {
         var columnElement = columns[colIndex][enumValueIndex];
-        return type === "String" ? '"' + columnElement.replace(/\\/g,"\\\\").replace(/"/g,"\\\"") + '"': columnElement;
+        return type === "String" ? '"' + columnElement.replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + '"' : columnElement;
     }, "(", ", ", ")");
 });
 outputln(";");
 
-forAllEnumParams(function (name, type, isId, colIndex) {
+forAllEnumParams(function (name, type, colIndex) {
     return ["    fun ", javaName(columnNames[colIndex]), "(", name, ": ", type, "): ", enumName, "? = values().find { it.", name, " == ", name, " }"].join("");
 }, "\n  companion object {\n", "\n", "\n  }\n");
 

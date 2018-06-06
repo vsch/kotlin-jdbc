@@ -436,7 +436,7 @@ database you are using.
 #### Installing IntelliJ Ultimate Database Tools Extension Scripts
 
 Download the groovy script for generating a `kotlin-jdbc` model:
-[Generate Kotlin-Model.groovy](Generate%20Kotlin-Model.groovy)
+[Generate Kotlin-Model.groovy](extensions/com.intellij.database/schema/Generate%20Kotlin-Model.groovy)
 
 In database tool window, right click on a table and select Scripted Extensions > Go to scripts
 directory and copy the script to this location.
@@ -447,7 +447,7 @@ It will appear in the `Scripted Extensions` pop-up menu.
 
 ![Scripted Extensions Generate Kotlin Model](assets/images/Scripted_Extensions_Generate_Kotlin-Model.png)
 
-You can also add the [Kotlin-Enum.kt.js](Kotlin-Enum.kt.js) to convert result set data to Kotlin
+You can also add the [Kotlin-Enum.kt.js](extensions/com.intellij.database/data/extractors/Kotlin-Enum.kt.js) to convert result set data to Kotlin
 Enum definition. You need to add it to the `data/extractors` directory
 
 ![Scripted_Extensions_Generate-Kotlin-Model](assets/images/Scripted_Extensions_Data_Extractors.png)
@@ -489,7 +489,7 @@ enum class ChangeHistoryTypes(val id: Int, val type: String) {
 
 A script for generating a JavaScript enum based on [`enumerated-type`] npm package will generate
 an enum usable in JavaScript
-[JavaScript-Enumerated-Value-Type.kt.js](JavaScript-Enumerated-Value-Type.kt.js)
+[JavaScript-Enumerated-Value-Type.kt.js](extensions/com.intellij.database/data/extractors/JavaScript-Enumerated-Value-Type.kt.js)
 
 ## Migrations
 
