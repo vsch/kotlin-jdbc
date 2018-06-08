@@ -288,7 +288,7 @@ session has separate methods for different types of query execution and results:
 * `session.execute` used to execute queries not expecting a result set
 * `session.update` used to execute update queries
 
-Convenience methods that process result sets which use an extractor which take an ResultSet Row
+Convenience methods that process result sets which use an extractor which take a ResultSet Row
 and return an instance of something:
 
 * `session.list` used to return a list of extracted data from rows
