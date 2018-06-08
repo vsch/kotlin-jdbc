@@ -309,11 +309,15 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
 
             if (!propType.isAuto) {
                 if (properties.containsKey(prop.name)) {
-                    val columnName = columnNames[prop.name] ?: prop.name
-                    sb.append(sep).append("`").append(columnName).append("`")
-                    sbValues.append(sep).append("?")
-                    sep = ", "
-                    params.add(properties[prop.name])
+                    val propValue = properties[prop.name]
+                    // skip null properties which have defaults (null means use default)
+                    if (propValue != null || !propType.isDefault) {
+                        val columnName = columnNames[prop.name] ?: prop.name
+                        sb.append(sep).append("`").append(columnName).append("`")
+                        sbValues.append(sep).append("?")
+                        sep = ", "
+                        params.add(propValue)
+                    }
                 } else if (!prop.returnType.isMarkedNullable && !propType.isDefault) {
                     throw IllegalStateException("$name.${prop.name} property is not nullable nor default and not defined in ${this}")
                 }
@@ -378,15 +382,28 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
 
         for (prop in kProperties) {
             val propType = propertyTypes[prop.name] ?: PropertyType.PROPERTY
-            if (!propType.isAuto && modified.contains(prop.name)) {
+            if (!propType.isAuto) {
                 if (properties.containsKey(prop.name)) {
-                    val columnName = columnNames[prop.name] ?: prop.name
+                    val propValue = properties[prop.name]
+                    if (modified.contains(prop.name)) {
+                        // skip null properties which have defaults (null means use default)
+                        if (propValue != null || !propType.isDefault) {
+                            val columnName = columnNames[prop.name] ?: prop.name
 
-                    sb.append(sep).append("`").append(columnName).append("` = ?")
-                    sep = ", "
-                    params.add(properties[prop.name])
+                            sb.append(sep).append("`").append(columnName).append("` = ?")
+                            sep = ", "
+                            params.add(properties[prop.name])
+                        }
+                    }
                 }
             }
+        }
+
+        if (params.isEmpty()) {
+            // all modified props were null with defaults, update key to itself
+            val prop = keyProperties[0]
+            val columnName = columnNames[prop.name] ?: prop.name
+            sb.append(sep).append("`").append(columnName).append("` = `").append(columnName).append("`")
         }
 
         sb.append(" WHERE ")

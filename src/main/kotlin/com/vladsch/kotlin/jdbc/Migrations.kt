@@ -5,13 +5,17 @@ import java.io.File
 import java.io.FileWriter
 import java.sql.SQLException
 
+@Suppress("MemberVisibilityCanBePrivate")
 class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor, val resourceClass: Class<*>) {
+
     companion object {
         private val logger = LoggerFactory.getLogger(Migrations::class.java)!!
         val MIGRATIONS_FILE_NAME = DbEntity.TABLE.addSuffix("migrations")
     }
 
+    var quiet = false
     var verbose = false
+    var detailed = false
 
     fun getVersions(): List<String> {
         val files = getResourceFiles(resourceClass, "/db").filter { it.matches(DbVersion.regex) }.map { it.toUpperCase() }.sorted()
@@ -126,6 +130,26 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
         return false
     }
 
+    fun logTableDetails(tableName: String, errorAppendable: Appendable?, resourceScript: String?, databaseScript: String?) {
+        if (detailed) {
+            val out = StringBuilder()
+
+            if (resourceScript != null) {
+                out.append("\n------------------------------------------ RESOURCE ------------------------------------------\n$resourceScript\n")
+            }
+            if (databaseScript != null) {
+                out.append("\n------------------------------------------ DATABASE ------------------------------------------\n$databaseScript\n")
+            }
+
+            if (resourceScript != null || databaseScript != null) {
+                out.append("----------------------------------------------------------------------------------------------\n")
+            }
+
+            logger.error(out.toString())
+            errorAppendable?.append(out)
+        }
+    }
+
     fun validateTableResourceFiles(dbVersion: String, errorAppendable: Appendable? = null): Boolean {
         val tableSet = HashSet<String>()
         var validationPassed = true
@@ -139,16 +163,14 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
                 if (tableName == null) {
                     val s = "Invalid SQL ${entity.displayName} file ${tableFile.path}, cannot find ${entity.displayName} name"
                     logger.error(s)
-                    if (errorAppendable != null) {
-                        errorAppendable.appendln(s)
-                    }
+                    errorAppendable?.appendln(s)
+                    logTableDetails(entity.displayName, errorAppendable, tableSql, null)
                     validationPassed = false
                 } else if (tableName + entity.fileSuffix != tableFile.name) {
                     val s = "File ${tableFile.path} for ${entity.displayName} $tableName should be named $tableName${entity.fileSuffix}"
                     logger.error(s)
-                    if (errorAppendable != null) {
-                        errorAppendable.appendln(s)
-                    }
+                    errorAppendable?.appendln(s)
+                    logTableDetails(entity.displayName, errorAppendable, tableSql, null)
                     validationPassed = false
                 }
             }
@@ -164,16 +186,14 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
                     if (tableName == null) {
                         val s = "Invalid SQL ${entity.displayName} file ${tableFile.path}, cannot find ${entity.displayName} name"
                         logger.error(s)
-                        if (errorAppendable != null) {
-                            errorAppendable.appendln(s)
-                        }
+                        errorAppendable?.appendln(s)
+                        logTableDetails(entity.displayName, errorAppendable, tableSql, null)
                         validationPassed = false
                     } else if (tableName + entity.fileSuffix != tableFile.name) {
                         val s = "File ${tableFile.path} for ${entity.displayName} $tableName should be named $tableName${entity.fileSuffix}"
                         logger.error(s)
-                        if (errorAppendable != null) {
-                            errorAppendable.appendln(s)
-                        }
+                        errorAppendable?.appendln(s)
+                        logTableDetails(entity.displayName, errorAppendable, tableSql, null)
                         validationPassed = false
                     } else {
                         if (tableSql.trim() != tableScript.trim()) {
@@ -188,6 +208,7 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
                                     if (!verbose) logger.error(s)
                                     errorAppendable.appendln(s)
                                 }
+                                logTableDetails(entity.displayName, errorAppendable, tableSql, tableScript)
                                 validationPassed = false
                             }
                         }
@@ -199,6 +220,7 @@ class Migrations(val session: Session, val dbEntityExtractor: DbEntityExtractor,
                         if (!verbose) logger.error(s)
                         errorAppendable.appendln(s)
                     }
+                    logTableDetails(entity.displayName, errorAppendable, null, tableScript)
                     validationPassed = false
                 }
             }
@@ -380,7 +402,7 @@ LIMIT 1
             migration = migration.withVersion(latestMatchedVersion ?: dbVersion ?: getLatestVersion())
 
             if (latestMatchedVersion != null || dbVersion != null) {
-               // insert <migrated> line so the rest know what version it is
+                // insert <migrated> line so the rest know what version it is
                 migration.insertUpMigrationAfter("<migrate>", "") {}
             }
         } else {
@@ -388,7 +410,7 @@ LIMIT 1
             val batchId = session.first(sqlQuery) {
                 it.int(1)
             } ?: 0
-            migration = MigrationSession(batchId + 1, dbVersion ?: getLatestVersion(), this)
+            migration = MigrationSession(batchId + 1, dbVersion ?: getCurrentVersion() ?: getLatestVersion(), this)
         }
 
         return migration
@@ -819,6 +841,13 @@ LIMIT 1
      *
      * @param args Array<String>
      *
+     *     flags
+     *
+     *          -v                  - verbose: show each comparison failure message in log
+     *          -d                  - detail:
+     *                                for validate-tables on failure log both scripts
+     *          -q                  - quiet: sets quiet mode (turns off some default logging)
+     *
      *     init                     - initialize migrations table and migrate all to given version or latest version
      *
      *     path "resources/db"      - path to resources/db directory
@@ -895,9 +924,9 @@ LIMIT 1
                 while (i < args.size) {
                     val option = args[i++]
                     when (option) {
-                        "-v" -> {
-                            verbose = true
-                        }
+                        "-v" -> verbose = true
+                        "-d" -> detailed = true
+                        "-q" -> quiet = true
 
                         "version" -> {
                             if (args.size <= i) {
@@ -908,9 +937,9 @@ LIMIT 1
                             }
                             val versions = getVersions()
                             val version = args[i++]
-                            if (!versions.contains(version.toUpperCase())) {
-                                throw IllegalArgumentException("version $version does not exist in classpath '/db'")
-                            }
+                            //                            if (!versions.contains(version.toUpperCase())) {
+                            //                                throw IllegalArgumentException("version $version does not exist in classpath '/db'")
+                            //                            }
                             dbVersion = version
                         }
 
@@ -962,6 +991,7 @@ LIMIT 1
 
                         "migrate" -> {
                             // here need to apply up migrations from current version to given version or latest in version sorted order
+                            if (dbVersion == null) dbVersion = getLatestVersion()
                             if (migration == null) migration = initMigrations(dbVersion)
 
                             migrate(migration!!)

@@ -14,24 +14,27 @@ packageName = "com.sample;" // package used for generated class files
 classFileNameSuffix = "Model" // appended to class file name
 
 // KLUDGE: the DasTable and columns does implement a way to get whether column is nullable, has default or is computed
-forceNullable = (~/^(?:createdAt|created_at|updatedAt|updated_at)/) // regex for column names which are forced to nullable Kotlin type
-forceAuto = (~/^(?:createdAt|created_at|updatedAt|updated_at)/) // column names marked auto generated
+forceNullable = (~/^(?:createdAt|created_at|updatedAt|updated_at)$/) // regex for column names which are forced to nullable Kotlin type
+forceAuto = (~/^(?:createdAt|created_at|updatedAt|updated_at)$/) // column names marked auto generated
+
+// column names marked as boolean when tinyint, only needed if using jdbc introspection which does not report actual declared type so all tinyint are tinyint(3)
+//forceBooleanTinyInt = (~/^(?:deleted|checkedStatus|checked_status|optionState|option_state)$/)
+forceBooleanTinyInt = ""
 
 downsizeLongIdToInt = true // if true changes id columns which would be declared Long to Int, change this to false to leave them as Long
 
 typeMapping = [
-        (~/(?i)tinyint\(1\)/)             : "Boolean",
-        (~/(?i)tinyint/)                  : "Int",
-        (~/(?i)bigint/)                   : "Long",
-        (~/(?i)int/)                      : "Int",
-        (~/(?i)float/)                    : "Float",
-        (~/(?i)double|decimal|real/)      : "Double",
-        (~/(?i)datetime|timestamp/)       : "java.sql.Timestamp",
-        (~/(?i)date/)                     : "java.sql.Date",
-        (~/(?i)time/)                     : "java.sql.Time",
-        (~/(?i)/)                         : "String"
+        (~/(?i)tinyint\(1\)/)       : "Boolean",
+        (~/(?i)tinyint/)            : "TinyInt",     // changed to Int if column name not in forceBooleanTinyInt
+        (~/(?i)bigint/)             : "Long",
+        (~/(?i)int/)                : "Int",
+        (~/(?i)float/)              : "Float",
+        (~/(?i)double|decimal|real/): "Double",
+        (~/(?i)datetime|timestamp/) : "Timestamp",
+        (~/(?i)date/)               : "Date",
+        (~/(?i)time/)               : "Time",
+        (~/(?i)/)                   : "String"
 ]
-
 
 FILES.chooseDirectoryAndSave("Choose directory", "Choose where to store generated files") { dir ->
     SELECTION.filter { it instanceof DasTable && it.getKind() == ObjectKind.TABLE }.each { generate(it, dir) }
@@ -44,21 +47,20 @@ def generate(table, dir) {
 }
 
 def generate(out, tableName, className, fields) {
-    out.println "package $packageName"
-    out.println ""
-    out.println "import com.vladsch.kotlin.jdbc.Model"
-    out.println "import com.vladsch.kotlin.jdbc.Row"
-    out.println "import javax.json.JsonObject"
-    out.println ""
-    out.println "data class $className ("
-
     def dbCase = true
     def keyCount = 0
     def nonKeyCount = 0
+    def timestampCount = 0
+    def dateCount = 0
+    def timeCount = 0
     fields.each() {
         if (it.name != it.column) dbCase = false
         if (it.key) keyCount++
         else nonKeyCount++
+
+        if (it.type == "Timestamp") timestampCount++
+        else if (it.type == "Date") dateCount++
+        else if (it.type == "Time") timeCount++
     }
 
     // set single key to nullable and auto
@@ -70,6 +72,17 @@ def generate(out, tableName, className, fields) {
             }
         }
     }
+
+    out.println "package $packageName"
+    out.println ""
+    out.println "import com.vladsch.kotlin.jdbc.Model"
+    out.println "import com.vladsch.kotlin.jdbc.Row"
+    if (timestampCount > 0) out.println "import java.sql.Timestamp"
+    if (dateCount > 0) out.println "import java.sql.Date"
+    if (timeCount > 0) out.println "import java.sql.Time"
+    out.println "import javax.json.JsonObject"
+    out.println ""
+    out.println "data class $className ("
 
     def sep = "";
     fields.each() {
@@ -90,11 +103,11 @@ def generate(out, tableName, className, fields) {
     fields.each() {
         def line = ""
         if (it.annos != "") line += "  ${it.annos}"
-        line +=  "  var ${it.name}: ${it.type}"
-        if (it.nullable) line +=  "?"
-        line +=  " by model"
+        line += "  var ${it.name}: ${it.type}"
+        if (it.nullable) line += "?"
+        line += " by model"
         if (it.auto) line += ".auto"
-        if (it.key) line +=  ".key"
+        if (it.key) line += ".key"
         if (maxWidth < line.length()) maxWidth = line.length()
         lines.add(line)
     }
@@ -111,7 +124,7 @@ def generate(out, tableName, className, fields) {
 
     // data copy constructor
     out.println ""
-    out.println "  constructor(other:${className}) : this() {"
+    out.println "  constructor(other: ${className}) : this() {"
     fields.each() {
         out.println "    ${it.name} = other.${it.name}"
     }
@@ -148,28 +161,36 @@ def generate(out, tableName, className, fields) {
 }
 
 def calcFields(table) {
-    def constraints = ((DasTable)table).getDbChildren(DasConstraint.class, ObjectKind.CHECK);
+    def constraints = ((DasTable) table).getDbChildren(DasConstraint.class, ObjectKind.CHECK);
     def colIndex = 0
-    DasUtil.getColumns(((DasTable)table)).reduce([]) { fields, col ->
+    DasUtil.getColumns(((DasTable) table)).reduce([]) { fields, col ->
         def spec = Case.LOWER.apply(col.getDataType().getSpecification())
-        def typeStr = (String)typeMapping.find { p, t -> p.matcher(spec).find() }.value
-        def colName = (String)col.getName()
-        def colNameLower = (String)Case.LOWER.apply(colName)
+        def typeStr = (String) typeMapping.find { p, t -> p.matcher(spec).find() }.value
+        def colName = (String) col.getName()
+        def colNameLower = (String) Case.LOWER.apply(colName)
         colIndex++
         def colType = downsizeLongIdToInt && typeStr == "Long" && DasUtil.isPrimary(col) || DasUtil.isForeign(col) && colNameLower.endsWith("id") ? "Int" : typeStr
+        def javaColName = (String) javaName(colName, false)
+        if (typeStr == "TinyInt") {
+            if (forceBooleanTinyInt && javaColName.matches(forceBooleanTinyInt)) {
+                colType = "Boolean"
+            } else {
+                colType = "Int"
+            }
+        }
         fields += [[
-                           name : javaName(colName, false),
-                           column: colName,
-                           type : colType,
-                           col  : col,
-                           spec : spec,
+                           name    : javaColName,
+                           column  : colName,
+                           type    : colType,
+                           col     : col,
+                           spec    : spec,
 //                           constraints : constraints.reduce("") { all, constraint ->
 //                               all += "[ name: ${constraint.name}, " + "kind: ${constraint.getKind()}," + "]"
 //                           },
-                           nullable : DasUtil.isAutoGenerated(col) || forceNullable.matcher(colName),
-                           key : DasUtil.isPrimary(col),
-                           auto : DasUtil.isAutoGenerated(col) || forceAuto.matcher(colName),
-                           annos : ""]]
+                           nullable: DasUtil.isAutoGenerated(col) || forceNullable.matcher(colName),
+                           key     : DasUtil.isPrimary(col),
+                           auto    : DasUtil.isAutoGenerated(col) || forceAuto.matcher(colName),
+                           annos   : ""]]
     }
 }
 

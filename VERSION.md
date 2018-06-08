@@ -30,12 +30,22 @@
   * [ ] Result set
   * [ ] Json
   * [ ] Kotlin types
+* [ ] Add case sensitive database entity aware migration
+  * [ ] Tables
+  * [ ] Others?
 
 ## 0.2.26
 
+* Add: insert and update queries to skip passing `null` value parameters which have defaults.
+  `null` effectively means the same thing as not setting the parameter, using the db defined
+  default instead for insert and no-op for update.
+* Add: update query which has no non-null non-default modified parameters will update key column
+  to itself to trigger auto updated fields.
+* Add: migration verbose `-v` and detailed `-d` flags for table validation
 * Add: ignoring named param pattern in query lines that are commented out with `-- ` or `#` as
   first non-blank of the line. Otherwise too many parameters will be passed for the query since
-  SQL will not see the named param uses or comments in sql might me interpreted as parameter names.
+  SQL will not see the named param uses or comments in sql might me interpreted as parameter
+  names.
 * Add: IntelliJ Ultimate Database Tools data extraction script to generate JavaScript enum from
   table data. See:
 * Add: IntelliJ Ultimate Database Tools data extraction script to generate Kotlin enum from

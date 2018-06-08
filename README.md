@@ -443,12 +443,15 @@ directory and copy the script to this location.
 
 ![Scripted Extensions Goto Script Dir](assets/images/Scripted_Extensions_Goto_Script_Dir.png)
 
-It will appear in the `Scripted Extensions` pop-up menu.
+It will appear in the `Scripted Extensions` pop-up menu. For best results use the native schema
+introspection instead of JDBC in connection configuration.
 
 ![Scripted Extensions Generate Kotlin Model](assets/images/Scripted_Extensions_Generate_Kotlin-Model.png)
 
-You can also add the [Kotlin-Enum.kt.js](extensions/com.intellij.database/data/extractors/Kotlin-Enum.kt.js) to convert result set data to Kotlin
-Enum definition. You need to add it to the `data/extractors` directory
+You can also add the
+[Kotlin-Enum.kt.js](extensions/com.intellij.database/data/extractors/Kotlin-Enum.kt.js) to
+convert result set data to Kotlin Enum definition. You need to add it to the `data/extractors`
+directory
 
 ![Scripted_Extensions_Generate-Kotlin-Model](assets/images/Scripted_Extensions_Data_Extractors.png)
 
@@ -490,6 +493,10 @@ enum class ChangeHistoryTypes(val id: Int, val type: String) {
 A script for generating a JavaScript enum based on [`enumerated-type`] npm package will generate
 an enum usable in JavaScript
 [JavaScript-Enumerated-Value-Type.kt.js](extensions/com.intellij.database/data/extractors/JavaScript-Enumerated-Value-Type.kt.js)
+
+A script for generating a markdown table for the table data
+[Markdown-Table.md.js](extensions/com.intellij.database/data/extractors/Markdown-Table.md.js)
+Note: the table above was generated with this script.
 
 ## Migrations
 

@@ -124,6 +124,41 @@ class ModelTest {
         }
     }
 
+    class TestNoNonDefaultModel() : Model<TestNoNonDefaultModel>("tests", true, false) {
+        constructor(
+            processId: Long? = null,
+            title: String? = null,
+            version: String? = null,
+            batch: Int? = null,
+            createdAt: String? = null
+        ) : this() {
+            if (processId != null) this.processId = processId
+            this.title = title
+            this.version = version
+            if (batch != null) this.batch = batch
+            if (createdAt != null) this.createdAt = createdAt
+
+            snapshot()
+        }
+
+        constructor(processId: Long) : this() {
+            this.processId = processId
+            snapshot()
+        }
+
+        var processId: Long? by model.auto.key; private set
+        var title: String? by model.default
+        var version: String? by model.default
+        var batch: Int? by model.default
+        var createdAt: String? by model.auto; private set
+
+        companion object {
+            val fromRow: (Row) -> TestModel = { row ->
+                TestModel().load(row)
+            }
+        }
+    }
+
     @Test
     fun invalidModel1() {
         thrown.expect(IllegalStateException::class.java)
@@ -178,6 +213,13 @@ class ModelTest {
         val model = TestModel(title = "title text", version = "V1.0", batch = 4)
         val sql = model.insertQuery
         assertEquals(sqlQuery("INSERT INTO `tests` (`title`, `version`, `batch`) VALUES (?, ?, ?)", listOf("title text", "V1.0", 4)).toString(), sql.toString());
+    }
+
+    @Test
+    fun insert_DefaultSkipNull() {
+        val model = TestModel(title = "title text", version = "V1.0", batch = null)
+        val sql = model.insertQuery
+        assertEquals(sqlQuery("INSERT INTO `tests` (`title`, `version`) VALUES (?, ?)", listOf("title text", "V1.0")).toString(), sql.toString());
     }
 
     @Test
@@ -255,11 +297,57 @@ class ModelTest {
         assertEquals(true, model.isDirty())
         assertEquals(true, model.isDirty(TestModel::title))
         assertEquals(true, model.isDirty(TestModel::version))
-        assertEquals(true, model.isDirty(TestModel::version))
+        assertEquals(true, model.isDirty(TestModel::batch))
 
         val sql = model.updateQuery
         assertEquals(sqlQuery("UPDATE `tests` SET `title` = ?, `version` = ?, `batch` = ? WHERE `processId` = ?", listOf("title text", "V2.0", 4, 5)).toString(), sql.toString());
     }
+
+    @Test
+    fun update_DefaultSkipNull() {
+        val model = TestModel(processId = 5, title = "title", version = "V1.0", batch = 4)
+        model.title = "title text"
+        model.version = "V2.0"
+        model.batch = null
+
+        assertEquals(true, model.isDirty())
+        assertEquals(true, model.isDirty(TestModel::title))
+        assertEquals(true, model.isDirty(TestModel::version))
+        assertEquals(true, model.isDirty(TestModel::batch))
+
+        val sql = model.updateQuery
+        assertEquals(sqlQuery("UPDATE `tests` SET `title` = ?, `version` = ? WHERE `processId` = ?", listOf("title text", "V2.0", 5)).toString(), sql.toString());
+    }
+
+    @Test
+    fun update_DefaultSkipNullUseKey() {
+        val model = TestModel(processId = 5, title = "title", version = "V1.0", batch = 4)
+        model.batch = null
+
+        assertEquals(true, model.isDirty())
+        assertEquals(false, model.isDirty(TestModel::title))
+        assertEquals(false, model.isDirty(TestModel::version))
+        assertEquals(true, model.isDirty(TestModel::batch))
+
+        val sql = model.updateQuery
+        assertEquals(sqlQuery("UPDATE `tests` SET `processId` = `processId` WHERE `processId` = ?", listOf(5)).toString(), sql.toString());
+    }
+
+    // no longer applicable, can always use a key column to set to itself
+//    @Test
+//    fun update_DefaultSkipNullNoUsableUnmodified() {
+//        val model = TestNoNonDefaultModel(processId = 5, title = null, version = null, batch = 4)
+//        model.batch = null
+//
+//        assertEquals(true, model.isDirty())
+//        assertEquals(false, model.isDirty(TestModel::title))
+//        assertEquals(false, model.isDirty(TestModel::version))
+//        assertEquals(true, model.isDirty(TestModel::batch))
+//
+//        thrown.expect(IllegalStateException::class.java)
+//        val sql = model.updateQuery
+//        assertEquals(sqlQuery("UPDATE `tests` SET `title` = ? WHERE `processId` = ?", listOf("title", 5)).toString(), sql.toString());
+//    }
 
     @Test
     fun test_dbCase() {
