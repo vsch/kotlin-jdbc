@@ -36,6 +36,8 @@
 
 ## 0.2.26
 
+* Add: `model.default(Any?)` default property type definition with a provided default value.
+  Will set properties not provided or if their value is null on insert to this value
 * Add: insert and update queries to skip passing `null` value parameters which have defaults.
   `null` effectively means the same thing as not setting the parameter, using the db defined
   default instead for insert and no-op for update.

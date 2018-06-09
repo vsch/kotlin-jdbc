@@ -15,6 +15,7 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
     private val properties = HashMap<String, Any?>()
     private val kProperties = ArrayList<KProperty<*>>()
     private val propertyTypes = HashMap<String, PropertyType>()
+    private val propertyDefaults = HashMap<String, Any?>()
     private val keyProperties = ArrayList<KProperty<*>>()
     private val modified = HashSet<String>()
     private val columnNames = HashMap<String, String>()
@@ -26,7 +27,10 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
     override val columnName: String?
         get() = null
 
-    internal fun registerProp(prop: KProperty<*>, propType: PropertyType, columnName: String?): ModelProperties<T> {
+    override val defaultValue: Any?
+        get() = Unit
+
+    internal fun registerProp(prop: KProperty<*>, propType: PropertyType, columnName: String?, defaultValue: Any?): ModelProperties<T> {
         kProperties.add(prop)
         propertyTypes[prop.name] = propType
 
@@ -43,6 +47,11 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
             if (columnName != prop.name) {
                 columnNames[prop.name] = columnName
             }
+
+        }
+
+        if (propType.isDefault && defaultValue != Unit) {
+            propertyDefaults[prop.name] = defaultValue
         }
 
         if (propType.isKey) {
@@ -59,7 +68,7 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
     }
 
     override operator fun provideDelegate(thisRef: T, prop: KProperty<*>): ModelProperties<T> {
-        return registerProp(prop, PropertyType.PROPERTY, columnName)
+        return registerProp(prop, PropertyType.PROPERTY, columnName, defaultValue)
     }
 
     // can be used to set immutable properties behind the scenes
@@ -94,7 +103,7 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
     override val autoKey = ModelPropertyProviderAutoKey<T>(this, null)
     override val key = ModelPropertyProviderKey<T>(this, null)
     override val auto = ModelPropertyProviderAuto<T>(this, null)
-    override val default = ModelPropertyProviderDefault<T>(this, null)
+    override val default = ModelPropertyProviderDefault<T>(this, null, Unit)
 
     override fun column(columnName: String?): ModelPropertyProvider<T> {
         return if (columnName == null) {
@@ -102,6 +111,10 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
         } else {
             ModelPropertyProviderBase<T>(this, PropertyType.PROPERTY, columnName)
         }
+    }
+
+    override fun default(value: Any?): ModelPropertyProvider<T> {
+        return ModelPropertyProviderDefault<T>(this, null, value)
     }
 
     override operator fun <V> getValue(thisRef: T, property: KProperty<*>): V {
@@ -308,7 +321,7 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
             val propType = propertyTypes[prop.name] ?: PropertyType.PROPERTY
 
             if (!propType.isAuto) {
-                if (properties.containsKey(prop.name)) {
+                if (properties.containsKey(prop.name) || propertyDefaults.containsKey(prop.name)) {
                     val propValue = properties[prop.name]
                     // skip null properties which have defaults (null means use default)
                     if (propValue != null || !propType.isDefault) {
@@ -317,6 +330,12 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
                         sbValues.append(sep).append("?")
                         sep = ", "
                         params.add(propValue)
+                    } else if (propertyDefaults.containsKey(prop.name)) {
+                        val columnName = columnNames[prop.name] ?: prop.name
+                        sb.append(sep).append("`").append(columnName).append("`")
+                        sbValues.append(sep).append("?")
+                        sep = ", "
+                        params.add(propertyDefaults[prop.name])
                     }
                 } else if (!prop.returnType.isMarkedNullable && !propType.isDefault) {
                     throw IllegalStateException("$name.${prop.name} property is not nullable nor default and not defined in ${this}")

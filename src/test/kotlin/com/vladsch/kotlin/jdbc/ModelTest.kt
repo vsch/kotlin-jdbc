@@ -124,6 +124,41 @@ class ModelTest {
         }
     }
 
+    class TestModelDefaultValue() : Model<TestModelDefaultValue>("tests", true, false) {
+        constructor(
+            processId: Long? = null,
+            title: String,
+            version: String,
+            batch: Int? = null,
+            createdAt: String? = null
+        ) : this() {
+            if (processId != null) this.processId = processId
+            this.title = title
+            this.version = version
+            if (batch != null) this.batch = batch
+            if (createdAt != null) this.createdAt = createdAt
+
+            snapshot()
+        }
+
+        constructor(processId: Long) : this() {
+            this.processId = processId
+            snapshot()
+        }
+
+        var processId: Long? by model.auto.key; private set
+        var title: String by model
+        var version: String by model
+        var batch: Int? by model.default(1)
+        var createdAt: String? by model.auto; private set
+
+        companion object {
+            val fromRow: (Row) -> TestModel = { row ->
+                TestModel().load(row)
+            }
+        }
+    }
+
     class TestNoNonDefaultModel() : Model<TestNoNonDefaultModel>("tests", true, false) {
         constructor(
             processId: Long? = null,
@@ -230,6 +265,20 @@ class ModelTest {
     }
 
     @Test
+    fun insert_DefaultSkipNullDefaultValue() {
+        val model = TestModelDefaultValue(title = "title text", version = "V1.0", batch = null)
+        val sql = model.insertQuery
+        assertEquals(sqlQuery("INSERT INTO `tests` (`title`, `version`, `batch`) VALUES (?, ?, ?)", listOf("title text", "V1.0", 1)).toString(), sql.toString());
+    }
+
+    @Test
+    fun insert_NoAutoColumnsDefaultValue() {
+        val model = TestModelDefaultValue(title = "title text", version = "V1.0", createdAt = "createdAt")
+        val sql = model.insertQuery
+        assertEquals(sqlQuery("INSERT INTO `tests` (`title`, `version`, `batch`) VALUES (?, ?, ?)", listOf("title text", "V1.0", 1)).toString(), sql.toString());
+    }
+
+    @Test
     fun update_MissingKey() {
         thrown.expect(IllegalStateException::class.java)
         val model = TestModel(title = "title", version = "V1.0")
@@ -322,6 +371,36 @@ class ModelTest {
     @Test
     fun update_DefaultSkipNullUseKey() {
         val model = TestModel(processId = 5, title = "title", version = "V1.0", batch = 4)
+        model.batch = null
+
+        assertEquals(true, model.isDirty())
+        assertEquals(false, model.isDirty(TestModel::title))
+        assertEquals(false, model.isDirty(TestModel::version))
+        assertEquals(true, model.isDirty(TestModel::batch))
+
+        val sql = model.updateQuery
+        assertEquals(sqlQuery("UPDATE `tests` SET `processId` = `processId` WHERE `processId` = ?", listOf(5)).toString(), sql.toString());
+    }
+
+    @Test
+    fun update_DefaultSkipNullDefaultValue() {
+        val model = TestModelDefaultValue(processId = 5, title = "title", version = "V1.0", batch = 4)
+        model.title = "title text"
+        model.version = "V2.0"
+        model.batch = null
+
+        assertEquals(true, model.isDirty())
+        assertEquals(true, model.isDirty(TestModel::title))
+        assertEquals(true, model.isDirty(TestModel::version))
+        assertEquals(true, model.isDirty(TestModel::batch))
+
+        val sql = model.updateQuery
+        assertEquals(sqlQuery("UPDATE `tests` SET `title` = ?, `version` = ? WHERE `processId` = ?", listOf("title text", "V2.0", 5)).toString(), sql.toString());
+    }
+
+    @Test
+    fun update_DefaultSkipNullUseKeyDefaultValue() {
+        val model = TestModelDefaultValue(processId = 5, title = "title", version = "V1.0", batch = 4)
         model.batch = null
 
         assertEquals(true, model.isDirty())

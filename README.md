@@ -57,14 +57,14 @@ functions, procedures, tables, triggers and views. See [Migrations](#migrations)
 <dependency>
     <groupId>com.vladsch.kotlin-jdbc</groupId>
     <artifactId>kotlin-jdbc</artifactId>
-    <version>0.2.22</version>
+    <version>0.2.26</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```gradle
-compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.2.22"
+compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.2.26"
 ```
 
 ### Example
@@ -361,6 +361,7 @@ class ValidModel : Model<ValidModel>(tableName, dbCase = true) {
     var processId: Long? by model.auto.key
     var title: String by model
     var version: String by model
+    var batch: Int? by model.default(1)
     var updatedAt: String? by model.auto
     var createdAt: String? by model.auto
     
@@ -383,6 +384,7 @@ fun useModel() {
         model.version = "V1.0"
         
         // execute an insert and set model's key properties from the keys returned by the database
+        // batch will be set to 1 since it is not set in properties
         model.insert(session)
         
         // this will delete the model and clear auto.key properties

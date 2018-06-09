@@ -2,9 +2,9 @@ package com.vladsch.kotlin.jdbc
 
 import kotlin.reflect.KProperty
 
-open class ModelPropertyProviderBase<T>(val provider: ModelProperties<T>, val propType: PropertyType, override val columnName: String?) : InternalModelPropertyProvider<T> {
+open class ModelPropertyProviderBase<T>(val provider: ModelProperties<T>, val propType: PropertyType, override val columnName: String?, override val defaultValue:Any? = Unit) : InternalModelPropertyProvider<T> {
     final override fun provideDelegate(thisRef: T, prop: KProperty<*>): ModelProperties<T> {
-        return provider.registerProp(prop, propType, columnName)
+        return provider.registerProp(prop, propType, columnName, defaultValue)
     }
 
     final override val autoKey: ModelPropertyProvider<T>
@@ -38,6 +38,10 @@ open class ModelPropertyProviderBase<T>(val provider: ModelProperties<T>, val pr
             }
         }
     }
+
+    override fun default(value: Any?): ModelPropertyProvider<T> {
+        return ModelPropertyProviderBase<T>(provider, propType, columnName, value)
+    }
 }
 
 class ModelPropertyProviderAutoKey<T>(provider: ModelProperties<T>, columnName: String?) : ModelPropertyProviderBase<T>(provider, PropertyType.AUTO_KEY, columnName) {
@@ -60,6 +64,11 @@ class ModelPropertyProviderAutoKey<T>(provider: ModelProperties<T>, columnName: 
                 ModelPropertyProviderAutoKey<T>(provider, columnName)
             }
         }
+    }
+
+    override fun default(value: Any?): ModelPropertyProvider<T> {
+        if (value === Unit) return this
+        throw IllegalStateException("Auto Key column cannot have a default value")
     }
 }
 
@@ -84,6 +93,11 @@ class ModelPropertyProviderKey<T>(provider: ModelProperties<T>, columnName: Stri
             }
         }
     }
+
+    override fun default(value: Any?): ModelPropertyProvider<T> {
+        if (value === Unit) return this
+        throw IllegalStateException("Key column cannot have a default value")
+    }
 }
 
 class ModelPropertyProviderAuto<T>(provider: ModelProperties<T>, columnName: String?) : ModelPropertyProviderBase<T>(provider, PropertyType.AUTO, columnName) {
@@ -107,9 +121,14 @@ class ModelPropertyProviderAuto<T>(provider: ModelProperties<T>, columnName: Str
             }
         }
     }
+
+    override fun default(value: Any?): ModelPropertyProvider<T> {
+        if (value === Unit) return this
+        throw IllegalStateException("Auto column cannot have a default value")
+    }
 }
 
-class ModelPropertyProviderDefault<T>(provider: ModelProperties<T>, columnName: String?) : ModelPropertyProviderBase<T>(provider, PropertyType.DEFAULT, columnName) {
+class ModelPropertyProviderDefault<T>(provider: ModelProperties<T>, columnName: String?, value: Any?) : ModelPropertyProviderBase<T>(provider, PropertyType.DEFAULT, columnName, value) {
     override val key: ModelPropertyProvider<T>
         get() = provider.autoKey
 
@@ -126,9 +145,14 @@ class ModelPropertyProviderDefault<T>(provider: ModelProperties<T>, columnName: 
             if (columnName == null) {
                 provider.autoKey
             } else {
-                ModelPropertyProviderDefault<T>(provider, columnName)
+                ModelPropertyProviderDefault<T>(provider, columnName, defaultValue)
             }
         }
+    }
+
+    override fun default(value: Any?): ModelPropertyProvider<T> {
+        if (value === defaultValue) return this
+        return ModelPropertyProviderBase<T>(provider, propType, columnName, value)
     }
 }
 

@@ -8,6 +8,7 @@ interface ModelPropertyProvider<T> {
     val auto: ModelPropertyProvider<T>
     val default: ModelPropertyProvider<T>
     fun column(columnName: String?):ModelPropertyProvider<T>
+    fun default(value:Any? = null):ModelPropertyProvider<T>
 
     operator fun provideDelegate(thisRef: T, prop: KProperty<*>): ModelPropertyProvider<T>
 
