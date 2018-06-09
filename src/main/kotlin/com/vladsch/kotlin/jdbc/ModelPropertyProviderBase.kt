@@ -87,7 +87,7 @@ class ModelPropertyProviderKey<T>(provider: ModelProperties<T>, columnName: Stri
             this
         } else {
             if (columnName == null) {
-                provider.autoKey
+                provider.key
             } else {
                 ModelPropertyProviderKey<T>(provider, columnName)
             }
@@ -108,14 +108,14 @@ class ModelPropertyProviderAuto<T>(provider: ModelProperties<T>, columnName: Str
         get() = this
 
     override val default: ModelPropertyProvider<T>
-        get() = provider.default
+        get() = this
 
     override fun column(columnName: String?): ModelPropertyProvider<T> {
         return if (this.columnName == columnName) {
             this
         } else {
             if (columnName == null) {
-                provider.autoKey
+                provider.auto
             } else {
                 ModelPropertyProviderAuto<T>(provider, columnName)
             }
@@ -143,7 +143,7 @@ class ModelPropertyProviderDefault<T>(provider: ModelProperties<T>, columnName: 
             this
         } else {
             if (columnName == null) {
-                provider.autoKey
+                provider.default
             } else {
                 ModelPropertyProviderDefault<T>(provider, columnName, defaultValue)
             }

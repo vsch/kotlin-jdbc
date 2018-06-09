@@ -36,6 +36,7 @@
 
 ## 0.2.26
 
+* Fix: `model`: `auto`, `key`, `default`, `autoKey` combinations
 * Add: `model.default(Any?)` default property type definition with a provided default value.
   Will set properties not provided or if their value is null on insert to this value
 * Add: insert and update queries to skip passing `null` value parameters which have defaults.
