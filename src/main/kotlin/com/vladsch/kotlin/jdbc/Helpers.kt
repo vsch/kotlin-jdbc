@@ -226,14 +226,18 @@ val toJsonObject: (Row) -> JsonObject = {
     jsonObject
 }
 
-fun getResourceFiles(resourceClass: Class<*>, path: String): List<String> {
+fun getResourceFiles(resourceClass: Class<*>, path: String, prefixPath: Boolean = false): List<String> {
     val filenames = ArrayList<String>()
 
     getResourceAsStream(resourceClass, path)?.use { inputStream ->
         BufferedReader(InputStreamReader(inputStream)).use { br ->
             while (true) {
                 val resource = br.readLine() ?: break
-                filenames.add(resource)
+                if (prefixPath) {
+                    filenames.add("$path/$resource")
+                } else {
+                    filenames.add(resource)
+                }
             }
         }
     }
@@ -376,5 +380,9 @@ fun String?.extractLeadingDigits(): Pair<Int?, String> {
         start = i + 1
     }
     return Pair(value, text.substring(start))
+}
+
+fun getExtraSampleFiles(resourceClass: Class<*>): List<String> {
+    return getResourceFiles(resourceClass, "/db/templates", true)
 }
 

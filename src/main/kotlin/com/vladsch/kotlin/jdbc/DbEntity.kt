@@ -15,6 +15,12 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
     ROLLBACK("", "rollback", "migrations", ".down.sql"),
     ;
 
+    companion object {
+        fun isEntityDirectory(name: String):Boolean {
+            return values().any { it.dbEntityDirectory == name }
+        }
+    }
+
     fun getEntityDirectory(dbVersionDir: File, createDir: Boolean?): File {
         if (createDir != null) {
             dbVersionDir.ensureExistingDirectory("dbDir/dbVersion")

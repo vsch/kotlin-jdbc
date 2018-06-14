@@ -727,6 +727,26 @@ LIMIT 1
             copyEntities(DbEntity.TABLE, getVersionDirectory(dbDir, previousVersion, true), versionDir, true) { it.toLowerCase() == MIGRATIONS_FILE_NAME }
             copyEntities(DbEntity.TRIGGER, getVersionDirectory(dbDir, previousVersion, true), versionDir, true)
             copyEntities(DbEntity.VIEW, getVersionDirectory(dbDir, previousVersion, true), versionDir, true)
+
+            // copy additional files from the templates directory
+            copyExtraTemplateFiles(dbDir, dbVersion)
+        }
+    }
+
+    fun copyExtraTemplateFiles(dbDir: File, dbVersion: String) {
+        val versionDir = getVersionDirectory(dbDir, dbVersion, false)
+        val extraResourceFiles = getExtraSampleFiles(resourceClass)
+
+        extraResourceFiles.forEach {
+            val resourcePath = File(it)
+            val resourceName = resourcePath.name
+
+            if (!DbEntity.isEntityDirectory(resourceName)) {
+                val entityFile = versionDir + resourceName
+
+                val entitySample = getResourceAsString(resourceClass, it)
+                entityFile.writeText(entitySample.replace("__VERSION__".toRegex(), dbVersion.replace('_','.')))
+            }
         }
     }
 

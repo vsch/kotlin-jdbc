@@ -36,6 +36,8 @@
 
 ## 0.2.26
 
+* Add: copying any extra files under `/db/template` resources directory to new version directory
+  on creation. Intended for things like change notes or other common file templates.
 * Fix: `model`: `auto`, `key`, `default`, `autoKey` combinations
 * Add: `model.default(Any?)` default property type definition with a provided default value.
   Will set properties not provided or if their value is null on insert to this value
