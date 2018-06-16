@@ -17,7 +17,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <kotlin.version>1.2.41</kotlin.version>
+        <kotlin.version>1.2.50</kotlin.version>
         <junit.version>4.12</junit.version>
         <dokka.version>0.9.9</dokka.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
