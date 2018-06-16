@@ -451,7 +451,10 @@ introspection instead of JDBC in connection configuration.
 
 ![Scripted Extensions Generate Kotlin Model](assets/images/Scripted_Extensions_Generate_Kotlin-Model.png)
 
-You can also add the
+Add
+[Generate Scala-Slick-Model.groovy](extensions/com.intellij.database/schema/Generate%20Scala-Slick-Model.groovy)
+for generating a Scala/Slick database model.
+
 [Kotlin-Enum.kt.js](extensions/com.intellij.database/data/extractors/Kotlin-Enum.kt.js) to
 convert result set data to Kotlin Enum definition. You need to add it to the `data/extractors`
 directory
