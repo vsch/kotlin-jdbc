@@ -16,9 +16,9 @@ without having to create a ton of intermediate classes, add result set to JSON c
 without intermediate objects, add stored procedure calls with `in`/`inout`/`out` parameters and
 ability to process multiple result sets.
 
-A convenient models with simple syntax which is aware of primary key columns, auto generated
-columns, columns with defaults and nullable columns. Uses protected property `model` to define
-properties via `provideDelegate`. See [Convenient Models](#convenient-models)
+Convenient models with simple syntax which are aware of primary key columns, auto generated
+columns, columns with defaults and nullable columns. Models protected property `model` to
+define properties via `provideDelegate`. See [Convenient Models](#convenient-models)
 
 ```kotlin
 import java.sql.Timestamp
@@ -333,11 +333,13 @@ the model's properties for every instance.
   whether the property can be omitted or set to null
 * Key properties by: `by model.key`. These will be used for `WHERE` list for `UPDATE`, `DELETE`
   or `SELECT` for reload query generation
-* Auto generated (not updatable) properties by: `by model.auto`
+* Auto generated (left out of update and insert column list) properties by: `by model.auto`
 * Auto generated Key (key column and auto generated) by: `by model.key.auto`, `by model.autoKey`
   or `by model.auto.key`
 * Columns which have default values by: `by model.default`. These won't raise an exception for
-  `INSERT` query generation if they are missing from the model's defined property set.
+  `INSERT` query generation if they are missing from the model's defined property set. A
+  function alternative `by model.default(value)` will provide a default value which will be used
+  for insert query if an explicit value is not provided for the property.
 
 If column names are the same as the property names then set `dbCase = true` for the `Model`
 constructor argument. If column names are snake-case versions of camelcase property names
@@ -349,9 +351,9 @@ on any delegate provider so it can be combined with key, auto and default proper
 
 By default models allow public setters on properties marked `auto` or `autoKey`. To add
 validation forcing all `auto` properties to have no `set` method or have `private set` pass
-`true` for `allowPublicAuto` second parameter to model constructor.
+`false` for `allowSetAuto` second parameter to model constructor.
 
-Any property marked as `auto` generated will not be used for value `UPDATE` or `INSERT`
+Any property marked as `auto` generated will not be used in `UPDATE` or `INSERT` queries.
 
 For IntelliJ Ultimate a Database extension script can be installed which will generate models
 from the context menu of any table in the database tools window. See
