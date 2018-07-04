@@ -3,6 +3,7 @@
 [TOC]: # " "
 
 - [TODO](#todo)
+- [Next 0.2.28](#next-0228)
 - [0.2.26](#0226)
 - [0.2.24](#0224)
 - [0.2.22](#0222)
@@ -33,6 +34,13 @@
 * [ ] Add case sensitive database entity aware migration
   * [ ] Tables
   * [ ] Others?
+
+## Next 0.2.28
+
+* Add: separate session for updating migrations table to keep separate from schema modification
+  session.
+* Fix: add trimming of table sql string for comparing by line re-ordering before splitting into
+  lines.
 
 ## 0.2.26
 

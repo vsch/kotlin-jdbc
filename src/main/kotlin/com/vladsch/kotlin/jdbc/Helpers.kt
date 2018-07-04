@@ -135,15 +135,10 @@ inline fun <T> usingDefault(noinline consumer: (Session) -> T): T {
 }
 
 fun <A : AutoCloseable, R> using(closeable: A?, f: (A) -> R): R {
-    try {
-        if (closeable != null) {
-            return f(closeable)
-        } else {
-            throw IllegalStateException("Closeable resource is unexpectedly null.")
-        }
-    } finally {
-        closeable?.close()
+    closeable?.use {
+        return f(closeable)
     }
+    throw IllegalStateException("Closeable resource is unexpectedly null.")
 }
 
 fun <V : Any> putNullable(jsonObject: MutableJsObject, name: String, v: V?, action: (V) -> Unit) {

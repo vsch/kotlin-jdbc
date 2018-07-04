@@ -73,7 +73,7 @@ INSERT INTO migrations (
     var lastScriptSql: String? = null
 
     fun <T : Any> invokeWith(action: (Session) -> T?): T? {
-        return action.invoke(migrations.session)
+        return action.invoke(migrations.migrationSession)
     }
 
     fun getMigrationSql(scriptName: String, scriptSql: String, migrationType:Int? = null): SqlQuery {
@@ -86,18 +86,18 @@ INSERT INTO migrations (
         val sqlQuery = getMigrationSql(scriptName, scriptSql, 1)
 
         action.invoke()
-        val transId = migrations.session.updateGetId(sqlQuery)
+        val transId = migrations.migrationSession.updateGetId(sqlQuery)
 
         // now need to mark all rollbacks of this script that they were reversed
         val rollBackScriptName = DbEntity.ROLLBACK.addSuffix( DbEntity.MIGRATION.removeSuffix(scriptName))
         val updateSql = sqlQuery("""
 UPDATE migrations SET rolled_back_id = :transId WHERE (script_name = :scriptName OR script_name LIKE :scriptNameLike) AND version = :version AND migration_type = -1 AND rolled_back_id IS NULL
 """, mapOf("transId" to transId, "version" to version, "scriptName" to rollBackScriptName, "scriptNameLike" to "$rollBackScriptName[%]"))
-        migrations.session.execute(updateSql)
-        if (!migrations.session.connection.autoCommit) {
+        migrations.migrationSession.execute(updateSql)
+        if (!migrations.migrationSession.connection.autoCommit) {
             // commit changes so the last success is not lost on next failure
-            migrations.session.connection.commit()
-            migrations.session.connection.begin()
+            migrations.migrationSession.connection.commit()
+            migrations.migrationSession.connection.begin()
         }
     }
 
@@ -105,25 +105,25 @@ UPDATE migrations SET rolled_back_id = :transId WHERE (script_name = :scriptName
         val sqlQuery = getMigrationSql(scriptName, scriptSql, -1)
 
         action.invoke()
-        val transId = migrations.session.updateGetId(sqlQuery)
+        val transId = migrations.migrationSession.updateGetId(sqlQuery)
 
         // now need to mark all rollbacks of this script that they were reversed
         val rollBackScriptName = DbEntity.MIGRATION.addSuffix( DbEntity.ROLLBACK.removeSuffix(scriptName))
         val updateSql = sqlQuery("""
 UPDATE migrations SET rolled_back_id = :transId WHERE (script_name = :scriptName OR script_name LIKE :scriptNameLike) AND version = :version AND migration_type = 1 AND rolled_back_id IS NULL
 """, mapOf("transId" to transId, "version" to version, "scriptName" to rollBackScriptName, "scriptNameLike" to "$rollBackScriptName[%]"))
-        migrations.session.execute(updateSql)
+        migrations.migrationSession.execute(updateSql)
     }
 
     fun insertMigrationAfter(scriptName: String, scriptSql: String, action: () -> Unit) {
         val sqlQuery = getMigrationSql(scriptName, scriptSql)
 
         action.invoke()
-        migrations.session.execute(sqlQuery)
+        migrations.migrationSession.execute(sqlQuery)
     }
 
     fun getVersionBatches(): List<Migration> {
-        return migrations.session.list(sqlQuery("""
+        return migrations.migrationSession.list(sqlQuery("""
 SELECT * FROM migrations
 WHERE rolled_back_id IS NULL AND last_problem IS NULL
 ORDER BY migration_id ASC
@@ -140,11 +140,11 @@ ORDER BY migration_id ASC
             row.string("script_name")
         }
 
-        return migrations.session.hashMap(query, keyExtractor, Migration.toModel)
+        return migrations.migrationSession.hashMap(query, keyExtractor, Migration.toModel)
     }
 
     fun getAllVersionBatches(): List<Migration> {
-        return migrations.session.list(sqlQuery("""
+        return migrations.migrationSession.list(sqlQuery("""
 SELECT * FROM migrations
 ORDER BY migration_id ASC
 """), Migration.toModel)

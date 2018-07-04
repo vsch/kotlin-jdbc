@@ -26,6 +26,12 @@ open class Session(
         connection.close()
     }
 
+    fun use(block: (Session) -> Unit) {
+        this.use {
+            block.invoke(this)
+        }
+    }
+
     fun prepare(query: SqlQuery, returnGeneratedKeys: Boolean = false): PreparedStatement {
         if (query is SqlCall) {
             val stmt = connection.underlying.prepareCall(query.cleanStatement)
@@ -95,7 +101,7 @@ open class Session(
         }
     }
 
-    fun <A> list(query: SqlQuery, extractor:  (Row)-> A): List<A> {
+    fun <A> list(query: SqlQuery, extractor: (Row) -> A): List<A> {
         return query(query) { rs ->
             val rows = ArrayList<A>()
             Rows(rs).forEach {

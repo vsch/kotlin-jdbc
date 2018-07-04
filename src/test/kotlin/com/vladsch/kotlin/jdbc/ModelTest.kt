@@ -10,7 +10,7 @@ class ModelTest {
 
     @Rule
     @JvmField
-    var thrown = ExpectedException.none()
+    var thrown: ExpectedException = ExpectedException.none()
 
     class InvalidModelPublicAutoKey() : Model<InvalidModelPublicAutoKey>("tests", true, false) {
         var processId: Long? by model.auto.key
