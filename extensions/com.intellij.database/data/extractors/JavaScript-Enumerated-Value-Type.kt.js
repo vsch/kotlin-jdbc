@@ -35,7 +35,7 @@ var NEWLINE = "\n";
 
 function output() {
     for (var i = 0; i < arguments.length; i++) {
-        OUT.append(arguments[i].toString());
+        OUT.append(arguments[i]);
     }
 }
 
@@ -359,7 +359,7 @@ outputln();
 outputln("// NOTE: this definition is used for WebStorm Code Completions to work");
 outputln("let ", enumName, " = {");
 forAllNamedEnumValues(function (name, value, index) {
-    return ["    ", name, ": ", idPrefix, snakeName(name).toUpperCase(), "_ID, // ", value, "\n"].join("");
+    return ["    ", name, ": ", enumName, "Value, // ", value, "\n"].join("");
 }, "", "", "");
 outputln();
 outputln("    value(arg) {");
@@ -367,7 +367,14 @@ outputln("        return ", enumName, "Value;");
 outputln("    },");
 outputln("};");
 outputln();
-outputln(enumName, " = new Enum(\"", enumName, "\", ", enumName, ", ", enumName, "Value);");
+outputln("// this definition is used for actual definition");
+outputln("let _", enumName, " = {");
+forAllNamedEnumValues(function (name, value, index) {
+    return ["    ", name, ": ", idPrefix, snakeName(name).toUpperCase(), "_ID, // ", value, "\n"].join("");
+}, "", "", "");
+outputln("};");
+outputln();
+outputln(enumName, " = new Enum(\"", enumName, "\", _", enumName, ", ", enumName, "Value);");
 outputln();
 outputln("export default ", enumName, ";");
 outputln();

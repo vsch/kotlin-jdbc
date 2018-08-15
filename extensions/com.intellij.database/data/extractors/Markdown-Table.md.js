@@ -10,7 +10,9 @@ function eachWithIdx(iterable, f) {
 
 function mapEach(iterable, f) {
     var vs = [];
-    eachWithIdx(iterable, function (i) { vs.push(f(i));});
+    eachWithIdx(iterable, function (i) {
+        vs.push(f(i));
+    });
     return vs;
 }
 
@@ -24,17 +26,29 @@ function escape(str) {
 
 var NEWLINE = "\n";
 
-function output() { for (var i = 0; i < arguments.length; i++) { OUT.append(arguments[i]); } }
+function output() {
+    for (var i = 0; i < arguments.length; i++) {
+        OUT.append(arguments[i]);
+    }
+}
+
+function outputln() {
+    for (var i = 0; i < arguments.length; i++) {
+        OUT.append(arguments[i].toString());
+    }
+    OUT.append("\n");
+}
 
 function outputRow(items) {
     output("| ");
-    for (var i = 0; i < items.length; i++)
-        output(escape(items[i]), " |");
+    for (var i = 0; i < items.length; i++) output(escape(items[i]), " |");
     output("", NEWLINE);
 }
 
 if (TRANSPOSED) {
-    var values = mapEach(COLUMNS, function (col) { return [col.name()]; });
+    var values = mapEach(COLUMNS, function (col) {
+        return [col.name()];
+    });
     var heading = [];
     eachWithIdx(ROWS, function (row) {
         heading.push("---");
@@ -44,13 +58,20 @@ if (TRANSPOSED) {
     });
     heading.push("---");
     outputRow(heading);
-    eachWithIdx(COLUMNS, function (_, i) { outputRow(values[i]); });
-}
-else {
-    outputRow(mapEach(COLUMNS, function (col) { return col.name(); }));
-    outputRow(mapEach(COLUMNS, function (col) { return "---"; }));
+    eachWithIdx(COLUMNS, function (_, i) {
+        outputRow(values[i]);
+    });
+} else {
+    outputRow(mapEach(COLUMNS, function (col) {
+        return col.name();
+    }));
+    outputRow(mapEach(COLUMNS, function (col) {
+        return "---";
+    }));
     eachWithIdx(ROWS, function (row) {
-        outputRow(mapEach(COLUMNS, function (col) { return FORMATTER.format(row, col); }));
+        outputRow(mapEach(COLUMNS, function (col) {
+            return FORMATTER.format(row, col);
+        }));
     });
 }
 

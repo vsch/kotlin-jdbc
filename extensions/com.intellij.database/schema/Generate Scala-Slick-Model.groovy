@@ -13,10 +13,11 @@ import com.intellij.database.util.DasUtil
 packageName = "com.sample" // package used for generated class files
 classFileNameSuffix = "Model" // appended to class file name
 
-// KLUDGE: the DasTable and columns does implement a way to get whether column is nullable, has default or is computed
+// KLUDGE: the DasTable and columns does not implement a way to get whether column is nullable, has default or is computed
 forceNullable = (~/^(?:createdAt|created_at|updatedAt|updated_at)$/) // regex for column names which are forced to nullable Kotlin type
 forceAuto = (~/^(?:createdAt|created_at|updatedAt|updated_at)$/) // column names marked auto generated
 forceTimestampString = (~/^(?:createdAt|created_at|updatedAt|updated_at)$/) // column names if timestamp type will be changed to String
+snakeCaseTables = false  // if true convert snake_case table names to Pascal case, else leave as is
 
 // column names marked as boolean when tinyint, only needed if using jdbc introspection which does not report actual declared type so all tinyint are tinyint(3)
 //forceBooleanTinyInt = (~/^(?:deleted|checkedStatus|checked_status|optionState|option_state)$/)
@@ -42,7 +43,7 @@ FILES.chooseDirectoryAndSave("Choose directory", "Choose where to store generate
 }
 
 def generate(table, dir) {
-    def className = javaName(singularize(table.getName()), true)
+    def className = snakeCaseTables ? javaName(singularize(table.getName()), true) : singularize(table.getName())
     def fields = calcFields(table)
     new File(dir, className + "${classFileNameSuffix}.scala").withPrintWriter { out -> generate(out, table.getName(), className, fields) }
 }
@@ -299,16 +300,16 @@ def calcFields(table) {
     }
 }
 
-def singularize(str) {
+def singularize(String str) {
     def s = com.intellij.psi.codeStyle.NameUtil.splitNameIntoWords(str).collect { it }
-    s[-1] = com.intellij.openapi.util.text.StringUtil.unpluralize(s[-1])
-    return s.join("")
+    def singleLast = com.intellij.openapi.util.text.StringUtil.unpluralize(s[-1])
+    return str.substring(0, str.length() - s[-1].length()) + singleLast
 }
 
-def pluralize(str) {
+def pluralize(String str) {
     def s = com.intellij.psi.codeStyle.NameUtil.splitNameIntoWords(str).collect { it }
-    s[-1] = com.intellij.openapi.util.text.StringUtil.pluralize(s[-1])
-    return s.join("")
+    def pluralLast = com.intellij.openapi.util.text.StringUtil.pluralize(s[-1])
+    return str.substring(0, str.length() - s[-1].length()) + pluralLast
 }
 
 def lowerFirst(str) {

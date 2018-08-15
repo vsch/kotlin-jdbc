@@ -41,6 +41,7 @@
   session.
 * Fix: add trimming of table sql string for comparing by line re-ordering before splitting into
   lines.
+* Fix: JS enum type script for better WebStorm code completion functionality
 
 ## 0.2.26
 
