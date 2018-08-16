@@ -1,7 +1,7 @@
 # Kotlin-JDBC
 
 [![Build Status](https://travis-ci.org/vsch/kotlin-jdbc.svg)](https://travis-ci.org/vsch/kotlin-jdbc)
-[![Maven Central status](https://img.shields.io/maven-central/v/com.vladsch.kotlin-jdbc/kotlin-jdbc.svg)](https://search.maven.org/#search%7Cga%7C1%7Cg%3A%22com.vladsch.kotlin-jdbc%22)
+[![Maven Central status](https://img.shields.io/maven-central/v/com.vladsch.kotlin-jdbc/kotlin-jdbc.svg)](https://search.maven.org/search?q=g:com.vladsch.kotlin-jdbc)
 
 A light weight library that exposes JDBC API with the convenience of Kotlin and gets out of the
 way when it is not needed.
