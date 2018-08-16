@@ -201,9 +201,11 @@
                     </execution>
                 </executions>
                 <configuration>
+<!--
                     <includes>
                         <file>packages.md</file>
                     </includes>
+-->
                 </configuration>
             </plugin>
             <plugin>

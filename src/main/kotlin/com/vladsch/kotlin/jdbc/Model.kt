@@ -138,4 +138,21 @@ abstract class Model<T : Model<T>>(val sqlTable: String, dbCase: Boolean, allowS
         sb.append(")")
         return sb.toString()
     }
+
+    companion object {
+        fun listQuery(tableName:String, params: Array<out Pair<String, Any?>>): SqlQuery {
+            val conditions = HashMap<String, Any?>()
+            conditions.putAll(params)
+            return listQuery(tableName, conditions)
+        }
+
+        fun listQuery(tableName:String, conditions: Map<String, Any?>): SqlQuery {
+            return if (!conditions.isEmpty()) {
+                sqlQuery("SELECT * FROM $tableName WHERE " + conditions.keys.joinToString(" AND ") { key -> "$key = ?" })
+                    .paramsList(conditions.values)
+            } else {
+                sqlQuery("SELECT * FROM $tableName")
+            }
+        }
+    }
 }

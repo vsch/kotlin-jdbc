@@ -42,8 +42,17 @@ open class SqlQuery(
         }
     }
 
-    open fun params(vararg param: Any?): SqlQuery {
-        params.addAll(param)
+    open fun params(vararg params: Any?): SqlQuery {
+        return paramsArray(params)
+    }
+
+    open fun paramsArray(params: Array<out Any?>): SqlQuery {
+        this.params.addAll(params)
+        return this
+    }
+
+    open fun paramsList(params: Collection<Any?>): SqlQuery {
+        this.params.addAll(params)
         return this
     }
 

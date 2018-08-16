@@ -30,8 +30,17 @@ class SqlCall(
         }
     }
 
-    override fun params(vararg param: Any?): SqlCall {
-        params.add(param)
+    override fun params(vararg params: Any?): SqlQuery {
+        return paramsArray(params)
+    }
+
+    override fun paramsArray(params: Array<out Any?>): SqlQuery {
+        this.params.addAll(params)
+        return this
+    }
+
+    override fun paramsList(params: Collection<Any?>): SqlQuery {
+        this.params.addAll(params)
         return this
     }
 
