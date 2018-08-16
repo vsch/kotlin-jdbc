@@ -3,7 +3,7 @@
 [TOC]: # " "
 
 - [TODO](#todo)
-- [0.2.28](#0228)
+- [0.3.0](#030)
 - [0.2.26](#0226)
 - [0.2.24](#0224)
 - [0.2.22](#0222)
@@ -35,7 +35,7 @@
   * [ ] Tables
   * [ ] Others?
 
-## 0.2.28
+## 0.3.0
 
 * Change: from `by model` to `by db` for model property definitions
 * Add: `Model.listQuery` companion methods to list model instances with or without conditions
