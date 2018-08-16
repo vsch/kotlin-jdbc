@@ -360,6 +360,15 @@ from the context menu of any table in the database tools window. See
 [Installing IntelliJ Ultimate Database Tools Extension Script](#installing-intellij-ultimate-database-tools-extension-scripts)
 
 ```kotlin
+data class ValidData(
+    val processId: Long?,
+    val title: String,
+    val version: String,
+    val batch: Int?,
+    val updatedAt: String?,
+    val createdAt: String?
+)
+
 class ValidModel : Model<ValidModel>(tableName, dbCase = true) {
     var processId: Long? by model.auto.key
     var title: String by model
@@ -367,48 +376,54 @@ class ValidModel : Model<ValidModel>(tableName, dbCase = true) {
     var batch: Int? by model.default(1)
     var updatedAt: String? by model.auto
     var createdAt: String? by model.auto
-    
-    companion object {
-        // convenience method for creating new instances from result set row
-        val toModel: (Row) -> ValidModel = { row ->
-            ValidModel().load(row)
-        }
-        
-        val tableName = "tableName"
+
+    fun toData() = ValidData(
+        processId,
+        title,
+        version,
+        batch,
+        updatedAt,
+        createdAt
+    )
+
+    companion object : ModelCompanion<ValidModel, ValidData> {
+        override val tableName = "tableName"
+        override fun createModel(): ValidModel = ValidModel()
+        override fun createData(model: ValidModel): ValidData = model.toData()
     }
 }
 
 fun useModel() {
     using(session(HikariCP.default())) { session ->
         val modelList = session.list("", ValidModel.fromRow)
-        
+
         val model = ValidModel()
         model.title = "title text"
         model.version = "V1.0"
-        
+
         // execute an insert and set model's key properties from the keys returned by the database
         // batch will be set to 1 since it is not set in properties
         model.insert(session)
-        
+
         // this will delete the model and clear auto.key properties
-        model.delete(session) 
-        
+        model.delete(session)
+
         // this will delete the model but not clear auto.key properties
-        model.deleteKeepAutoKeys(session) 
-        
+        model.deleteKeepAutoKeys(session)
+
         // execute select query for model (based on keys) and load model
         model.select(session)
-        
+
         // just insert, don't bother getting keys
         model.insertIgnoreKeys(session)
-        
+
         // take a snapshot of current properties
         model.snapshot()
         model.version = "V2.0"
-        
+
         // will only update version since it is the only one changed, does automatic snapshot after update
         model.update(session)
-        
+
         // will only update version since it is the only one changed but will reload model from database 
         // if updatedAt field is timestamped on update then it will be loaded with a new value
         model.version = "V3.0"

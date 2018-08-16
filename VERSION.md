@@ -38,6 +38,8 @@
 ## Next 0.2.28
 
 * Add: `Model.listQuery` companion methods to list model instances with or without conditions
+* Add: `ModelCompanion` to make companion methods of real models simpler to update without code
+  editing
 * Add: separate session for updating migrations table to keep separate from schema modification
   session.
 * Fix: add trimming of table sql string for comparing by line re-ordering before splitting into
