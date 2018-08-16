@@ -106,7 +106,7 @@ def generate(out, tableName, className, fields) {
         if (it.annos != "") line += "  ${it.annos}"
         line += "  var ${it.name}: ${it.type}"
         if (it.nullable) line += "?"
-        line += " by model"
+        line += " by db"
         if (it.auto) line += ".auto"
         if (it.key) line += ".key"
         if (maxWidth < line.length()) maxWidth = line.length()
