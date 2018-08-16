@@ -6,7 +6,7 @@ import kotlin.reflect.KProperty
 @Suppress("MemberVisibilityCanBePrivate")
 abstract class Model<T : Model<T>>(val sqlTable: String, dbCase: Boolean, allowSetAuto: Boolean = true) {
 
-    protected val model: ModelPropertyProvider<T> get() = _model
+    protected val db: ModelPropertyProvider<T> get() = _model
 
     internal val _model = ModelProperties<T>(this::class.simpleName ?: "<unknown>", dbCase, allowSetAuto)
 

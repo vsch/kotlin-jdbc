@@ -37,6 +37,7 @@
 
 ## Next 0.2.28
 
+* Change: from `by model` to `by db` for model property definitions
 * Add: `Model.listQuery` companion methods to list model instances with or without conditions
 * Add: `ModelCompanion` to make companion methods of real models simpler to update without code
   editing

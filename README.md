@@ -26,13 +26,13 @@ import java.sql.Timestamp
 // dbCase = true if database columns same as properties
 // dbCase = false if database columns are snake-case versions of property names
 class ValidModel : Model<ValidModel>("tableName", dbCase = true) {
-    var processId: Long? by model.auto.key
-    var title: String by model
-    var version: String by model
-    var optional: Int? by model           
-    var hasOwnColumnName: Int? by model.column("own_name")           
-    var updatedAt: Timestamp? by model.auto
-    var createdAt: Timestamp? by model.auto
+    var processId: Long? by db.auto.key
+    var title: String by db
+    var version: String by db
+    var optional: Int? by db           
+    var hasOwnColumnName: Int? by db.column("own_name")           
+    var updatedAt: Timestamp? by db.auto
+    var createdAt: Timestamp? by db.auto
 }
 ```
 
@@ -329,16 +329,16 @@ model instance with validation of required fields and minimal required columns f
 Using these models is a convenience not a requirement since it does create overhead by building
 the model's properties for every instance.
 
-* Define model's properties by using `by model`. The nullability of the property type dictates
+* Define model's properties by using `by db`. The nullability of the property type dictates
   whether the property can be omitted or set to null
-* Key properties by: `by model.key`. These will be used for `WHERE` list for `UPDATE`, `DELETE`
+* Key properties by: `by db.key`. These will be used for `WHERE` list for `UPDATE`, `DELETE`
   or `SELECT` for reload query generation
-* Auto generated (left out of update and insert column list) properties by: `by model.auto`
-* Auto generated Key (key column and auto generated) by: `by model.key.auto`, `by model.autoKey`
-  or `by model.auto.key`
-* Columns which have default values by: `by model.default`. These won't raise an exception for
+* Auto generated (left out of update and insert column list) properties by: `by db.auto`
+* Auto generated Key (key column and auto generated) by: `by db.key.auto`, `by db.autoKey`
+  or `by db.auto.key`
+* Columns which have default values by: `by db.default`. These won't raise an exception for
   `INSERT` query generation if they are missing from the model's defined property set. A
-  function alternative `by model.default(value)` will provide a default value which will be used
+  function alternative `by db.default(value)` will provide a default value which will be used
   for insert query if an explicit value is not provided for the property.
 
 If column names are the same as the property names then set `dbCase = true` for the `Model`
@@ -370,12 +370,12 @@ data class ValidData(
 )
 
 class ValidModel : Model<ValidModel>(tableName, dbCase = true) {
-    var processId: Long? by model.auto.key
-    var title: String by model
-    var version: String by model
-    var batch: Int? by model.default(1)
-    var updatedAt: String? by model.auto
-    var createdAt: String? by model.auto
+    var processId: Long? by db.auto.key
+    var title: String by db
+    var version: String by db
+    var batch: Int? by db.default(1)
+    var updatedAt: String? by db.auto
+    var createdAt: String? by db.auto
 
     fun toData() = ValidData(
         processId,

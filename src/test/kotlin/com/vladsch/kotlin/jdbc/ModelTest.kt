@@ -13,11 +13,11 @@ class ModelTest {
     var thrown: ExpectedException = ExpectedException.none()
 
     class InvalidModelPublicAutoKey() : Model<InvalidModelPublicAutoKey>("tests", true, false) {
-        var processId: Long? by model.auto.key
-        var title: String by model
-        var version: String by model
-        var unknown: String? by model
-        var createdAt: String? by model.auto; private set
+        var processId: Long? by db.auto.key
+        var title: String by db
+        var version: String by db
+        var unknown: String? by db
+        var createdAt: String? by db.auto; private set
 
         companion object {
             val fromRow: (Row) -> InvalidModelPublicAutoKey = { row ->
@@ -27,11 +27,11 @@ class ModelTest {
     }
 
     class InvalidModelPublicAuto() : Model<InvalidModelPublicAuto>("tests", true, false) {
-        var processId: Long? by model.auto.key; private set
-        var title: String by model
-        var version: String by model
-        var unknown: String? by model
-        var createdAt: String? by model.auto
+        var processId: Long? by db.auto.key; private set
+        var title: String by db
+        var version: String by db
+        var unknown: String? by db
+        var createdAt: String? by db.auto
 
         companion object {
             val fromRow: (Row) -> InvalidModelPublicAutoKey = { row ->
@@ -41,11 +41,11 @@ class ModelTest {
     }
 
     class ValidModelPublicAuto : Model<ValidModelPublicAuto>("tests", true) {
-        var processId: Long? by model.auto.key
-        var title: String by model
-        var version: String by model
-        var unknown: String? by model
-        var createdAt: String? by model.auto
+        var processId: Long? by db.auto.key
+        var title: String by db
+        var version: String by db
+        var unknown: String? by db
+        var createdAt: String? by db.auto
 
         companion object {
             val fromRow: (Row) -> InvalidModelPublicAutoKey = { row ->
@@ -55,14 +55,14 @@ class ModelTest {
     }
 
     class ValidModel() : Model<ValidModel>("tests", true, false) {
-        var processId: Long? by model.key.auto; private set
-        val noSetter: String by model.auto
-        val noSetter2: String by model.auto.key
-        var title: String by model
-        var version: String by model
-        var unknown: String? by model
-        var createdAt: String? by model.auto; private set
-        val createdAt2: String? by model.auto
+        var processId: Long? by db.key.auto; private set
+        val noSetter: String by db.auto
+        val noSetter2: String by db.auto.key
+        var title: String by db
+        var version: String by db
+        var unknown: String? by db
+        var createdAt: String? by db.auto; private set
+        val createdAt2: String? by db.auto
 
         companion object {
             val fromRow: (Row) -> ValidModel = { row ->
@@ -72,15 +72,15 @@ class ModelTest {
     }
 
     class DatabaseModel() : Model<DatabaseModel>("tests", false, true) {
-        var processId: Long? by model.key.auto
-        var modelName: String? by model.key.auto
-        var title: String by model
-        var version: String by model
-        var ownName: String by model.column("hasOwnName")
-        var CappedName: Int by model
-        var ALLCAPS: Int by model
-        var withDigits2: Int by model
-        var createdAt: String? by model.auto
+        var processId: Long? by db.key.auto
+        var modelName: String? by db.key.auto
+        var title: String by db
+        var version: String by db
+        var ownName: String by db.column("hasOwnName")
+        var CappedName: Int by db
+        var ALLCAPS: Int by db
+        var withDigits2: Int by db
+        var createdAt: String? by db.auto
 
         companion object {
             val fromRow: (Row) -> ValidModel = { row ->
@@ -111,11 +111,11 @@ class ModelTest {
             snapshot()
         }
 
-        var processId: Long? by model.auto.key; private set
-        var title: String by model
-        var version: String by model
-        var batch: Int? by model.default
-        var createdAt: String? by model.auto; private set
+        var processId: Long? by db.auto.key; private set
+        var title: String by db
+        var version: String by db
+        var batch: Int? by db.default
+        var createdAt: String? by db.auto; private set
 
         companion object {
             val fromRow: (Row) -> TestModel = { row ->
@@ -146,11 +146,11 @@ class ModelTest {
             snapshot()
         }
 
-        var processId: Long? by model.auto.key; private set
-        var title: String by model
-        var version: String by model
-        var batch: Int? by model.default(1)
-        var createdAt: String? by model.auto; private set
+        var processId: Long? by db.auto.key; private set
+        var title: String by db
+        var version: String by db
+        var batch: Int? by db.default(1)
+        var createdAt: String? by db.auto; private set
 
         companion object {
             val fromRow: (Row) -> TestModel = { row ->
@@ -181,11 +181,11 @@ class ModelTest {
             snapshot()
         }
 
-        var processId: Long? by model.auto.key; private set
-        var title: String? by model.default
-        var version: String? by model.default
-        var batch: Int? by model.default
-        var createdAt: String? by model.auto; private set
+        var processId: Long? by db.auto.key; private set
+        var title: String? by db.default
+        var version: String? by db.default
+        var batch: Int? by db.default
+        var createdAt: String? by db.auto; private set
 
         companion object {
             val fromRow: (Row) -> TestModel = { row ->
