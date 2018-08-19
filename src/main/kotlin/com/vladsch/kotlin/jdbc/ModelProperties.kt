@@ -210,7 +210,7 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
         snapshot()
     }
 
-    @Suppress("USELESS_CAST")
+    @Suppress("USELESS_CAST", "ReplaceGetOrSet", "MoveLambdaOutsideParentheses")
     fun load(json: JsonObject) {
         // load initial properties from result set
         val boxed = BoxedJson.of(json)

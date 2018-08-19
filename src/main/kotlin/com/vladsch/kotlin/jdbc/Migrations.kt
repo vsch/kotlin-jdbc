@@ -200,7 +200,7 @@ class Migrations(val session: Session, val migrationSession: Session, val dbEnti
                             if (!equalWithOutOfOrderLines(tableSql, tableScript)) {
                                 val s = "Table validation failed for ${tableFile.path}, database and resource differ"
                                 if (validationPassed) {
-                                    val tmp = 0
+//                                    val tmp = 0
                                 }
                                 if (verbose) logger.error(s)
                                 if (errorAppendable != null) {
