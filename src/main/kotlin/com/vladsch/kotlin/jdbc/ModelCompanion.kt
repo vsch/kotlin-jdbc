@@ -1,5 +1,6 @@
 package com.vladsch.kotlin.jdbc
 
+import javax.json.JsonArray
 import javax.json.JsonObject
 
 abstract class ModelCompanion<M:Model<M>, D> {
@@ -25,5 +26,21 @@ abstract class ModelCompanion<M:Model<M>, D> {
 
     fun listQuery(params: Map<String, Any?>): SqlQuery {
         return Model.listQuery(tableName, params)
+    }
+
+    fun list(session: Session, vararg params: Pair<String, Any?>): List<D> {
+        return session.list(Model.listQuery(tableName, params), toData)
+    }
+
+    fun list(session: Session, params: Map<String, Any?>):  List<D> {
+        return session.list(Model.listQuery(tableName, params), toData)
+    }
+
+    fun jsonArray(session: Session, vararg params: Pair<String, Any?>): JsonArray {
+        return session.jsonArray(Model.listQuery(tableName, params), toJson)
+    }
+
+    fun jsonArray(session: Session, params: Map<String, Any?>):  JsonArray {
+        return session.jsonArray(Model.listQuery(tableName, params), toJson)
     }
 }

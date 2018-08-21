@@ -147,11 +147,15 @@ abstract class Model<T : Model<T>>(val sqlTable: String, dbCase: Boolean, allowS
         }
 
         fun listQuery(tableName:String, conditions: Map<String, Any?>): SqlQuery {
+            return appendWhereClause("SELECT * FROM $tableName", conditions)
+        }
+
+        fun appendWhereClause(query:String, conditions: Map<String, Any?>): SqlQuery {
             return if (!conditions.isEmpty()) {
-                sqlQuery("SELECT * FROM $tableName WHERE " + conditions.keys.joinToString(" AND ") { key -> "$key = ?" })
+                sqlQuery("$query WHERE " + conditions.keys.joinToString(" AND ") { key -> "$key = ?" })
                     .paramsList(conditions.values)
             } else {
-                sqlQuery("SELECT * FROM $tableName")
+                sqlQuery(query)
             }
         }
     }

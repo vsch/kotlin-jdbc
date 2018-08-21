@@ -3,6 +3,7 @@
 [TOC]: # " "
 
 - [TODO](#todo)
+- [0.3.2](#032)
 - [0.3.0](#030)
 - [0.2.26](#0226)
 - [0.2.24](#0224)
@@ -34,6 +35,10 @@
 * [ ] Add case sensitive database entity aware migration
   * [ ] Tables
   * [ ] Others?
+
+## 0.3.2
+
+* Add: `Model.appendWhereClause()` to simplify creating list queries
 
 ## 0.3.0
 
