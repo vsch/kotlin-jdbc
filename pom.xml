@@ -99,7 +99,7 @@
         <dependency>
             <groupId>com.vladsch.boxed-json</groupId>
             <artifactId>boxed-json</artifactId>
-            <version>0.5.14</version>
+            <version>0.5.16</version>
         </dependency>
         <dependency>
             <groupId>com.h2database</groupId>
