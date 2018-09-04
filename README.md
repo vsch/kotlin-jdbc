@@ -17,7 +17,7 @@ without intermediate objects, add stored procedure calls with `in`/`inout`/`out`
 ability to process multiple result sets.
 
 Convenient models with simple syntax which are aware of primary key columns, auto generated
-columns, columns with defaults and nullable columns. Models protected property `model` to
+columns, columns with defaults and nullable columns. Models protected property `db` to
 define properties via `provideDelegate`. See [Convenient Models](#convenient-models)
 
 ```kotlin
