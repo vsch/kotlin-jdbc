@@ -146,17 +146,26 @@ abstract class Model<T : Model<T>>(val sqlTable: String, dbCase: Boolean, allowS
             return listQuery(tableName, conditions)
         }
 
-        fun listQuery(tableName:String, conditions: Map<String, Any?>): SqlQuery {
-            return appendWhereClause("SELECT * FROM $tableName", conditions)
+        fun listQuery(tableName:String, whereClause:String, params: Array<out Pair<String, Any?>>): SqlQuery {
+            val _params = HashMap<String, Any?>()
+            _params.putAll(params)
+            return listQuery(tableName, whereClause, _params)
         }
 
-        fun appendWhereClause(query:String, conditions: Map<String, Any?>): SqlQuery {
-            return if (!conditions.isEmpty()) {
-                sqlQuery("$query WHERE " + conditions.keys.joinToString(" AND ") { key -> "$key = ?" })
-                    .paramsList(conditions.values)
+        fun appendWhereClause(query:String, params: Map<String, Any?>): SqlQuery {
+            return if (!params.isEmpty()) {
+                listQuery(query, " WHERE " + params.keys.joinToString(" AND ") { key -> "$key = ?" }, params)
             } else {
                 sqlQuery(query)
             }
+        }
+
+        fun listQuery(tableName:String, params: Map<String, Any?>): SqlQuery {
+            return appendWhereClause("SELECT * FROM $tableName", params)
+        }
+
+        fun listQuery(tableName:String, whereClause:String, params: Map<String, Any?>): SqlQuery {
+            return sqlQuery("SELECT * FROM $tableName $whereClause", params)
         }
     }
 }

@@ -3,6 +3,7 @@
 [TOC]: # " "
 
 - [TODO](#todo)
+- [0.3.4](#034)
 - [0.3.2](#032)
 - [0.3.0](#030)
 - [0.2.26](#0226)
@@ -35,6 +36,12 @@
 * [ ] Add case sensitive database entity aware migration
   * [ ] Tables
   * [ ] Others?
+
+## 0.3.4
+
+* Add: variations of `list` and `listJson` to `ModelCompanion` taking where clause and vararg
+  `Pair` or map argument for parameters for the where clause for more flexibility of generating
+  list queries.
 
 ## 0.3.2
 

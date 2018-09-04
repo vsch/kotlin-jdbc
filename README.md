@@ -17,8 +17,8 @@ without intermediate objects, add stored procedure calls with `in`/`inout`/`out`
 ability to process multiple result sets.
 
 Convenient models with simple syntax which are aware of primary key columns, auto generated
-columns, columns with defaults and nullable columns. Models protected property `db` to
-define properties via `provideDelegate`. See [Convenient Models](#convenient-models)
+columns, columns with defaults and nullable columns. Models protected property `db` to define
+properties via `provideDelegate`. See [Convenient Models](#convenient-models)
 
 ```kotlin
 import java.sql.Timestamp
@@ -58,14 +58,14 @@ functions, procedures, tables, triggers and views. See [Migrations](#migrations)
 <dependency>
     <groupId>com.vladsch.kotlin-jdbc</groupId>
     <artifactId>kotlin-jdbc</artifactId>
-    <version>0.3.2</version>
+    <version>0.3.4</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```gradle
-compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.3.2"
+compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.3.4"
 ```
 
 ### Example
@@ -331,11 +331,11 @@ the model's properties for every instance.
 
 * Define model's properties by using `by db`. The nullability of the property type dictates
   whether the property can be omitted or set to null
-* Key properties by: `by db.key`. These will be used for `WHERE` list for `UPDATE`, `DELETE`
-  or `SELECT` for reload query generation
+* Key properties by: `by db.key`. These will be used for `WHERE` list for `UPDATE`, `DELETE` or
+  `SELECT` for reload query generation
 * Auto generated (left out of update and insert column list) properties by: `by db.auto`
-* Auto generated Key (key column and auto generated) by: `by db.key.auto`, `by db.autoKey`
-  or `by db.auto.key`
+* Auto generated Key (key column and auto generated) by: `by db.key.auto`, `by db.autoKey` or
+  `by db.auto.key`
 * Columns which have default values by: `by db.default`. These won't raise an exception for
   `INSERT` query generation if they are missing from the model's defined property set. A
   function alternative `by db.default(value)` will provide a default value which will be used
@@ -358,6 +358,30 @@ Any property marked as `auto` generated will not be used in `UPDATE` or `INSERT`
 For IntelliJ Ultimate a Database extension script can be installed which will generate models
 from the context menu of any table in the database tools window. See
 [Installing IntelliJ Ultimate Database Tools Extension Script](#installing-intellij-ultimate-database-tools-extension-scripts)
+
+The model's companion implements helper functions for converting result set row to the data
+class, JSON object and creating list queries.
+
+List Query Helpers:
+
+* `fun listQuery(vararg params: Pair<String, Any?>): SqlQuery`
+* `fun listQuery(params: Map<String, Any?>): SqlQuery`
+* `fun listQuery(whereClause:String, vararg params: Pair<String, Any?>): SqlQuery`
+* `fun listQuery(whereClause:String, params: Map<String, Any?>): SqlQuery`
+
+List results:
+
+* `fun list(session: Session, vararg params: Pair<String, Any?>): List<D>`
+* `fun list(session: Session, params: Map<String, Any?>): List<D>`
+* `fun list(session: Session, whereClause:String, vararg params: Pair<String, Any?>): List<D>`
+* `fun list(session: Session, whereClause:String, params: Map<String, Any?>): List<D>`
+
+JSON Array results:
+
+* `fun jsonArray(session: Session, vararg params: Pair<String, Any?>): JsonArray`
+* `fun jsonArray(session: Session, params: Map<String, Any?>): JsonArray`
+* `fun jsonArray(session: Session, whereClause:String, vararg params: Pair<String, Any?>): JsonArray`
+* `fun jsonArray(session: Session, whereClause:String, params: Map<String, Any?>): JsonArray`
 
 ```kotlin
 data class ValidData(
@@ -442,6 +466,7 @@ configuration:
 The places patterns text is:
 
 ```
++ kotlinParameter().ofFunction(0, kotlinFunction().withName("appendWhereClause"))
 + kotlinParameter().ofFunction(0, kotlinFunction().withName("sqlCall").definedInPackage("com.vladsch.kotlin.jdbc"))
 + kotlinParameter().ofFunction(0, kotlinFunction().withName("sqlQuery").definedInPackage("com.vladsch.kotlin.jdbc"))
 
