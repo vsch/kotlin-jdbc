@@ -154,9 +154,9 @@ abstract class Model<T : Model<T>>(val sqlTable: String, dbCase: Boolean, allowS
         }
 
         fun listQuery(tableName: String, whereClause: String, params: Array<out Pair<String, Any?>>, quote: String = ModelProperties.databaseQuoting): SqlQuery {
-            val _params = HashMap<String, Any?>()
-            _params.putAll(params)
-            return listQuery(tableName, whereClause, _params, quote)
+            val paramsMap = HashMap<String, Any?>()
+            paramsMap.putAll(params)
+            return listQuery(tableName, whereClause, paramsMap, quote)
         }
 
         fun appendWhereClause(query: String, params: Map<String, Any?>, quote: String = ModelProperties.databaseQuoting): SqlQuery {
@@ -167,8 +167,8 @@ abstract class Model<T : Model<T>>(val sqlTable: String, dbCase: Boolean, allowS
             }
         }
 
-        fun listQuery(tableName: String, params: Map<String, Any?>, quote: String = ModelProperties.databaseQuoting): SqlQuery {
-            return appendWhereClause("SELECT * FROM $quote$tableName$quote", params, quote)
+        fun listQuery(tableName: String, conditions: Map<String, Any?>, quote: String = ModelProperties.databaseQuoting): SqlQuery {
+            return appendWhereClause("SELECT * FROM $quote$tableName$quote", conditions, quote)
         }
 
         fun listQuery(tableName: String, whereClause: String, params: Map<String, Any?>, quote: String = ModelProperties.databaseQuoting): SqlQuery {

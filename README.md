@@ -662,8 +662,8 @@ During a rollback operation, only down scripts whose up script execution has bee
 the `migrations` table will be executed. All down scripts are executed in decreasing file name
 order.
 
-The a migration script files is split on `;` delimiters and each part run as a separate query,
-if successful then an entry for this fact is added to the migration table.
+Migration script files are split on `;` delimiters and each part run as a separate query, if
+successful then an entry for this fact is added to the migration table.
 
 After all migrations/rollback scripts have been applied for all required versions, the database
 entity scripts (excluding tables) for the resulting version will be run. This means that
@@ -688,7 +688,8 @@ contents and an error is recorded if the validation fails. The validation will i
 differences caused by re-ordering of lines, this is used to eliminate column, key and constraint
 order changes from causing validation failures.
 
-To generate contents for the `tables/` directory run the `dump-tables` command.
+To generate contents for the `tables/` directory of the current version or a specific version,
+run the `dump-tables` command.
 
 Commands:
 
