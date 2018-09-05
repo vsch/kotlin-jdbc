@@ -3,6 +3,7 @@
 [TOC]: # " "
 
 - [TODO](#todo)
+- [0.4.0](#040)
 - [0.3.4](#034)
 - [0.3.2](#032)
 - [0.3.0](#030)
@@ -36,6 +37,41 @@
 * [ ] Add case sensitive database entity aware migration
   * [ ] Tables
   * [ ] Others?
+
+## 0.4.0
+
+* Fix: remove database dependent quoting of table name and column names and replace it with an
+  optional `quote` argument to `ModelProperties` and `Model` constructor argument with default
+  from `ModelProperties.databaseQuoting` which can be set to any desired string. If the same
+  database type is used on all connections then quoting should be set during initialization
+  through `Model.databaseQuoting`.
+
+  However, if multiple databases with different quoting requirements are used then `quote`
+  argument will need to be passed to model constructor based on the database connection.
+
+  * companion functions requiring quoting now take an optional argument `quote` with default of
+    `ModelProperties.databaseQuoting`
+  * model companion abstract `createModel()` now has `createModel(quote: String?)` signature so
+    it can pass `quote` argument to model constructor.
+
+* Fix: list query with where clause parameters to use name parameters instead of plain
+  parameters since parameters are passed as a map.
+
+* Fix: list queries with where clause parameters having collection values to use `IN (:name)`
+  instead of `name = :name` for condition
+
+* Add: automatic expansion of `sqlQuery` and `sqlCall` collection valued parameters into their
+  contained values. This allows lists to be used where individual parameters are expected:
+
+```kotlin
+sqlQuery("SELECT * FROM Table WHERE column in (:list)").inParams("list" to listOf(1,2,3))
+```
+
+To expand to `SELECT * FROM Table WHERE column in (?,?,?)` with parameters of `1, 2, 3`.
+
+* Change: refactor `sqlQuery` to substitute named parameters and compute named parameter mapping
+  as needed and after any parameter changes. Required to have access to the parameter's type to
+  figure out if it is a list or a single value.
 
 ## 0.3.4
 

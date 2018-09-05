@@ -25,8 +25,8 @@ import java.sql.Timestamp
 
 // dbCase = true if database columns same as properties
 // dbCase = false if database columns are snake-case versions of property names
-class ValidModel : Model<ValidModel>("tableName", dbCase = true) {
-    var processId: Long? by db.auto.key
+class ValidModel(quote:String? = null) : Model<ValidModel>("tableName", dbCase = true, quote = quote) {
+    var processId: Long? by db.autoKey
     var title: String by db
     var version: String by db
     var optional: Int? by db           
@@ -58,14 +58,14 @@ functions, procedures, tables, triggers and views. See [Migrations](#migrations)
 <dependency>
     <groupId>com.vladsch.kotlin-jdbc</groupId>
     <artifactId>kotlin-jdbc</artifactId>
-    <version>0.3.4</version>
+    <version>0.4.0</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```gradle
-compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.3.4"
+compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.4.0"
 ```
 
 ### Example
@@ -209,6 +209,19 @@ sqlCall("""call storedProc(:inParam,:inOutParam,:outParam)""")
 However, the first method is fastest because it sets all the parameters with the least run-time
 processing.
 
+##### Collection parameter values
+
+Automatic expansion of `sqlQuery` and `sqlCall` collection valued named parameters to their
+contained values will be performed. This allows collections to be used where individual
+parameters are specified:
+
+```kotlin
+sqlQuery("SELECT * FROM Table WHERE column in (:list)").inParams("list" to listOf(1,2,3))
+```
+
+Will be expanded to `SELECT * FROM Table WHERE column in (?,?,?)` with parameters of `1, 2, 3`
+passed to the prepared statement.
+
 #### Typed params
 
 In the case, the parameter type has to be explicitly stated, there's a wrapper class -
@@ -242,7 +255,7 @@ This can be useful in situations similar to one described
 ```kotlin
 session.forEach(sqlQuery("select id from members")) { row ->
   // working with large data set
-})
+}
 ```
 
 As an alternative when you need to modify a small amount of values or columns, and then pass the
@@ -355,9 +368,22 @@ validation forcing all `auto` properties to have no `set` method or have `privat
 
 Any property marked as `auto` generated will not be used in `UPDATE` or `INSERT` queries.
 
+##### Identifier Quoting
+
+Column and table names are not quoted by default. If the same database type is used on all
+connections then quoting should be set during initialization through `Model.databaseQuoting`.
+
+When multiple database quoting types are used for different sessions then quote string to be
+used by models should be passed to the model constructor based on the database type for the
+session. This means that models with different quoting strings.
+
+##### Model Generation
+
 For IntelliJ Ultimate a Database extension script can be installed which will generate models
 from the context menu of any table in the database tools window. See
 [Installing IntelliJ Ultimate Database Tools Extension Script](#installing-intellij-ultimate-database-tools-extension-scripts)
+
+##### List Query Helpers
 
 The model's companion implements helper functions for converting result set row to the data
 class, JSON object and creating list queries.
@@ -380,7 +406,8 @@ JSON Array results:
 
 * `fun jsonArray(session: Session, vararg params: Pair<String, Any?>): JsonArray`
 * `fun jsonArray(session: Session, params: Map<String, Any?>): JsonArray`
-* `fun jsonArray(session: Session, whereClause:String, vararg params: Pair<String, Any?>): JsonArray`
+* `fun jsonArray(session: Session, whereClause:String, vararg params: Pair<String, Any?>):
+  JsonArray`
 * `fun jsonArray(session: Session, whereClause:String, params: Map<String, Any?>): JsonArray`
 
 ```kotlin
@@ -393,7 +420,7 @@ data class ValidData(
     val createdAt: String?
 )
 
-class ValidModel : Model<ValidModel>(tableName, dbCase = true) {
+class ValidModel(quote:String? = null) : Model<ValidModel>(tableName, dbCase = true, quote = quote) {
     var processId: Long? by db.auto.key
     var title: String by db
     var version: String by db
@@ -412,7 +439,7 @@ class ValidModel : Model<ValidModel>(tableName, dbCase = true) {
 
     companion object : ModelCompanion<ValidModel, ValidData> {
         override val tableName = "tableName"
-        override fun createModel(): ValidModel = ValidModel()
+        override fun createModel(quote:String?): ValidModel = ValidModel(quote)
         override fun createData(model: ValidModel): ValidData = model.toData()
     }
 }
