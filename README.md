@@ -383,32 +383,46 @@ For IntelliJ Ultimate a Database extension script can be installed which will ge
 from the context menu of any table in the database tools window. See
 [Installing IntelliJ Ultimate Database Tools Extension Script](#installing-intellij-ultimate-database-tools-extension-scripts)
 
-##### List Query Helpers
+##### Companion Helpers
 
 The model's companion implements helper functions for converting result set row to the data
 class, JSON object and creating list queries.
 
+Result set row to model/json/data conversion:
+
+These return conversion function without identifier quoting option:
+
+* `val toModel: (Row) -> M = toModel()`
+* `val toData: (Row) -> D = toData()`
+* `val toJson: (Row) -> JsonObject = toJson()`
+
+These return conversion function with identifier quoting option:
+
+* `fun toModel(quote: String? = null): (Row) -> M`
+* `fun toData(quote: String? = null): (Row) -> D`
+* `fun toJson(quote: String? = null): (Row) -> JsonObject`
+
+
 List Query Helpers:
 
-* `fun listQuery(vararg params: Pair<String, Any?>): SqlQuery`
-* `fun listQuery(params: Map<String, Any?>): SqlQuery`
-* `fun listQuery(whereClause:String, vararg params: Pair<String, Any?>): SqlQuery`
-* `fun listQuery(whereClause:String, params: Map<String, Any?>): SqlQuery`
+* `fun listQuery(vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): SqlQuery`
+* `fun listQuery(params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): SqlQuery`
+* `fun listQuery(whereClause:String, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): SqlQuery`
+* `fun listQuery(whereClause:String, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): SqlQuery`
 
 List results:
 
-* `fun list(session: Session, vararg params: Pair<String, Any?>): List<D>`
-* `fun list(session: Session, params: Map<String, Any?>): List<D>`
-* `fun list(session: Session, whereClause:String, vararg params: Pair<String, Any?>): List<D>`
-* `fun list(session: Session, whereClause:String, params: Map<String, Any?>): List<D>`
+* `fun list(session: Session, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): List<D>`
+* `fun list(session: Session, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): List<D>`
+* `fun list(session: Session, whereClause:String, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): List<D>`
+* `fun list(session: Session, whereClause:String, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): List<D>`
 
 JSON Array results:
 
-* `fun jsonArray(session: Session, vararg params: Pair<String, Any?>): JsonArray`
-* `fun jsonArray(session: Session, params: Map<String, Any?>): JsonArray`
-* `fun jsonArray(session: Session, whereClause:String, vararg params: Pair<String, Any?>):
-  JsonArray`
-* `fun jsonArray(session: Session, whereClause:String, params: Map<String, Any?>): JsonArray`
+* `fun jsonArray(session: Session, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): JsonArray`
+* `fun jsonArray(session: Session, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): JsonArray`
+* `fun jsonArray(session: Session, whereClause:String, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): JsonArray`
+* `fun jsonArray(session: Session, whereClause:String, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): JsonArray`
 
 ```kotlin
 data class ValidData(
@@ -446,7 +460,8 @@ class ValidModel(quote:String? = null) : Model<ValidModel>(tableName, dbCase = t
 
 fun useModel() {
     using(session(HikariCP.default())) { session ->
-        val modelList = session.list("", ValidModel.fromRow)
+        // get all rows from table as list
+        val modelList = ValidModel.list(session)
 
         val model = ValidModel()
         model.title = "title text"
