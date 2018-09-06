@@ -105,11 +105,11 @@ fun sqlCall(statement: String, inputParams: Map<String, Any?>, outputParams: Map
 
 fun session(url: String, user: String, password: String): Session {
     val conn = DriverManager.getConnection(url, user, password)
-    return Session(Connection(conn))
+    return SessionImpl(Connection(conn))
 }
 
 fun session(dataSource: DataSource): Session {
-    return Session(Connection(dataSource.connection))
+    return SessionImpl(Connection(dataSource.connection))
 }
 
 /**
@@ -118,9 +118,9 @@ fun session(dataSource: DataSource): Session {
  * @return Session
  */
 fun session(): Session {
-    val dataSource = Session.defaultDataSource
+    val dataSource = SessionImpl.defaultDataSource
         ?: throw IllegalStateException("Session.defaultDataSource needs to be set to generate default data source connections before use.")
-    return Session(Connection(dataSource.invoke().connection))
+    return SessionImpl(Connection(dataSource.invoke().connection))
 }
 
 /**

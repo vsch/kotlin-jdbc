@@ -33,7 +33,7 @@ class UsageTest {
     fun sessionUsage() {
         using(borrowConnection()) { conn ->
 
-            val session = Session(Connection(conn, driverName))
+            val session = SessionImpl(Connection(conn, driverName))
 
             session.execute(sqlQuery("drop table members if exists"))
             session.execute(sqlQuery("""
@@ -74,7 +74,7 @@ create table members (
     @Test
     fun addNewWithId() {
         using(borrowConnection()) { conn ->
-            val session = Session(Connection(conn, driverName))
+            val session = SessionImpl(Connection(conn, driverName))
             session.execute(sqlQuery("drop table members if exists"))
             session.execute(sqlQuery("""
 create table members (
@@ -98,7 +98,7 @@ create table members (
     fun actionUsage() {
         using(borrowConnection()) { conn ->
 
-            val session = Session(Connection(conn, driverName))
+            val session = SessionImpl(Connection(conn, driverName))
 
             session.execute(sqlQuery("drop table members if exists"))
             session.execute(sqlQuery("""
@@ -143,7 +143,7 @@ create table members (
 
             val idsQuery = sqlQuery("select id from members")
 
-            val session = Session(Connection(conn, driverName))
+            val session = SessionImpl(Connection(conn, driverName))
 
             session.execute(sqlQuery("drop table members if exists"))
             session.execute(sqlQuery("""
@@ -252,7 +252,7 @@ create table members (
     fun nullParamsJdbcHandling() {
         // this test could fail for PostgreSQL
         using(borrowConnection()) { conn ->
-            val session = Session(Connection(conn, driverName))
+            val session = SessionImpl(Connection(conn, driverName))
 
             session.execute(sqlQuery("drop table if exists members"))
             session.execute(sqlQuery("""
@@ -289,7 +289,7 @@ create table members (
 
     fun withPreparedStmt(query: SqlQuery, closure: (PreparedStatement) -> Unit) {
         using(borrowConnection()) { conn ->
-            val session = Session(Connection(conn, driverName))
+            val session = SessionImpl(Connection(conn, driverName))
 
             val preparedStmt = session.prepare(query)
 
