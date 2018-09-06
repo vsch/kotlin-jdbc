@@ -100,7 +100,7 @@ Define default data source for session and use shorter code:
 ```kotlin
 HikariCP.default("jdbc:h2:mem:hello", "user", "pass")
 // define default data source factory to allow use of session() for default
-Session.defaultDataSource = { HikariCP.dataSource() }
+SessionImpl.defaultDataSource = { HikariCP.dataSource() }
 
 usingDefault { session ->
    // working with the session
