@@ -1,6 +1,7 @@
 package com.vladsch.kotlin.jdbc
 
 import java.sql.CallableStatement
+import java.sql.PreparedStatement
 
 class SqlCall(
     statement: String,
@@ -9,70 +10,62 @@ class SqlCall(
     outputParams: Map<String, Any> = mapOf()
 ) : SqlQuery(statement, params, inputParams) {
 
-    val outputParams = HashMap(outputParams)
+    protected val outputParams = HashMap(outputParams)
 
-    fun populateParams(stmt: CallableStatement) {
-        if (replacementMap.isNotEmpty()) {
-            replacementMap.forEach { paramName, occurrences ->
-                occurrences.forEach {
-                    stmt.setTypedParam(it + 1, inputParams[paramName].param())
-                }
+    override fun populateNamedParam(stmt: PreparedStatement, paramName: String, occurrences: List<Int>) {
+        super.populateNamedParam(stmt, paramName, occurrences)
 
-                if (outputParams.containsKey(paramName)) {
-                    // setup out or inout param
-                    stmt.registerOutParameter(paramName, outputParams[paramName].param().sqlType())
-                }
-            }
-        } else {
-            params.forEachIndexed { index, value ->
-                stmt.setTypedParam(index + 1, value.param())
-            }
+        if (outputParams.containsKey(paramName)) {
+            // setup out or inout param
+            (stmt as CallableStatement).registerOutParameter(paramName, outputParams[paramName].param().sqlType())
         }
     }
 
-    override fun params(vararg params: Any?): SqlQuery {
-        return paramsArray(params)
+    override fun params(vararg params: Any?): SqlCall {
+        return super.params(*params) as SqlCall
     }
 
-    override fun paramsArray(params: Array<out Any?>): SqlQuery {
-        this.params.addAll(params)
-        return this
+    override fun paramsArray(params: Array<out Any?>): SqlCall {
+        return super.paramsArray(params) as SqlCall
     }
 
-    override fun paramsList(params: Collection<Any?>): SqlQuery {
-        this.params.addAll(params)
-        return this
+    override fun paramsList(params: Collection<Any?>): SqlCall {
+        return super.paramsList(params) as SqlCall
     }
 
     override fun inParams(params: Map<String, Any?>): SqlCall {
-        inputParams.putAll(params)
-        return this
+        return super.inParams(params) as SqlCall
     }
 
     override fun inParams(vararg params: Pair<String, Any?>): SqlCall {
-        inputParams.putAll(params)
-        return this
+        return super.inParams(*params) as SqlCall
+    }
+
+    override fun inParamsArray(params: Array<out Pair<String, Any?>>): SqlCall {
+        return super.inParamsArray(params) as SqlCall
     }
 
     fun inOutParams(params: Map<String, Any?>): SqlCall {
-        inputParams.putAll(params)
         outputParams.putAll(params)
+        inParams(params)
         return this
     }
 
     fun inOutParams(vararg params: Pair<String, Any?>): SqlCall {
-        inputParams.putAll(params)
         outputParams.putAll(params)
+        inParamsArray(params)
         return this
     }
 
     fun outParams(params: Map<String, Any?>): SqlCall {
         outputParams.putAll(params)
+        resetDetails()
         return this
     }
 
     fun outParams(vararg params: Pair<String, Any?>): SqlCall {
         outputParams.putAll(params)
+        resetDetails()
         return this
     }
 

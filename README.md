@@ -17,16 +17,16 @@ without intermediate objects, add stored procedure calls with `in`/`inout`/`out`
 ability to process multiple result sets.
 
 Convenient models with simple syntax which are aware of primary key columns, auto generated
-columns, columns with defaults and nullable columns. Models protected property `model` to
-define properties via `provideDelegate`. See [Convenient Models](#convenient-models)
+columns, columns with defaults and nullable columns. Models protected property `db` to define
+properties via `provideDelegate`. See [Convenient Models](#convenient-models)
 
 ```kotlin
 import java.sql.Timestamp
 
 // dbCase = true if database columns same as properties
 // dbCase = false if database columns are snake-case versions of property names
-class ValidModel : Model<ValidModel>("tableName", dbCase = true) {
-    var processId: Long? by db.auto.key
+class ValidModel(quote:String? = null) : Model<ValidModel>("tableName", dbCase = true, quote = quote) {
+    var processId: Long? by db.autoKey
     var title: String by db
     var version: String by db
     var optional: Int? by db           
@@ -58,14 +58,14 @@ functions, procedures, tables, triggers and views. See [Migrations](#migrations)
 <dependency>
     <groupId>com.vladsch.kotlin-jdbc</groupId>
     <artifactId>kotlin-jdbc</artifactId>
-    <version>0.3.2</version>
+    <version>0.4.0</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```gradle
-compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.3.2"
+compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.4.0"
 ```
 
 ### Example
@@ -209,6 +209,19 @@ sqlCall("""call storedProc(:inParam,:inOutParam,:outParam)""")
 However, the first method is fastest because it sets all the parameters with the least run-time
 processing.
 
+##### Collection parameter values
+
+Automatic expansion of `sqlQuery` and `sqlCall` collection valued named parameters to their
+contained values will be performed. This allows collections to be used where individual
+parameters are specified:
+
+```kotlin
+sqlQuery("SELECT * FROM Table WHERE column in (:list)").inParams("list" to listOf(1,2,3))
+```
+
+Will be expanded to `SELECT * FROM Table WHERE column in (?,?,?)` with parameters of `1, 2, 3`
+passed to the prepared statement.
+
 #### Typed params
 
 In the case, the parameter type has to be explicitly stated, there's a wrapper class -
@@ -242,7 +255,7 @@ This can be useful in situations similar to one described
 ```kotlin
 session.forEach(sqlQuery("select id from members")) { row ->
   // working with large data set
-})
+}
 ```
 
 As an alternative when you need to modify a small amount of values or columns, and then pass the
@@ -331,11 +344,11 @@ the model's properties for every instance.
 
 * Define model's properties by using `by db`. The nullability of the property type dictates
   whether the property can be omitted or set to null
-* Key properties by: `by db.key`. These will be used for `WHERE` list for `UPDATE`, `DELETE`
-  or `SELECT` for reload query generation
+* Key properties by: `by db.key`. These will be used for `WHERE` list for `UPDATE`, `DELETE` or
+  `SELECT` for reload query generation
 * Auto generated (left out of update and insert column list) properties by: `by db.auto`
-* Auto generated Key (key column and auto generated) by: `by db.key.auto`, `by db.autoKey`
-  or `by db.auto.key`
+* Auto generated Key (key column and auto generated) by: `by db.key.auto`, `by db.autoKey` or
+  `by db.auto.key`
 * Columns which have default values by: `by db.default`. These won't raise an exception for
   `INSERT` query generation if they are missing from the model's defined property set. A
   function alternative `by db.default(value)` will provide a default value which will be used
@@ -355,9 +368,61 @@ validation forcing all `auto` properties to have no `set` method or have `privat
 
 Any property marked as `auto` generated will not be used in `UPDATE` or `INSERT` queries.
 
+##### Identifier Quoting
+
+Column and table names are not quoted by default. If the same database type is used on all
+connections then quoting should be set during initialization through `Model.databaseQuoting`.
+
+When multiple database quoting types are used for different sessions then quote string to be
+used by models should be passed to the model constructor based on the database type for the
+session. This means that models with different quoting strings.
+
+##### Model Generation
+
 For IntelliJ Ultimate a Database extension script can be installed which will generate models
 from the context menu of any table in the database tools window. See
 [Installing IntelliJ Ultimate Database Tools Extension Script](#installing-intellij-ultimate-database-tools-extension-scripts)
+
+##### Companion Helpers
+
+The model's companion implements helper functions for converting result set row to the data
+class, JSON object and creating list queries.
+
+Result set row to model/json/data conversion:
+
+These return conversion function without identifier quoting option:
+
+* `val toModel: (Row) -> M = toModel()`
+* `val toData: (Row) -> D = toData()`
+* `val toJson: (Row) -> JsonObject = toJson()`
+
+These return conversion function with identifier quoting option:
+
+* `fun toModel(quote: String? = null): (Row) -> M`
+* `fun toData(quote: String? = null): (Row) -> D`
+* `fun toJson(quote: String? = null): (Row) -> JsonObject`
+
+
+List Query Helpers:
+
+* `fun listQuery(vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): SqlQuery`
+* `fun listQuery(params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): SqlQuery`
+* `fun listQuery(whereClause:String, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): SqlQuery`
+* `fun listQuery(whereClause:String, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): SqlQuery`
+
+List results:
+
+* `fun list(session: Session, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): List<D>`
+* `fun list(session: Session, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): List<D>`
+* `fun list(session: Session, whereClause:String, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): List<D>`
+* `fun list(session: Session, whereClause:String, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): List<D>`
+
+JSON Array results:
+
+* `fun jsonArray(session: Session, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): JsonArray`
+* `fun jsonArray(session: Session, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): JsonArray`
+* `fun jsonArray(session: Session, whereClause:String, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): JsonArray`
+* `fun jsonArray(session: Session, whereClause:String, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): JsonArray`
 
 ```kotlin
 data class ValidData(
@@ -369,7 +434,7 @@ data class ValidData(
     val createdAt: String?
 )
 
-class ValidModel : Model<ValidModel>(tableName, dbCase = true) {
+class ValidModel(quote:String? = null) : Model<ValidModel>(tableName, dbCase = true, quote = quote) {
     var processId: Long? by db.auto.key
     var title: String by db
     var version: String by db
@@ -388,14 +453,15 @@ class ValidModel : Model<ValidModel>(tableName, dbCase = true) {
 
     companion object : ModelCompanion<ValidModel, ValidData> {
         override val tableName = "tableName"
-        override fun createModel(): ValidModel = ValidModel()
+        override fun createModel(quote:String?): ValidModel = ValidModel(quote)
         override fun createData(model: ValidModel): ValidData = model.toData()
     }
 }
 
 fun useModel() {
     using(session(HikariCP.default())) { session ->
-        val modelList = session.list("", ValidModel.fromRow)
+        // get all rows from table as list
+        val modelList = ValidModel.list(session)
 
         val model = ValidModel()
         model.title = "title text"
@@ -442,6 +508,7 @@ configuration:
 The places patterns text is:
 
 ```
++ kotlinParameter().ofFunction(0, kotlinFunction().withName("appendWhereClause"))
 + kotlinParameter().ofFunction(0, kotlinFunction().withName("sqlCall").definedInPackage("com.vladsch.kotlin.jdbc"))
 + kotlinParameter().ofFunction(0, kotlinFunction().withName("sqlQuery").definedInPackage("com.vladsch.kotlin.jdbc"))
 
@@ -595,8 +662,8 @@ During a rollback operation, only down scripts whose up script execution has bee
 the `migrations` table will be executed. All down scripts are executed in decreasing file name
 order.
 
-The a migration script files is split on `;` delimiters and each part run as a separate query,
-if successful then an entry for this fact is added to the migration table.
+Migration script files are split on `;` delimiters and each part run as a separate query, if
+successful then an entry for this fact is added to the migration table.
 
 After all migrations/rollback scripts have been applied for all required versions, the database
 entity scripts (excluding tables) for the resulting version will be run. This means that
@@ -621,7 +688,8 @@ contents and an error is recorded if the validation fails. The validation will i
 differences caused by re-ordering of lines, this is used to eliminate column, key and constraint
 order changes from causing validation failures.
 
-To generate contents for the `tables/` directory run the `dump-tables` command.
+To generate contents for the `tables/` directory of the current version or a specific version,
+run the `dump-tables` command.
 
 Commands:
 

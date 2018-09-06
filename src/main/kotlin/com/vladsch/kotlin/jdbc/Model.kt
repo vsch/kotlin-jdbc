@@ -4,11 +4,10 @@ import javax.json.JsonObject
 import kotlin.reflect.KProperty
 
 @Suppress("MemberVisibilityCanBePrivate")
-abstract class Model<T : Model<T>>(val sqlTable: String, dbCase: Boolean, allowSetAuto: Boolean = true) {
-
+abstract class Model<T : Model<T>>(val sqlTable: String, dbCase: Boolean, allowSetAuto: Boolean = true, quote: String? = null) {
     protected val db: ModelPropertyProvider<T> get() = _model
 
-    internal val _model = ModelProperties<T>(this::class.simpleName ?: "<unknown>", dbCase, allowSetAuto)
+    internal val _model = ModelProperties<T>(this::class.simpleName ?: "<unknown>", dbCase, allowSetAuto, quote ?: ModelProperties.databaseQuoting)
 
     fun load(rs: Row): T {
         _model.load(rs)
@@ -140,23 +139,40 @@ abstract class Model<T : Model<T>>(val sqlTable: String, dbCase: Boolean, allowS
     }
 
     companion object {
-        fun listQuery(tableName:String, params: Array<out Pair<String, Any?>>): SqlQuery {
+        var databaseQuoting: String
+            get() = ModelProperties.databaseQuoting
+            set(value) {
+                ModelProperties.databaseQuoting = value
+            }
+
+        fun quoteIdentifier(name: String): String = ModelProperties.quoteIdentifier(name)
+
+        fun listQuery(tableName: String, params: Array<out Pair<String, Any?>>, quote: String = ModelProperties.databaseQuoting): SqlQuery {
             val conditions = HashMap<String, Any?>()
             conditions.putAll(params)
-            return listQuery(tableName, conditions)
+            return listQuery(tableName, conditions, quote)
         }
 
-        fun listQuery(tableName:String, conditions: Map<String, Any?>): SqlQuery {
-            return appendWhereClause("SELECT * FROM $tableName", conditions)
+        fun listQuery(tableName: String, whereClause: String, params: Array<out Pair<String, Any?>>, quote: String = ModelProperties.databaseQuoting): SqlQuery {
+            val paramsMap = HashMap<String, Any?>()
+            paramsMap.putAll(params)
+            return listQuery(tableName, whereClause, paramsMap, quote)
         }
 
-        fun appendWhereClause(query:String, conditions: Map<String, Any?>): SqlQuery {
-            return if (!conditions.isEmpty()) {
-                sqlQuery("$query WHERE " + conditions.keys.joinToString(" AND ") { key -> "$key = ?" })
-                    .paramsList(conditions.values)
+        fun appendWhereClause(query: String, params: Map<String, Any?>, quote: String = ModelProperties.databaseQuoting): SqlQuery {
+            return if (!params.isEmpty()) {
+                sqlQuery("$query WHERE " + params.keys.joinToString(" AND ") { key -> if (params[key] is Collection<*>) "$quote$key$quote IN (:$key)" else "$quote$key$quote = :$key" }, params)
             } else {
                 sqlQuery(query)
             }
+        }
+
+        fun listQuery(tableName: String, conditions: Map<String, Any?>, quote: String = ModelProperties.databaseQuoting): SqlQuery {
+            return appendWhereClause("SELECT * FROM $quote$tableName$quote", conditions, quote)
+        }
+
+        fun listQuery(tableName: String, whereClause: String, params: Map<String, Any?>, quote: String = ModelProperties.databaseQuoting): SqlQuery {
+            return sqlQuery("SELECT * FROM $quote$tableName$quote $whereClause", params, quote)
         }
     }
 }

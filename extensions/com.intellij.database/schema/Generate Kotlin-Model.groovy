@@ -98,7 +98,7 @@ def generate(out, tableName, className, fields) {
 
     // model class
     out.println "@Suppress(\"MemberVisibilityCanBePrivate\")"
-    out.println "class ${className}Model() : Model<${className}Model>(tableName, dbCase = ${dbCase}) {"
+    out.println "class ${className}Model(quote: String? = null) : Model<${className}Model>(tableName, dbCase = ${dbCase}, quote = quote) {"
     def maxWidth = 0
     def lines = []
     fields.each() {
@@ -107,8 +107,9 @@ def generate(out, tableName, className, fields) {
         line += "  var ${it.name}: ${it.type}"
         if (it.nullable) line += "?"
         line += " by db"
-        if (it.auto) line += ".auto"
-        if (it.key) line += ".key"
+        if (it.auto && it.key) line += ".autoKey"
+        else if (it.auto) line += ".auto"
+        else if (it.key) line += ".key"
         if (maxWidth < line.length()) maxWidth = line.length()
         lines.add(line)
     }
@@ -125,7 +126,7 @@ def generate(out, tableName, className, fields) {
 
     // data copy constructor
     out.println ""
-    out.println "  constructor(other: ${className}) : this() {"
+    out.println "  constructor(other: ${className}, quote: String? = null) : this(quote) {"
     fields.each() {
         out.println "    ${it.name} = other.${it.name}"
     }
@@ -145,7 +146,7 @@ def generate(out, tableName, className, fields) {
 
     out.println "  companion object : ModelCompanion<${className}Model, ${className}>() {"
     out.println "      override val tableName = \"${tableName}\""
-    out.println "      override fun createModel(): ${className}Model = ${className}Model()"
+    out.println "      override fun createModel(quote:String?): ${className}Model = ${className}Model(quote)"
     out.println "      override fun createData(model: ${className}Model): ${className} = model.toData()"
     out.println "  }"
     out.println "}"

@@ -11,7 +11,7 @@ import kotlin.reflect.KMutableProperty
 import kotlin.reflect.KProperty
 import kotlin.reflect.KVisibility
 
-class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto: Boolean = false) : InternalModelPropertyProvider<T> {
+class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto: Boolean = false, val quote: String = ModelProperties.databaseQuoting) : InternalModelPropertyProvider<T> {
     private val properties = HashMap<String, Any?>()
     private val kProperties = ArrayList<KProperty<*>>()
     private val propertyTypes = HashMap<String, PropertyType>()
@@ -47,7 +47,6 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
             if (columnName != prop.name) {
                 columnNames[prop.name] = columnName
             }
-
         }
 
         if (propType.isDefault && defaultValue != Unit) {
@@ -241,9 +240,9 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
                 java.sql.Timestamp::class -> parsedString(name, prop, boxed.get(prop.name), { java.sql.Timestamp(java.util.Date.parse(it)) }) as java.sql.Timestamp?
                 java.sql.Time::class -> parsedString(name, prop, boxed.get(prop.name), { java.sql.Time(java.util.Date.parse(it)) }) as java.sql.Time?
                 java.sql.Date::class -> parsedString(name, prop, boxed.get(prop.name), { java.sql.Date(java.util.Date.parse(it)) }) as java.sql.Date?
-            //java.sql.SQLXML::class -> parsedString(prop, _rs.get(prop.name).asJsNumber(), java.sql.SQLXML::parse)
-            //ByteArray::class -> _rs.get(prop.name).asJsArray()
-            //java.sql.Array::class -> _rs.get(prop.name).asJsArray()
+                //java.sql.SQLXML::class -> parsedString(prop, _rs.get(prop.name).asJsNumber(), java.sql.SQLXML::parse)
+                //ByteArray::class -> _rs.get(prop.name).asJsArray()
+                //java.sql.Array::class -> _rs.get(prop.name).asJsArray()
                 URL::class -> urlString(name, prop, boxed.get(prop.name))
                 else -> {
                     val className = (prop.returnType.classifier as? Class<*>)?.simpleName ?: "<unknown>"
@@ -315,7 +314,7 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
         val params = ArrayList<Any?>()
         var sep = ""
 
-        sb.append("INSERT INTO `$tableName` (")
+        sb.append("INSERT INTO $quote$tableName$quote (")
 
         for (prop in kProperties) {
             val propType = propertyTypes[prop.name] ?: PropertyType.PROPERTY
@@ -326,13 +325,13 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
                     // skip null properties which have defaults (null means use default)
                     if (propValue != null || !propType.isDefault) {
                         val columnName = columnNames[prop.name] ?: prop.name
-                        sb.append(sep).append("`").append(columnName).append("`")
+                        sb.append(sep).append(quote).append(columnName).append(quote)
                         sbValues.append(sep).append("?")
                         sep = ", "
                         params.add(propValue)
                     } else if (propertyDefaults.containsKey(prop.name)) {
                         val columnName = columnNames[prop.name] ?: prop.name
-                        sb.append(sep).append("`").append(columnName).append("`")
+                        sb.append(sep).append(quote).append(columnName).append(quote)
                         sbValues.append(sep).append("?")
                         sep = ", "
                         params.add(propertyDefaults[prop.name])
@@ -355,7 +354,7 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
             if (properties.containsKey(prop.name)) {
                 val columnName = columnNames[prop.name] ?: prop.name
 
-                appendable.append(useSep).append("`").append(columnName).append("` = ?")
+                appendable.append(useSep).append(quote).append(columnName).append(quote).append(" = ?")
                 useSep = delimiter
                 params.add(properties[prop.name])
             } else {
@@ -369,7 +368,7 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
         val sb = StringBuilder()
         val params = ArrayList<Any?>()
 
-        sb.append("DELETE FROM `$tableName` WHERE ")
+        sb.append("DELETE FROM $quote$tableName$quote WHERE ")
         appendKeys(sb, params)
         return sqlQuery(sb.toString(), params)
     }
@@ -383,7 +382,7 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
         val sb = StringBuilder()
         val params = ArrayList<Any?>()
 
-        sb.append("SELECT * FROM `$tableName` WHERE ")
+        sb.append("SELECT * FROM $quote$tableName$quote WHERE ")
         appendKeys(sb, params)
         return sqlQuery(sb.toString(), params)
     }
@@ -397,7 +396,7 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
             throw IllegalStateException("sqlUpdateQuery requested with no modified model properties")
         }
 
-        sb.append("UPDATE `$tableName` SET ")
+        sb.append("UPDATE $quote$tableName$quote SET ")
 
         for (prop in kProperties) {
             val propType = propertyTypes[prop.name] ?: PropertyType.PROPERTY
@@ -409,7 +408,7 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
                         if (propValue != null || !propType.isDefault) {
                             val columnName = columnNames[prop.name] ?: prop.name
 
-                            sb.append(sep).append("`").append(columnName).append("` = ?")
+                            sb.append(sep).append(quote).append(columnName).append(quote).append(" = ?")
                             sep = ", "
                             params.add(properties[prop.name])
                         }
@@ -422,7 +421,7 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
             // all modified props were null with defaults, update key to itself
             val prop = keyProperties[0]
             val columnName = columnNames[prop.name] ?: prop.name
-            sb.append(sep).append("`").append(columnName).append("` = `").append(columnName).append("`")
+            sb.append(sep).append(quote).append(columnName).append(quote).append(" = ").append(quote).append(columnName).append(quote)
         }
 
         sb.append(" WHERE ")
@@ -431,7 +430,7 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
     }
 
     fun sqlSelectTable(tableName: String): String {
-        return "SELECT * FROM `$tableName` "
+        return "SELECT * FROM $quote$tableName$quote "
     }
 
     fun clearAutoKeys() {
@@ -480,6 +479,18 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
                 consumer.invoke(prop, propertyTypes[prop.name]!!, columnName, properties[prop.name])
             } else {
                 consumer.invoke(prop, propertyTypes[prop.name]!!, columnName, Unit)
+            }
+        }
+    }
+
+    companion object {
+        var databaseQuoting = ""
+
+        fun quoteIdentifier(name: String): String {
+            return if (databaseQuoting.isEmpty()) {
+                name
+            } else {
+                "$databaseQuoting$name$databaseQuoting"
             }
         }
     }
