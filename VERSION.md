@@ -3,6 +3,7 @@
 [TOC]: # " "
 
 - [TODO](#todo)
+- [0.4.2](#042)
 - [0.4.0](#040)
 - [0.3.4](#034)
 - [0.3.2](#032)
@@ -37,6 +38,11 @@
 * [ ] Add case sensitive database entity aware migration
   * [ ] Tables
   * [ ] Others?
+
+## 0.4.2
+
+* Fix: factor out `Session` and `Transaction` functions into interfaces. Implementation renamed
+  to `SessionImpl` and `TransactionImpl`
 
 ## 0.4.0
 

@@ -58,14 +58,14 @@ functions, procedures, tables, triggers and views. See [Migrations](#migrations)
 <dependency>
     <groupId>com.vladsch.kotlin-jdbc</groupId>
     <artifactId>kotlin-jdbc</artifactId>
-    <version>0.4.0</version>
+    <version>0.4.2</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```gradle
-compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.4.0"
+compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.4.2"
 ```
 
 ### Example
@@ -100,7 +100,7 @@ Define default data source for session and use shorter code:
 ```kotlin
 HikariCP.default("jdbc:h2:mem:hello", "user", "pass")
 // define default data source factory to allow use of session() for default
-Session.defaultDataSource = { HikariCP.dataSource() }
+SessionImpl.defaultDataSource = { HikariCP.dataSource() }
 
 usingDefault { session ->
    // working with the session
