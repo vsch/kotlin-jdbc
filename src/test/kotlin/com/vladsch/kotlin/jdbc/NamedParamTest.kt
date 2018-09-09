@@ -121,6 +121,19 @@ class NamedParamTest {
                 assertEquals(listOf<Any?>(0, 1, 2, 10), query.getParams())
             }
         }
+
+        describe("should extract multiple repeated list params") {
+            withQueries(
+                """SELECT * FROM table t WHERE t.a IN (:param) OR t.b IN (:param)""") { query ->
+                query.inParams("param" to listOf(0, 1, 2))
+
+                val cleanStatement = query.cleanStatement
+
+                assertEquals("""SELECT * FROM table t WHERE t.a IN (?,?,?) OR t.b IN (?,?,?)""", cleanStatement.normalizeSpaces())
+                assertEquals(mapOf("param" to listOf(0, 3)), query.replacementMap)
+                assertEquals(listOf<Any?>(0, 1, 2, 0, 1, 2), query.getParams())
+            }
+        }
     }
 
     @Test
