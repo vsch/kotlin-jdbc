@@ -3,6 +3,7 @@
 [TOC]: # " "
 
 - [TODO](#todo)
+- [0.4.4](#044)
 - [0.4.2](#042)
 - [0.4.0](#040)
 - [0.3.4](#034)
@@ -38,6 +39,10 @@
 * [ ] Add case sensitive database entity aware migration
   * [ ] Tables
   * [ ] Others?
+
+## 0.4.4
+
+* Add: multiple list parameter handling, PR by **[root-talis](https://github.com/root-talis)**
 
 ## 0.4.2
 
