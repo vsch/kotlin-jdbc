@@ -5,7 +5,7 @@
 
     <groupId>com.vladsch.kotlin-jdbc</groupId>
     <artifactId>kotlin-jdbc</artifactId>
-    <version>0.4.4</version>
+    <version>0.4.6</version>
     <packaging>jar</packaging>
 
     <name>Kotlin-JDBC</name>

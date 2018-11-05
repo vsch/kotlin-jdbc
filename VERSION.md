@@ -3,6 +3,7 @@
 [TOC]: # " "
 
 - [TODO](#todo)
+- [0.4.6](#046)
 - [0.4.4](#044)
 - [0.4.2](#042)
 - [0.4.0](#040)
@@ -39,6 +40,10 @@
 * [ ] Add case sensitive database entity aware migration
   * [ ] Tables
   * [ ] Others?
+
+## 0.4.6
+
+* Fix: migrate command was string sorting versions instead of using versionCompare()
 
 ## 0.4.4
 
