@@ -16,6 +16,33 @@ class NamedParamTest {
             }
         }
 
+        describe("should not extract param in string") {
+            withQueries(
+                "INSERT INTO table VALUES (':param')"
+            ) { query ->
+                assertEquals("""INSERT INTO table VALUES (':param')""".normalizeSpaces(), query.cleanStatement.normalizeSpaces())
+                assertEquals(mapOf(), query.replacementMap)
+            }
+        }
+
+        describe("should not extract param in back quotes") {
+            withQueries(
+                "INSERT INTO `:table` VALUES (':param')"
+            ) { query ->
+                assertEquals("""INSERT INTO `:table` VALUES (':param')""".normalizeSpaces(), query.cleanStatement.normalizeSpaces())
+                assertEquals(mapOf(), query.replacementMap)
+            }
+        }
+
+        describe("should not extract param in double quotes") {
+            withQueries(
+                "INSERT INTO \":table\" VALUES (':param')"
+            ) { query ->
+                assertEquals("""INSERT INTO ":table" VALUES (':param')""".normalizeSpaces(), query.cleanStatement.normalizeSpaces())
+                assertEquals(mapOf(), query.replacementMap)
+            }
+        }
+
         describe("should extract a single param") {
             withQueries(
                 """SELECT * FROM table t WHERE t.a =

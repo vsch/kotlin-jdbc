@@ -3,6 +3,7 @@
 [TOC]: # " "
 
 - [TODO](#todo)
+- [0.4.8](#048)
 - [0.4.6](#046)
 - [0.4.4](#044)
 - [0.4.2](#042)
@@ -40,6 +41,12 @@
 * [ ] Add case sensitive database entity aware migration
   * [ ] Tables
   * [ ] Others?
+
+## 0.4.8
+
+* Fix: migrate was using string compare for current version and versions for finding later ones
+* Fix: parameter extraction should take quoted, double quoted and back-quoted strings into account.
+  Otherwise a string with `:\w+` will be treated as a parameter.
 
 ## 0.4.6
 

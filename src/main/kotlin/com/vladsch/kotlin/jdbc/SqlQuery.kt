@@ -33,9 +33,14 @@ open class SqlQuery(
             val listParamsMap: HashMap<String, String> = HashMap()
             var idxOffset = 0
             val replacementMap = regex.findAll(statement).filter { group ->
-                val pos = statement.lastIndexOf('\n', group.range.first)
-                val lineStart = if (pos == -1) 0 else pos + 1;
-                !regexSqlComment.containsMatchIn(statement.subSequence(lineStart, statement.length))
+                if (!group.value.startsWith(":")) {
+                    // not a parameter
+                    false
+                } else {
+                    val pos = statement.lastIndexOf('\n', group.range.first)
+                    val lineStart = if (pos == -1) 0 else pos + 1;
+                    !regexSqlComment.containsMatchIn(statement.subSequence(lineStart, statement.length))
+                }
             }.map { group ->
                 val paramName = group.value.substring(1);
                 val paramValue = inputParams[paramName]
@@ -52,8 +57,14 @@ open class SqlQuery(
             }.groupBy({ it.first }, { it.second })
 
             val cleanStatement = regex.replace(statement) { matchResult ->
-                val paramName = matchResult.value.substring(1);
-                listParamsMap[paramName] ?: "?"
+                if (!matchResult.value.startsWith(":")) {
+                    // not a parameter, leave as is
+                    matchResult.value
+                } else {
+
+                    val paramName = matchResult.value.substring(1);
+                    listParamsMap[paramName] ?: "?"
+                }
             }
             _queryDetails = Details(listParamsMap, replacementMap, cleanStatement, idxOffset)
         }
@@ -153,7 +164,8 @@ open class SqlQuery(
     }
 
     companion object {
-        private val regex = Regex(""":\w+""")
+        // must begin with
+        private val regex = Regex(""":\w+|'(?:[^']|'')*'|`(?:[^`])*`|"(?:[^"])*"""")
         private val regexSqlComment = Regex("""^\s*(?:--\s|#)""")
     }
 }

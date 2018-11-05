@@ -5,12 +5,6 @@ import java.io.File
 import java.io.FileWriter
 import java.sql.SQLException
 
-object VersionComparator : Comparator<String> {
-    override fun compare(o1: String?, o2: String?): Int {
-        return o1?.versionCompare(o2 ?: "") ?: "".versionCompare(o2 ?: "");
-    }
-}
-
 @Suppress("MemberVisibilityCanBePrivate")
 class Migrations(val session: Session, val migrationSession: Session, val dbEntityExtractor: DbEntityExtractor, val resourceClass: Class<*>) {
 
@@ -24,7 +18,7 @@ class Migrations(val session: Session, val migrationSession: Session, val dbEnti
     var detailed = false
 
     fun getVersions(): List<String> {
-        return getResourceFiles(resourceClass, "/db").filter { it.matches(DbVersion.regex) }.map { it.toUpperCase() }.sortedWith(VersionComparator)
+        return getResourceFiles(resourceClass, "/db").filter { it.matches(DbVersion.regex) }.map { it.toUpperCase() }.sortedWith(Comparator(String::versionCompare))
     }
 
     fun getPreviousVersion(version: String): String? {
@@ -457,7 +451,7 @@ LIMIT 1
             if (versionCompare < 0) {
                 // need to run all migrations from later versions up to requested version
                 val versionList = getVersions()
-                    .filter { it.compareTo(currentVersion) > 0 && (it.versionCompare(migration.version) <= 0) }
+                    .filter { it.versionCompare(currentVersion) > 0 && (it.versionCompare(migration.version) <= 0) }
                     .sortedWith(Comparator(String::versionCompare))
 
                 versionList.forEach { version ->
