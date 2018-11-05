@@ -20,7 +20,7 @@ Convenient models with simple syntax which are aware of primary key columns, aut
 columns, columns with defaults and nullable columns. Models protected property `db` to define
 properties via `provideDelegate`. See [Convenient Models](#convenient-models)
 
-```kotlin
+```kotlin-a
 import java.sql.Timestamp
 
 // dbCase = true if database columns same as properties
@@ -76,7 +76,7 @@ compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.4.4"
 converts results into instances, lists, hash maps with corresponding json versions as json
 objects or json arrays.
 
-```kotlin
+```kotlin-a
 import com.vladsch.kotlin.jdbc.*
 
 val session = session("jdbc:h2:mem:hello", "user", "pass") 
@@ -87,7 +87,7 @@ val session = session("jdbc:h2:mem:hello", "user", "pass")
 [HikariCP](https://github.com/brettwooldridge/HikariCP) is an excellent choice for connection
 pool implementation. It is blazing fast and easy to use.
 
-```kotlin
+```kotlin-a
 HikariCP.default("jdbc:h2:mem:hello", "user", "pass")
 
 using(session(HikariCP.dataSource())) { session ->
@@ -97,7 +97,7 @@ using(session(HikariCP.dataSource())) { session ->
 
 Define default data source for session and use shorter code:
 
-```kotlin
+```kotlin-a
 HikariCP.default("jdbc:h2:mem:hello", "user", "pass")
 // define default data source factory to allow use of session() for default
 SessionImpl.defaultDataSource = { HikariCP.dataSource() }
@@ -109,7 +109,7 @@ usingDefault { session ->
 
 #### DDL Execution
 
-```kotlin
+```kotlin-a
 session.execute(
 sqlQuery("""
   create table members (
@@ -122,7 +122,7 @@ sqlQuery("""
 
 #### Update Operations
 
-```kotlin
+```kotlin-a
 val insertQuery: String = "insert into members (name,  created_at) values (?, ?)"
 
 session.update(sqlQuery(insertQuery, "Alice", Date())) // returns effected row count
@@ -137,14 +137,14 @@ Prepare select query execution in the following steps:
 - run the query using `session.list` or `session.first` passing it extractor function (`(Row) ->
   A`)
 
-```kotlin
+```kotlin-a
 val allIdsQuery = sqlQuery("select id from members")
 val ids: List<Int> = session.list(allIdsQuery) { row -> row.int("id") }
 ```
 
 Extractor function can be used to return any type of result type from a `ResultSet`.
 
-```kotlin
+```kotlin-a
 data class Member(
   val id: Int,
   val name: String?,
@@ -162,7 +162,7 @@ val allMembersQuery = sqlQuery("select id, name, created_at from members")
 val members: List<Member> = session.list(allMembersQuery, toMember)
 ```
 
-```kotlin
+```kotlin-a
 val aliceQuery = sqlQuery("select id, name, created_at from members where name = ?", "Alice")
 val alice: Member? = session.first(aliceQuery, toMember)
 ```
@@ -171,7 +171,7 @@ val alice: Member? = session.first(aliceQuery, toMember)
 
 Alternative syntax is supported to allow named parameters in all queries.
 
-```kotlin
+```kotlin-a
 val query = sqlQuery("""
 SELECT id, name, created_at FROM members
 WHERE (:name IS NOT NULL OR name = :name) AND (:age IS NOT NULL OR age = :age)
@@ -190,7 +190,7 @@ This method converts the pattern name to an indexed `?` parameter and is not bas
 parameter is only significant for its type used when getting the results back. For `inout`
 parameters pass the name in both maps.
 
-```kotlin
+```kotlin-a
 sqlCall("""call storedProc(:inParam,:inOutParam,:outParam)""",
 	mapOf("inParam" to "Alice", "inOutParam" to "Bob"), 
 	mapOf("inOutParam" to "", "outParam" to ""))
@@ -199,7 +199,7 @@ sqlCall("""call storedProc(:inParam,:inOutParam,:outParam)""",
 For convenience there are methods to pass parameters as in, inout, out as a list of pairs or
 maps:
 
-```kotlin
+```kotlin-a
 sqlCall("""call storedProc(:inParam,:inOutParam,:outParam)""")
 	.inParams("inParam" to "Alice")
 	.inOutParms("inOutParam" to "Bob") 
@@ -209,13 +209,15 @@ sqlCall("""call storedProc(:inParam,:inOutParam,:outParam)""")
 However, the first method is fastest because it sets all the parameters with the least run-time
 processing.
 
+:information_source: parameter-like sequences in single, double or back-quotes are ignored.
+
 ##### Collection parameter values
 
 Automatic expansion of `sqlQuery` and `sqlCall` collection valued named parameters to their
 contained values will be performed. This allows collections to be used where individual
 parameters are specified:
 
-```kotlin
+```kotlin-a
 sqlQuery("SELECT * FROM Table WHERE column in (:list)").inParams("list" to listOf(1,2,3))
 ```
 
@@ -227,7 +229,7 @@ passed to the prepared statement.
 In the case, the parameter type has to be explicitly stated, there's a wrapper class -
 `Parameter` that will help provide explicit type information.
 
-```kotlin
+```kotlin-a
 val param = Parameter(param, String::class.java)
 sqlQuery("""select id, name 
     from members 
@@ -237,7 +239,7 @@ sqlQuery("""select id, name
 
 or also with the helper function `param`
 
-```kotlin
+```kotlin-a
 sqlQuery("""select id, name 
     from members 
     where ? is null or ? = name""", 
@@ -252,7 +254,7 @@ This can be useful in situations similar to one described
 `#forEach` allows you to make some side-effect in iterations. This API is useful for handling a
 `ResultSet` one row at a time.
 
-```kotlin
+```kotlin-a
 session.forEach(sqlQuery("select id from members")) { row ->
   // working with large data set
 }
@@ -275,7 +277,7 @@ transaction to be automatically rolled back.
 The `Transaction` instance is a session with added `java.sql.Connection` transaction methods for
 convenience.
 
-```kotlin
+```kotlin-a
 session.transaction { tx ->
   // begin
   tx.update(sqlQuery("insert into members (name,  created_at) values (?, ?)", "Alice", Date()))
@@ -424,7 +426,7 @@ JSON Array results:
 * `fun jsonArray(session: Session, whereClause:String, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): JsonArray`
 * `fun jsonArray(session: Session, whereClause:String, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): JsonArray`
 
-```kotlin
+```kotlin-a
 data class ValidData(
     val processId: Long?,
     val title: String,
@@ -565,7 +567,7 @@ Result set:
 
 Generated Kotlin enum:
 
-```kotlin
+```kotlin-a
 enum class ChangeHistoryTypes(val id: Int, val type: String) {
   PROCESS(1, "Process"),
   FILE(2, "File"),
