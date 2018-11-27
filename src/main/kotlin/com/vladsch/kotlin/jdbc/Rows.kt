@@ -21,7 +21,7 @@ class Rows(rs: ResultSet) : Row(rs), Sequence<Row> {
     }
 
     fun hasNext(): Boolean {
-        if (rs.isClosed || rs.isLast || rs.isAfterLast) return false
+        if (rs.isClosed || (rs.type != ResultSet.TYPE_FORWARD_ONLY && (rs.isLast || rs.isAfterLast))) return false
         if (movedNext) return true
 
         movedNext = rs.next()
