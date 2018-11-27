@@ -3,6 +3,7 @@
 [TOC]: # " "
 
 - [TODO](#todo)
+- [0.4.10](#0410)
 - [0.4.8](#048)
 - [0.4.6](#046)
 - [0.4.4](#044)
@@ -41,6 +42,11 @@
 * [ ] Add case sensitive database entity aware migration
   * [ ] Tables
   * [ ] Others?
+
+## 0.4.10
+
+* Fix: merge #7, isLast and isAfterLast checking removed for TYPE_FORWARD_ONLY ResultSet thanks
+  to [@s5r3](https://github.com/s5r3)
 
 ## 0.4.8
 
