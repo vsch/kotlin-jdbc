@@ -1,9 +1,22 @@
 package com.vladsch.kotlin.jdbc
 
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.ExpectedException
+import java.sql.DriverManager
 import kotlin.test.assertEquals
+
+fun session(): Session {
+    val driverName = "org.h2.Driver"
+
+    val connection = DriverManager.getConnection("jdbc:h2:mem:hello", "user", "pass")
+    val session = object : SessionImpl(Connection(connection, driverName)) {
+        override val identifierQuoteString: String
+            get() = ""
+    }
+    return session
+}
 
 @Suppress("UNUSED_VARIABLE")
 class ModelTest {
@@ -12,49 +25,90 @@ class ModelTest {
     @JvmField
     var thrown: ExpectedException = ExpectedException.none()
 
-    class InvalidModelPublicAutoKey() : Model<InvalidModelPublicAutoKey>("tests", true, false) {
+    class InvalidModelPublicAutoKey(session: Session? = session(), quote: String? = null) : Model<InvalidModelPublicAutoKey, InvalidModelPublicAutoKey.Data>(session, "tests", true, false, quote = quote) {
+        data class Data(
+                val processId: Long?,
+                val title: String,
+                val version: String,
+                val unknown: String?,
+                val createdAt: String?
+        )
+
         var processId: Long? by db.autoKey
         var title: String by db
         var version: String by db
         var unknown: String? by db
         var createdAt: String? by db.auto; private set
 
-        companion object {
-            val fromRow: (Row) -> InvalidModelPublicAutoKey = { row ->
-                InvalidModelPublicAutoKey().load(row)
-            }
+        override fun invoke(): InvalidModelPublicAutoKey {
+            return InvalidModelPublicAutoKey(_session, _quote)
+        }
+
+        override fun toData(): Data {
+            return Data(processId, title, version, unknown, createdAt)
         }
     }
 
-    class InvalidModelPublicAuto() : Model<InvalidModelPublicAuto>("tests", true, false) {
+    class InvalidModelPublicAuto(session: Session? = session(), quote: String? = null) : Model<InvalidModelPublicAuto, InvalidModelPublicAuto.Data>(session, "tests", true, false, quote = quote) {
+        data class Data(
+                val processId: Long?,
+                val title: String,
+                val version: String,
+                val unknown: String?,
+                val createdAt: String?
+        )
+
         var processId: Long? by db.autoKey; private set
         var title: String by db
         var version: String by db
         var unknown: String? by db
         var createdAt: String? by db.auto
 
-        companion object {
-            val fromRow: (Row) -> InvalidModelPublicAutoKey = { row ->
-                InvalidModelPublicAutoKey().load(row)
-            }
+        override fun invoke(): InvalidModelPublicAuto {
+            return InvalidModelPublicAuto(_session, _quote)
+        }
+
+        override fun toData(): Data {
+            return Data(processId, title, version, unknown, createdAt)
         }
     }
 
-    class ValidModelPublicAuto : Model<ValidModelPublicAuto>("tests", true) {
+    class ValidModelPublicAuto(session: Session? = session(), quote: String? = null) : Model<ValidModelPublicAuto, ValidModelPublicAuto.Data>(session, sqlTable = "tests", dbCase = true, quote = quote) {
+        data class Data(
+                val processId: Long?,
+                val title: String,
+                val version: String,
+                val unknown: String?,
+                val createdAt: String?
+        )
+
         var processId: Long? by db.autoKey
         var title: String by db
         var version: String by db
         var unknown: String? by db
         var createdAt: String? by db.auto
 
-        companion object {
-            val fromRow: (Row) -> InvalidModelPublicAutoKey = { row ->
-                InvalidModelPublicAutoKey().load(row)
-            }
+        override fun invoke(): ValidModelPublicAuto {
+            return ValidModelPublicAuto(_session, _quote)
+        }
+
+        override fun toData(): Data {
+            return Data(processId, title, version, unknown, createdAt)
         }
     }
 
-    class ValidModel() : Model<ValidModel>("tests", true, false) {
+    class ValidModel(session: Session? = session(), quote: String? = null) : Model<ValidModel, ValidModel.Data>(session, "tests", true, false, quote) {
+        data class Data(
+                val processId: Long?,
+                val noSetter: String,
+                val noSetter2: String,
+                val title: String,
+                val version: String,
+                val unknown: String?,
+                val createdAt: String?,
+                val createdAt2: String?
+        )
+
         var processId: Long? by db.key.auto; private set
         val noSetter: String by db.auto
         val noSetter2: String by db.autoKey
@@ -64,14 +118,28 @@ class ModelTest {
         var createdAt: String? by db.auto; private set
         val createdAt2: String? by db.auto
 
-        companion object {
-            val fromRow: (Row) -> ValidModel = { row ->
-                ValidModel().load(row)
-            }
+        override fun invoke(): ValidModel {
+            return ValidModel(_session, _quote)
+        }
+
+        override fun toData(): Data {
+            return Data(processId, noSetter, noSetter2, title, version, unknown, createdAt, createdAt2)
         }
     }
 
-    class DatabaseModel() : Model<DatabaseModel>("tests", false, true) {
+    class DatabaseModel(session: Session? = session(), quote: String? = null) : Model<DatabaseModel, DatabaseModel.Data>(session, "tests", false, true, quote) {
+        data class Data(
+                val processId: Long?,
+                val modelName: String?,
+                val title: String,
+                val version: String,
+                val ownName: String,
+                val CappedName: Int,
+                val ALLCAPS: Int,
+                val withDigits2: Int,
+                val createdAt: String?
+        )
+
         var processId: Long? by db.key.auto
         var modelName: String? by db.key.auto
         var title: String by db
@@ -82,30 +150,33 @@ class ModelTest {
         var withDigits2: Int by db
         var createdAt: String? by db.auto
 
-        companion object {
-            val fromRow: (Row) -> ValidModel = { row ->
-                ValidModel().load(row)
-            }
+        override fun invoke(): DatabaseModel {
+            return DatabaseModel(_session, _quote)
+        }
+
+        override fun toData(): Data {
+            return Data(processId, modelName, title, version, ownName, CappedName, ALLCAPS, withDigits2, createdAt)
         }
     }
 
-    data class TestData(
-        val processId: Long?,
-        val title: String,
-        val version: String,
-        val batch: Int?,
-        val createdAt: String?
-    )
+    class TestModel(session: Session? = session(), quote: String? = null) : Model<TestModel, TestModel.Data>(session, "tests", true, false, quote) {
+        data class Data(
+                val processId: Long?,
+                val title: String,
+                val version: String,
+                val batch: Int?,
+                val createdAt: String?
+        )
 
-    class TestModel(quote: String? = null) : Model<TestModel>("tests", true, false, quote = quote) {
         constructor(
-            processId: Long? = null,
-            title: String,
-            version: String,
-            batch: Int? = null,
-            createdAt: String? = null,
-            quote: String? = null
-        ) : this(quote) {
+                processId: Long? = null,
+                title: String,
+                version: String,
+                batch: Int? = null,
+                createdAt: String? = null,
+                session: Session? = session(),
+                quote:String? = null
+        ) : this(session,quote) {
             if (processId != null) this.processId = processId
             this.title = title
             this.version = version
@@ -115,18 +186,10 @@ class ModelTest {
             snapshot()
         }
 
-        constructor(processId: Long, quote: String? = null) : this(quote) {
+        constructor(processId: Long, quote: String? = null, session: Session? = session()) : this(session, quote) {
             this.processId = processId
             snapshot()
         }
-
-        fun toData() = TestData(
-            processId,
-            title,
-            version,
-            batch,
-            createdAt
-        )
 
         var processId: Long? by db.autoKey; private set
         var title: String by db
@@ -134,25 +197,33 @@ class ModelTest {
         var batch: Int? by db.default
         var createdAt: String? by db.auto; private set
 
-        companion object : ModelCompanion<TestModel, TestData>() {
-            override val tableName = "Test"
-            override fun createModel(quote: String?): TestModel = TestModel(quote)
-            override fun createData(model: TestModel): TestData = model.toData()
+        override fun invoke(): TestModel {
+            return TestModel(_session, _quote)
+        }
 
-            val fromRow: (Row) -> TestModel = { row ->
-                TestModel().load(row)
-            }
+        override fun toData(): Data {
+            return Data(processId, title, version, batch, createdAt)
         }
     }
 
-    class TestModelDefaultValue() : Model<TestModelDefaultValue>("tests", true, false) {
+    class TestModelDefaultValue(session: Session? = session(), quote: String? = null) : Model<TestModelDefaultValue, TestModelDefaultValue.Data>(session, "tests", true, false, quote = quote) {
+        data class Data(
+                var processId: Long?,
+                var title: String,
+                var version: String,
+                var batch: Int?,
+                var createdAt: String?
+        )
+
         constructor(
-            processId: Long? = null,
-            title: String,
-            version: String,
-            batch: Int? = null,
-            createdAt: String? = null
-        ) : this() {
+                processId: Long? = null,
+                title: String,
+                version: String,
+                batch: Int? = null,
+                createdAt: String? = null,
+                session: Session? = session(),
+                quote:String? = null
+        ) : this(session, quote) {
             if (processId != null) this.processId = processId
             this.title = title
             this.version = version
@@ -173,21 +244,33 @@ class ModelTest {
         var batch: Int? by db.default(1)
         var createdAt: String? by db.auto; private set
 
-        companion object {
-            val fromRow: (Row) -> TestModel = { row ->
-                TestModel().load(row)
-            }
+        override fun invoke(): TestModelDefaultValue {
+            return TestModelDefaultValue(_session, _quote)
+        }
+
+        override fun toData(): Data {
+            return Data(processId, title, version, batch, createdAt)
         }
     }
 
-    class TestNoNonDefaultModel() : Model<TestNoNonDefaultModel>("tests", true, false) {
+    class TestNoNonDefaultModel(session: Session? = session(), quote: String? = null) : Model<TestNoNonDefaultModel, TestNoNonDefaultModel.Data>(session, "tests", true, false, quote = quote) {
+        data class Data(
+                var processId: Long?,
+                var title: String?,
+                var version: String?,
+                var batch: Int?,
+                var createdAt: String?
+        )
+
         constructor(
-            processId: Long? = null,
-            title: String? = null,
-            version: String? = null,
-            batch: Int? = null,
-            createdAt: String? = null
-        ) : this() {
+                processId: Long? = null,
+                title: String? = null,
+                version: String? = null,
+                batch: Int? = null,
+                createdAt: String? = null,
+                session: Session? = session(),
+                quote: String? = null
+        ) : this(session,quote) {
             if (processId != null) this.processId = processId
             this.title = title
             this.version = version
@@ -208,10 +291,12 @@ class ModelTest {
         var batch: Int? by db.default
         var createdAt: String? by db.auto; private set
 
-        companion object {
-            val fromRow: (Row) -> TestModel = { row ->
-                TestModel().load(row)
-            }
+        override fun invoke(): TestNoNonDefaultModel {
+            return TestNoNonDefaultModel(_session, _quote)
+        }
+
+        override fun toData(): Data {
+            return Data(processId, title, version, batch, createdAt)
         }
     }
 
@@ -550,18 +635,18 @@ class ModelTest {
 
     @Test
     fun test_listQuery() {
-        val sql = TestModel.listQuery("list" to listOf(1, 2, 3, 4), "single" to 10)
+        val sql = TestModel().listQuery("single" to 10, "list" to listOf(1, 2, 3, 4))
 
-        val sqlQuery = sqlQuery("SELECT * FROM Test WHERE single = :single AND list IN (:list)", mapOf("single" to 10, "list" to listOf(1, 2, 3, 4)))
+        val sqlQuery = sqlQuery("SELECT * FROM tests WHERE single = :single AND list IN (:list)", mapOf("single" to 10, "list" to listOf(1, 2, 3, 4)))
 
         assertEquals(sqlQuery.toString(), sql.toString());
     }
 
     @Test
     fun test_listQueryQuoted() {
-        val sql = TestModel.listQuery("list" to listOf(1, 2, 3, 4), "single" to 10,quote = "`")
+        val sql = TestModel(quote = "`").listQuery("single" to 10, "list" to listOf(1, 2, 3, 4))
 
-        val sqlQuery = sqlQuery("SELECT * FROM `Test` WHERE `single` = :single AND `list` IN (:list)", mapOf("single" to 10, "list" to listOf(1, 2, 3, 4)))
+        val sqlQuery = sqlQuery("SELECT * FROM `tests` WHERE `single` = :single AND `list` IN (:list)", mapOf("single" to 10, "list" to listOf(1, 2, 3, 4)))
 
         assertEquals(sqlQuery.toString(), sql.toString());
     }

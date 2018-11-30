@@ -32,7 +32,8 @@ open class SqlQuery(
             // called when parameters are defined and have request for clean statement or populate params
             val listParamsMap: HashMap<String, String> = HashMap()
             var idxOffset = 0
-            val replacementMap = regex.findAll(statement).filter { group ->
+            val findAll = regex.findAll(statement)
+            val replacementMap = findAll.filter { group ->
                 if (!group.value.startsWith(":")) {
                     // not a parameter
                     false
@@ -61,7 +62,6 @@ open class SqlQuery(
                     // not a parameter, leave as is
                     matchResult.value
                 } else {
-
                     val paramName = matchResult.value.substring(1);
                     listParamsMap[paramName] ?: "?"
                 }
@@ -165,7 +165,7 @@ open class SqlQuery(
 
     companion object {
         // must begin with
-        private val regex = Regex(""":\w+|'(?:[^']|'')*'|`(?:[^`])*`|"(?:[^"])*"""")
+        private val regex = Regex(":\\w+|'(?:[^']|'')*'|`(?:[^`])*`|\"(?:[^\"])*\"")
         private val regexSqlComment = Regex("""^\s*(?:--\s|#)""")
     }
 }

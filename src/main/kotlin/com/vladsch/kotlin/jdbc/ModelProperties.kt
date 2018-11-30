@@ -11,7 +11,7 @@ import kotlin.reflect.KMutableProperty
 import kotlin.reflect.KProperty
 import kotlin.reflect.KVisibility
 
-class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto: Boolean = false, val quote: String = ModelProperties.databaseQuoting) : InternalModelPropertyProvider<T> {
+class ModelProperties<M>(val session: Session, val tableName: String, val dbCase: Boolean, val allowSetAuto: Boolean = false, quote: String? = null) : InternalModelPropertyProvider<M> {
     private val properties = HashMap<String, Any?>()
     private val kProperties = ArrayList<KProperty<*>>()
     private val propertyTypes = HashMap<String, PropertyType>()
@@ -19,6 +19,7 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
     private val keyProperties = ArrayList<KProperty<*>>()
     private val modified = HashSet<String>()
     private val columnNames = HashMap<String, String>()
+    val quote: String = quote ?: session.identifierQuoteString
 
     internal fun snapshot() {
         modified.clear()
@@ -30,7 +31,7 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
     override val defaultValue: Any?
         get() = Unit
 
-    internal fun registerProp(prop: KProperty<*>, propType: PropertyType, columnName: String?, defaultValue: Any?): ModelProperties<T> {
+    internal fun registerProp(prop: KProperty<*>, propType: PropertyType, columnName: String?, defaultValue: Any?): ModelProperties<M> {
         kProperties.add(prop)
         propertyTypes[prop.name] = propType
 
@@ -60,28 +61,42 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
         if (!allowSetAuto && propType.isAuto && prop is KMutableProperty) {
             val propSetter = prop.setter.visibility ?: KVisibility.PRIVATE
             if (propSetter != KVisibility.PRIVATE) {
-                throw IllegalStateException("$name.${prop.name} auto property should have no set or have private set")
+                throw IllegalStateException("$tableName.${prop.name} auto property should have no set or have private set")
             }
         }
         return this
     }
 
-    override operator fun provideDelegate(thisRef: T, prop: KProperty<*>): ModelProperties<T> {
+    override operator fun provideDelegate(thisRef: M, prop: KProperty<*>): ModelProperties<M> {
         return registerProp(prop, PropertyType.PROPERTY, columnName, defaultValue)
     }
 
     // can be used to set immutable properties behind the scenes
-    internal fun <V> setProperty(thisRef: T, property: KProperty<*>, value: V) {
+    internal fun <V> setProperty(thisRef: M, property: KProperty<*>, value: V) {
         if (!propertyTypes.containsKey(property.name)) {
-            throw IllegalStateException("Attempt to set undefined $name.${property.name} property")
+            throw IllegalStateException("Attempt to set undefined $tableName.${property.name} property")
         }
 
         setValue(thisRef, property, value)
     }
 
+    fun appendQuoted(out: Appendable, id: kotlin.String): Appendable {
+        return if (quote.isEmpty()) out.append(id)
+        else out.append(quote).append(id).append(quote)
+    }
+
+    fun appendSelectSql(out: Appendable, alias: String? = null): Appendable {
+        out.append("SELECT * FROM ")
+        appendQuoted(out, tableName)//.append(" ")
+        if (!alias.isNullOrBlank()) {
+            out.append(alias)
+        }
+        return out
+    }
+
     fun isModified(property: KProperty<*>): Boolean {
         if (!propertyTypes.containsKey(property.name)) {
-            throw IllegalStateException("Attempt to test modified status of undefined $name.${property.name} property")
+            throw IllegalStateException("Attempt to test modified status of undefined $tableName.${property.name} property")
         }
 
         return modified.contains(property.name)
@@ -93,35 +108,35 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
 
     fun columnName(property: KProperty<*>): String {
         if (!propertyTypes.containsKey(property.name)) {
-            throw IllegalStateException("Attempt to get column name of undefined $name.${property.name} property")
+            throw IllegalStateException("Attempt to get column name of undefined $tableName.${property.name} property")
         }
 
         return columnNames[property.name] ?: property.name
     }
 
-    override val autoKey = ModelPropertyProviderAutoKey<T>(this, null)
-    override val key = ModelPropertyProviderKey<T>(this, null)
-    override val auto = ModelPropertyProviderAuto<T>(this, null)
-    override val default = ModelPropertyProviderDefault<T>(this, null, Unit)
+    override val autoKey = ModelPropertyProviderAutoKey(this, null)
+    override val key = ModelPropertyProviderKey(this, null)
+    override val auto = ModelPropertyProviderAuto(this, null)
+    override val default = ModelPropertyProviderDefault(this, null, Unit)
 
-    override fun column(columnName: String?): ModelPropertyProvider<T> {
+    override fun column(columnName: String?): ModelPropertyProvider<M> {
         return if (columnName == null) {
             this
         } else {
-            ModelPropertyProviderBase<T>(this, PropertyType.PROPERTY, columnName)
+            ModelPropertyProviderBase(this, PropertyType.PROPERTY, columnName)
         }
     }
 
-    override fun default(value: Any?): ModelPropertyProvider<T> {
-        return ModelPropertyProviderDefault<T>(this, null, value)
+    override fun default(value: Any?): ModelPropertyProvider<M> {
+        return ModelPropertyProviderDefault<M>(this, null, value)
     }
 
-    override operator fun <V> getValue(thisRef: T, property: KProperty<*>): V {
+    override operator fun <V> getValue(thisRef: M, property: KProperty<*>): V {
         @Suppress("UNCHECKED_CAST")
         return properties[property.name] as V
     }
 
-    override operator fun <V> setValue(thisRef: T, property: KProperty<*>, value: V) {
+    override operator fun <V> setValue(thisRef: M, property: KProperty<*>, value: V) {
         if (properties[property.name] !== value) {
             properties[property.name] = value
             val propType = propertyTypes[property.name] ?: PropertyType.PROPERTY
@@ -175,12 +190,12 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
                     URL::class -> row.urlOrNull(columnName) as URL?
                     else -> {
                         val className = (prop.returnType.classifier as? Class<*>)?.simpleName ?: "<unknown>"
-                        throw IllegalArgumentException("$name.${columnName} cannot be set from json ${row.rs.getObject(columnName)}, type $className")
+                        throw IllegalArgumentException("$tableName.${columnName} cannot be set from json ${row.rs.getObject(columnName)}, type $className")
                     }
                 }
             } catch (e: SQLException) {
                 if (!prop.returnType.isMarkedNullable) {
-                    throw IllegalArgumentException("$name.${prop.name}, is not nullable and result set has no value for ${prop.name}")
+                    throw IllegalArgumentException("$tableName.${prop.name}, is not nullable and result set has no value for ${prop.name}")
                 }
                 value = null
             }
@@ -189,7 +204,7 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
                 // missing will not be set
                 properties.put(prop.name, value)
             } else {
-                throw IllegalArgumentException("$name.${prop.name}, is not nullable but result set has null value")
+                throw IllegalArgumentException("$tableName.${prop.name}, is not nullable but result set has null value")
             }
         }
     }
@@ -217,36 +232,36 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
             val returnType = prop.returnType.classifier ?: continue
             @Suppress("IMPLICIT_CAST_TO_ANY")
             val value: Any? = when (returnType) {
-                String::class -> stringValue(name, prop, boxed.get(prop.name)) as String?
-                Byte::class -> integralValue(name, prop, boxed.get(prop.name), Byte.MIN_VALUE.toLong(), Byte.MAX_VALUE.toLong())?.toByte() as Byte?
-                Boolean::class -> booleanLikeValue(name, prop, boxed.get(prop.name)) as Boolean?
-                Int::class -> integralValue(name, prop, boxed.get(prop.name), Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong())?.toInt() as Int?
-                Long::class -> integralValue(name, prop, boxed.get(prop.name), Long.MIN_VALUE, Long.MAX_VALUE) as Long?
-                Short::class -> integralValue(name, prop, boxed.get(prop.name), Short.MIN_VALUE.toLong(), Short.MAX_VALUE.toLong())?.toShort() as Short?
-                Double::class -> doubleValue(name, prop, boxed.get(prop.name), Double.MIN_VALUE.toDouble(), Double.MAX_VALUE.toDouble()) as Double?
-                Float::class -> doubleValue(name, prop, boxed.get(prop.name), Float.MIN_VALUE.toDouble(), Float.MAX_VALUE.toDouble())?.toFloat() as Float?
-                BigDecimal::class -> bigDecimalValue(name, prop, boxed.get(prop.name)) as BigDecimal?
-                ZonedDateTime::class -> parsedString(name, prop, boxed.get(prop.name), ZonedDateTime::parse) as ZonedDateTime?
-                OffsetDateTime::class -> parsedString(name, prop, boxed.get(prop.name), OffsetDateTime::parse) as OffsetDateTime?
-                Instant::class -> parsedString(name, prop, boxed.get(prop.name), Instant::parse) as Instant?
-                LocalDateTime::class -> parsedString(name, prop, boxed.get(prop.name), LocalDateTime::parse) as LocalDateTime?
-                LocalDate::class -> parsedString(name, prop, boxed.get(prop.name), LocalDate::parse) as LocalDate?
-                LocalTime::class -> parsedString(name, prop, boxed.get(prop.name), LocalTime::parse) as LocalTime?
-                org.joda.time.DateTime::class -> parsedString(name, prop, boxed.get(prop.name), org.joda.time.DateTime::parse) as org.joda.time.DateTime?
-                org.joda.time.LocalDateTime::class -> parsedString(name, prop, boxed.get(prop.name), org.joda.time.LocalDateTime::parse) as org.joda.time.LocalDateTime?
-                org.joda.time.LocalDate::class -> parsedString(name, prop, boxed.get(prop.name), org.joda.time.LocalDate::parse) as org.joda.time.LocalDate?
-                org.joda.time.LocalTime::class -> parsedString(name, prop, boxed.get(prop.name), org.joda.time.LocalTime::parse) as org.joda.time.LocalTime?
-                java.util.Date::class -> parsedString(name, prop, boxed.get(prop.name), { java.util.Date(it) }) as java.util.Date?
-                java.sql.Timestamp::class -> parsedString(name, prop, boxed.get(prop.name), { java.sql.Timestamp(java.util.Date.parse(it)) }) as java.sql.Timestamp?
-                java.sql.Time::class -> parsedString(name, prop, boxed.get(prop.name), { java.sql.Time(java.util.Date.parse(it)) }) as java.sql.Time?
-                java.sql.Date::class -> parsedString(name, prop, boxed.get(prop.name), { java.sql.Date(java.util.Date.parse(it)) }) as java.sql.Date?
+                String::class -> stringValue(tableName, prop, boxed.get(prop.name)) as String?
+                Byte::class -> integralValue(tableName, prop, boxed.get(prop.name), Byte.MIN_VALUE.toLong(), Byte.MAX_VALUE.toLong())?.toByte() as Byte?
+                Boolean::class -> booleanLikeValue(tableName, prop, boxed.get(prop.name)) as Boolean?
+                Int::class -> integralValue(tableName, prop, boxed.get(prop.name), Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong())?.toInt() as Int?
+                Long::class -> integralValue(tableName, prop, boxed.get(prop.name), Long.MIN_VALUE, Long.MAX_VALUE) as Long?
+                Short::class -> integralValue(tableName, prop, boxed.get(prop.name), Short.MIN_VALUE.toLong(), Short.MAX_VALUE.toLong())?.toShort() as Short?
+                Double::class -> doubleValue(tableName, prop, boxed.get(prop.name), Double.MIN_VALUE.toDouble(), Double.MAX_VALUE.toDouble()) as Double?
+                Float::class -> doubleValue(tableName, prop, boxed.get(prop.name), Float.MIN_VALUE.toDouble(), Float.MAX_VALUE.toDouble())?.toFloat() as Float?
+                BigDecimal::class -> bigDecimalValue(tableName, prop, boxed.get(prop.name)) as BigDecimal?
+                ZonedDateTime::class -> parsedString(tableName, prop, boxed.get(prop.name), ZonedDateTime::parse) as ZonedDateTime?
+                OffsetDateTime::class -> parsedString(tableName, prop, boxed.get(prop.name), OffsetDateTime::parse) as OffsetDateTime?
+                Instant::class -> parsedString(tableName, prop, boxed.get(prop.name), Instant::parse) as Instant?
+                LocalDateTime::class -> parsedString(tableName, prop, boxed.get(prop.name), LocalDateTime::parse) as LocalDateTime?
+                LocalDate::class -> parsedString(tableName, prop, boxed.get(prop.name), LocalDate::parse) as LocalDate?
+                LocalTime::class -> parsedString(tableName, prop, boxed.get(prop.name), LocalTime::parse) as LocalTime?
+                org.joda.time.DateTime::class -> parsedString(tableName, prop, boxed.get(prop.name), org.joda.time.DateTime::parse) as org.joda.time.DateTime?
+                org.joda.time.LocalDateTime::class -> parsedString(tableName, prop, boxed.get(prop.name), org.joda.time.LocalDateTime::parse) as org.joda.time.LocalDateTime?
+                org.joda.time.LocalDate::class -> parsedString(tableName, prop, boxed.get(prop.name), org.joda.time.LocalDate::parse) as org.joda.time.LocalDate?
+                org.joda.time.LocalTime::class -> parsedString(tableName, prop, boxed.get(prop.name), org.joda.time.LocalTime::parse) as org.joda.time.LocalTime?
+                java.util.Date::class -> parsedString(tableName, prop, boxed.get(prop.name), { java.util.Date(it) }) as java.util.Date?
+                java.sql.Timestamp::class -> parsedString(tableName, prop, boxed.get(prop.name), { java.sql.Timestamp(java.util.Date.parse(it)) }) as java.sql.Timestamp?
+                java.sql.Time::class -> parsedString(tableName, prop, boxed.get(prop.name), { java.sql.Time(java.util.Date.parse(it)) }) as java.sql.Time?
+                java.sql.Date::class -> parsedString(tableName, prop, boxed.get(prop.name), { java.sql.Date(java.util.Date.parse(it)) }) as java.sql.Date?
                 //java.sql.SQLXML::class -> parsedString(prop, _rs.get(prop.name).asJsNumber(), java.sql.SQLXML::parse)
                 //ByteArray::class -> _rs.get(prop.name).asJsArray()
                 //java.sql.Array::class -> _rs.get(prop.name).asJsArray()
-                URL::class -> urlString(name, prop, boxed.get(prop.name))
+                URL::class -> urlString(tableName, prop, boxed.get(prop.name))
                 else -> {
                     val className = (prop.returnType.classifier as? Class<*>)?.simpleName ?: "<unknown>"
-                    throw IllegalArgumentException("$name.${prop.name} cannot be set from json ${json.toString()}, type $className")
+                    throw IllegalArgumentException("$tableName.${prop.name} cannot be set from json ${json.toString()}, type $className")
                 }
             }
 
@@ -254,19 +269,19 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
                 properties.put(prop.name, value)
             } else {
                 val className = (prop.returnType.classifier as? Class<*>)?.simpleName ?: "<unknown>"
-                throw IllegalArgumentException("$name.${prop.name}, cannot be set from json ${json.toString()}, type $className")
+                throw IllegalArgumentException("$tableName.${prop.name}, cannot be set from json ${json.toString()}, type $className")
             }
         }
     }
 
-    fun load(other: Model<*>) {
+    fun load(other: Model<*, *>) {
         // load initial properties from result set
         for (prop in kProperties) {
-            properties.put(prop.name, if (prop.returnType.isMarkedNullable) {
-                other._model.properties[prop.name]
+            properties[prop.name] = if (prop.returnType.isMarkedNullable) {
+                other._db.properties[prop.name]
             } else {
-                other._model.properties[prop.name]!!
-            })
+                other._db.properties[prop.name]!!
+            }
         }
     }
 
@@ -308,13 +323,14 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
         return jsonObject
     }
 
-    fun sqlInsertQuery(tableName: String): SqlQuery {
+    fun sqlInsertQuery(): SqlQuery {
         val sb = StringBuilder()
         val sbValues = StringBuilder()
         val params = ArrayList<Any?>()
         var sep = ""
 
-        sb.append("INSERT INTO $quote$tableName$quote (")
+        sb.append("INSERT INTO ")
+        appendQuoted(sb, tableName).append(" (")
 
         for (prop in kProperties) {
             val propType = propertyTypes[prop.name] ?: PropertyType.PROPERTY
@@ -325,19 +341,21 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
                     // skip null properties which have defaults (null means use default)
                     if (propValue != null || !propType.isDefault) {
                         val columnName = columnNames[prop.name] ?: prop.name
-                        sb.append(sep).append(quote).append(columnName).append(quote)
+                        sb.append(sep)
+                        appendQuoted(sb, columnName)
                         sbValues.append(sep).append("?")
                         sep = ", "
                         params.add(propValue)
                     } else if (propertyDefaults.containsKey(prop.name)) {
                         val columnName = columnNames[prop.name] ?: prop.name
-                        sb.append(sep).append(quote).append(columnName).append(quote)
+                        sb.append(sep)
+                        appendQuoted(sb, columnName)
                         sbValues.append(sep).append("?")
                         sep = ", "
                         params.add(propertyDefaults[prop.name])
                     }
                 } else if (!prop.returnType.isMarkedNullable && !propType.isDefault) {
-                    throw IllegalStateException("$name.${prop.name} property is not nullable nor default and not defined in ${this}")
+                    throw IllegalStateException("$tableName.${prop.name} property is not nullable nor default and not defined in ${this}")
                 }
             }
         }
@@ -347,47 +365,44 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
     }
 
     @Suppress("MemberVisibilityCanBePrivate")
-    fun appendKeys(appendable: Appendable, params: ArrayList<Any?>, delimiter: String = " AND ", sep: String = ""): String {
+    fun appendKeys(out: Appendable, params: ArrayList<Any?>, delimiter: String = " AND ", sep: String = ""): String {
         var useSep = sep
 
         for (prop in keyProperties) {
             if (properties.containsKey(prop.name)) {
                 val columnName = columnNames[prop.name] ?: prop.name
 
-                appendable.append(useSep).append(quote).append(columnName).append(quote).append(" = ?")
+                out.append(useSep)
+                appendQuoted(out, columnName).append(" = ?")
                 useSep = delimiter
                 params.add(properties[prop.name])
             } else {
-                throw IllegalStateException("$name.${prop.name} key property is not defined in ${this}")
+                throw IllegalStateException("$tableName.${prop.name} key property is not defined in ${this}")
             }
         }
         return useSep
     }
 
-    fun sqlDeleteQuery(tableName: String): SqlQuery {
+    fun sqlDeleteQuery(): SqlQuery {
         val sb = StringBuilder()
         val params = ArrayList<Any?>()
 
-        sb.append("DELETE FROM $quote$tableName$quote WHERE ")
+        sb.append("DELETE FROM ")
+        appendQuoted(sb, tableName).append(" WHERE ")
         appendKeys(sb, params)
         return sqlQuery(sb.toString(), params)
     }
 
-    /**
-     * Return select for keys of the model
-     * @param tableName String
-     * @return SqlQuery
-     */
-    fun sqlSelectQuery(tableName: String): SqlQuery {
+    fun sqlSelectQuery(): SqlQuery {
         val sb = StringBuilder()
         val params = ArrayList<Any?>()
 
-        sb.append("SELECT * FROM $quote$tableName$quote WHERE ")
+        appendSelectSql(sb).append(" WHERE ")
         appendKeys(sb, params)
         return sqlQuery(sb.toString(), params)
     }
 
-    fun sqlUpdateQuery(tableName: String): SqlQuery {
+    fun sqlUpdateQuery(): SqlQuery {
         val sb = StringBuilder()
         val params = ArrayList<Any?>()
         var sep = ""
@@ -396,7 +411,8 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
             throw IllegalStateException("sqlUpdateQuery requested with no modified model properties")
         }
 
-        sb.append("UPDATE $quote$tableName$quote SET ")
+        sb.append("UPDATE ")
+        appendQuoted(sb, tableName).append(" SET ")
 
         for (prop in kProperties) {
             val propType = propertyTypes[prop.name] ?: PropertyType.PROPERTY
@@ -408,7 +424,9 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
                         if (propValue != null || !propType.isDefault) {
                             val columnName = columnNames[prop.name] ?: prop.name
 
-                            sb.append(sep).append(quote).append(columnName).append(quote).append(" = ?")
+                            sb.append(sep)
+                            appendQuoted(sb, columnName).append(" = ?")
+
                             sep = ", "
                             params.add(properties[prop.name])
                         }
@@ -421,7 +439,9 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
             // all modified props were null with defaults, update key to itself
             val prop = keyProperties[0]
             val columnName = columnNames[prop.name] ?: prop.name
-            sb.append(sep).append(quote).append(columnName).append(quote).append(" = ").append(quote).append(columnName).append(quote)
+            sb.append(sep)
+            appendQuoted(sb, columnName).append(" = ")
+            appendQuoted(sb, columnName)
         }
 
         sb.append(" WHERE ")
@@ -429,8 +449,8 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
         return sqlQuery(sb.toString(), params)
     }
 
-    fun sqlSelectTable(tableName: String): String {
-        return "SELECT * FROM $quote$tableName$quote "
+    fun sqlSelectTable(): String {
+        return appendSelectSql(StringBuilder()).toString()
     }
 
     fun clearAutoKeys() {
@@ -483,15 +503,103 @@ class ModelProperties<T>(val name: String, val dbCase: Boolean, val allowSetAuto
         }
     }
 
-    companion object {
-        var databaseQuoting = ""
-
-        fun quoteIdentifier(name: String): String {
-            return if (databaseQuoting.isEmpty()) {
-                name
-            } else {
-                "$databaseQuoting$name$databaseQuoting"
-            }
+    fun insert() {
+        session.updateGetKeys(sqlInsertQuery()) {
+            loadKeys(it)
         }
     }
+
+    fun insertIgnoreKeys() {
+        session.update(sqlInsertQuery())
+    }
+
+    fun select() {
+        session.first(sqlSelectQuery()) {
+            load(it)
+        }
+    }
+
+    fun insertReload() {
+        insert()
+        select()
+    }
+
+    fun delete() {
+        session.execute(sqlDeleteQuery())
+        clearAutoKeys()
+    }
+
+    fun update() {
+        if (session.execute(sqlUpdateQuery())) {
+            snapshot()
+        }
+    }
+
+    fun updateReload() {
+        update()
+        select()
+    }
+
+    fun deleteKeepAutoKeys() {
+        delete()
+    }
+
+    fun appendWhereClause(out: Appendable, params: Set<Map.Entry<String, Any?>>, alias: String? = null): Appendable {
+        if (!params.isEmpty()) {
+            out.append(" WHERE ")
+            var sep = ""
+            params.forEach { (key, value) ->
+                out.append(sep)
+                sep = " AND "
+                if (alias != null) if (alias.isEmpty()) appendQuoted(out, tableName) else out.append(alias).append('.')
+                if (value is Collection<*>) appendQuoted(out, key).append(" IN (:").append(key).append(")") 
+                else appendQuoted(out, key).append(" = :").append(key)
+            }
+        }
+        return out
+    }
+
+    fun appendListQuery(out: Appendable, params: Array<out Pair<String, Any?>>, alias: String? = null): Appendable {
+        val map = HashMap<String,Any?>()
+        map.putAll(params)
+        appendSelectSql(out)
+        return appendWhereClause(out, map.entries, alias)
+    }
+
+    fun appendListQuery(out: Appendable, params: Map<String, Any?>, alias: String? = null): Appendable {
+        appendSelectSql(out)
+        return appendWhereClause(out, params.entries, alias)
+    }
+
+    fun listQuery(params: Map<String, Any?>, alias: String? = null): SqlQuery {
+        return sqlQuery(appendListQuery(StringBuilder(), params, alias).toString(), params)
+    }
+
+    fun listQuery(params: Array<out Pair<String, Any?>>, alias: String? = null): SqlQuery {
+        return sqlQuery(appendListQuery(StringBuilder(), params, alias).toString()).inParamsArray(params)
+    }
+
+    fun <D> listData(toData: (Row) -> D): List<D> {
+        return session.list(listQuery(properties), toData);
+    }
+
+    fun <D> listData(whereClause: String, params: Map<String, Any?>, toData: (Row) -> D): List<D> {
+        return session.list(listQuery(whereClause, params), toData)
+    }
+
+    fun listModel(toModel: (Row) -> M): List<M> {
+        return session.list(listQuery(properties), toModel);
+    }
+
+    fun listModel(whereClause: String, params: Map<String, Any?>, toModel: (Row) -> M): List<M> {
+        return session.list(listQuery(whereClause, params), toModel)
+    }
+
+    fun listQuery(whereClause: String, params: Map<String, Any?>, alias: String? = null): SqlQuery {
+        val sb = StringBuilder()
+        appendSelectSql(sb, alias)
+        appendSelectSql(sb).append(whereClause, alias)
+        return sqlQuery(sb.toString(), params)
+    }
 }
+
