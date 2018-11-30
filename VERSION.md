@@ -3,6 +3,8 @@
 [TOC]: # " "
 
 - [TODO](#todo)
+    - [High Priority](#high-priority)
+- [0.5.0](#050)
 - [0.4.10](#0410)
 - [0.4.8](#048)
 - [0.4.6](#046)
@@ -43,6 +45,55 @@
   * [ ] Tables
   * [ ] Others?
 
+### High Priority
+
+* [ ] Test: query generating functions
+  * [ ] validate quote parameter is used for table and column names
+  * [ ] alias parameter
+    * [ ] `""`
+    * [ ] same as table name
+    * [ ] other string `"a"`
+* [ ] Test: list generation functions
+* [ ] Fix: Readme docs, consider creating a wiki
+
+## 0.5.0
+
+:information_source: breaking change
+
+* Refactor Model and related classes to eliminate having to specify identifier quoting in the
+  model by creating the model for a database session. Which makes sense for a database model
+  class.
+
+  Biggest change is that the model now takes two template arguments: main model class and its
+  associated data class with an optional session instance and identifier quoting string, if not
+  given or `null` then default session will be used. For quoting if not given or `null` then the
+  connection `metaData.identifierQuoting` will be used. Unless your jdbc driver does not provide
+  identifier quoting, there is no need to use anything but he default
+
+  Companion object now only has the table name constant string.
+
+  All other functions implemented in the `Model` with two abstract members: `toData()` returning
+  the data class for the model and `operator invoke` for factory the function of the model. To
+  get another instance of a model `myModel` simply invoke it as a function `myModel()`, with
+  optional arguments for `session` and `quote`
+
+  Identifier quoting is taken from the session information but can be overridden by passing a
+  `quote` parameter to `Model` constructor, `null` will use session quoting, anything else will
+  use whatever string is passed in.
+
+  The model having the session instance information simplifies using models because session no
+  longer has to be specified. To get a list of data of the model `myModel.listData()` variations
+  can be used or `myModel.listModel()` variations.
+
+  Additionally there is now an `alias:String? = null` argument available for sql generating
+  functions which will add a table alias to the table name and use the alias for disambiguating
+  column names. If generating queries with multiple tables, set the `alias` to empty string `""`
+  or the table name to have it added to the column references. An empty table alias or one equal
+  to the table name will only be used for column references.
+
+  [`Generate Kotlin-Model.groovy`](extensions/com.intellij.database/schema/Generate%20Kotlin-Model.groovy)
+  has been updated to generate the new model format from tables in the database.
+
 ## 0.4.10
 
 * Fix: merge #7, isLast and isAfterLast checking removed for TYPE_FORWARD_ONLY ResultSet thanks
@@ -51,8 +102,8 @@
 ## 0.4.8
 
 * Fix: migrate was using string compare for current version and versions for finding later ones
-* Fix: parameter extraction should take quoted, double quoted and back-quoted strings into account.
-  Otherwise a string with `:\w+` will be treated as a parameter.
+* Fix: parameter extraction should take quoted, double quoted and back-quoted strings into
+  account. Otherwise a string with `:\w+` will be treated as a parameter.
 
 ## 0.4.6
 

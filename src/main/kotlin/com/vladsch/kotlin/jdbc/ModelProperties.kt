@@ -87,8 +87,8 @@ class ModelProperties<M>(val session: Session, val tableName: String, val dbCase
 
     fun appendSelectSql(out: Appendable, alias: String? = null): Appendable {
         out.append("SELECT * FROM ")
-        appendQuoted(out, tableName)//.append(" ")
-        if (!alias.isNullOrBlank()) {
+        appendQuoted(out, tableName) //.append(" ")
+        if (!alias.isNullOrBlank() && alias != tableName) {
             out.append(alias)
         }
         return out
@@ -261,7 +261,7 @@ class ModelProperties<M>(val session: Session, val tableName: String, val dbCase
                 URL::class -> urlString(tableName, prop, boxed.get(prop.name))
                 else -> {
                     val className = (prop.returnType.classifier as? Class<*>)?.simpleName ?: "<unknown>"
-                    throw IllegalArgumentException("$tableName.${prop.name} cannot be set from json ${json.toString()}, type $className")
+                    throw IllegalArgumentException("$tableName.${prop.name} cannot be set from json $json, type $className")
                 }
             }
 
@@ -269,7 +269,7 @@ class ModelProperties<M>(val session: Session, val tableName: String, val dbCase
                 properties.put(prop.name, value)
             } else {
                 val className = (prop.returnType.classifier as? Class<*>)?.simpleName ?: "<unknown>"
-                throw IllegalArgumentException("$tableName.${prop.name}, cannot be set from json ${json.toString()}, type $className")
+                throw IllegalArgumentException("$tableName.${prop.name}, cannot be set from json $json, type $className")
             }
         }
     }
@@ -365,7 +365,7 @@ class ModelProperties<M>(val session: Session, val tableName: String, val dbCase
     }
 
     @Suppress("MemberVisibilityCanBePrivate")
-    fun appendKeys(out: Appendable, params: ArrayList<Any?>, delimiter: String = " AND ", sep: String = ""): String {
+    fun appendKeys(out: Appendable, params: ArrayList<Any?>, delimiter: String = " AND ", sep: String = "", alias: String?): String {
         var useSep = sep
 
         for (prop in keyProperties) {
@@ -373,6 +373,7 @@ class ModelProperties<M>(val session: Session, val tableName: String, val dbCase
                 val columnName = columnNames[prop.name] ?: prop.name
 
                 out.append(useSep)
+                if (alias != null) if (alias.isEmpty()) appendQuoted(out, tableName) else out.append(alias).append('.')
                 appendQuoted(out, columnName).append(" = ?")
                 useSep = delimiter
                 params.add(properties[prop.name])
@@ -383,22 +384,38 @@ class ModelProperties<M>(val session: Session, val tableName: String, val dbCase
         return useSep
     }
 
-    fun sqlDeleteQuery(): SqlQuery {
+    @Suppress("MemberVisibilityCanBePrivate")
+    fun appendWhereClause(out: Appendable, params: Set<Map.Entry<String, Any?>>, alias: String? = null): Appendable {
+        if (!params.isEmpty()) {
+            out.append(" WHERE ")
+            var sep = ""
+            params.forEach { (key, value) ->
+                out.append(sep)
+                sep = " AND "
+                if (alias != null) if (alias.isEmpty()) appendQuoted(out, tableName) else out.append(alias).append('.')
+                if (value is Collection<*>) appendQuoted(out, key).append(" IN (:").append(key).append(")")
+                else appendQuoted(out, key).append(" = :").append(key)
+            }
+        }
+        return out
+    }
+
+    fun sqlDeleteQuery(alias: String? = null): SqlQuery {
         val sb = StringBuilder()
         val params = ArrayList<Any?>()
 
         sb.append("DELETE FROM ")
         appendQuoted(sb, tableName).append(" WHERE ")
-        appendKeys(sb, params)
+        appendKeys(sb, params, alias = alias)
         return sqlQuery(sb.toString(), params)
     }
 
-    fun sqlSelectQuery(): SqlQuery {
+    fun sqlSelectQuery(alias: String? = null): SqlQuery {
         val sb = StringBuilder()
         val params = ArrayList<Any?>()
 
-        appendSelectSql(sb).append(" WHERE ")
-        appendKeys(sb, params)
+        appendSelectSql(sb, alias).append(" WHERE ")
+        appendKeys(sb, params, alias = alias)
         return sqlQuery(sb.toString(), params)
     }
 
@@ -445,7 +462,7 @@ class ModelProperties<M>(val session: Session, val tableName: String, val dbCase
         }
 
         sb.append(" WHERE ")
-        appendKeys(sb, params)
+        appendKeys(sb, params, alias = null)
         return sqlQuery(sb.toString(), params)
     }
 
@@ -544,30 +561,15 @@ class ModelProperties<M>(val session: Session, val tableName: String, val dbCase
         delete()
     }
 
-    fun appendWhereClause(out: Appendable, params: Set<Map.Entry<String, Any?>>, alias: String? = null): Appendable {
-        if (!params.isEmpty()) {
-            out.append(" WHERE ")
-            var sep = ""
-            params.forEach { (key, value) ->
-                out.append(sep)
-                sep = " AND "
-                if (alias != null) if (alias.isEmpty()) appendQuoted(out, tableName) else out.append(alias).append('.')
-                if (value is Collection<*>) appendQuoted(out, key).append(" IN (:").append(key).append(")") 
-                else appendQuoted(out, key).append(" = :").append(key)
-            }
-        }
-        return out
-    }
-
     fun appendListQuery(out: Appendable, params: Array<out Pair<String, Any?>>, alias: String? = null): Appendable {
-        val map = HashMap<String,Any?>()
+        val map = HashMap<String, Any?>()
         map.putAll(params)
-        appendSelectSql(out)
+        appendSelectSql(out, alias)
         return appendWhereClause(out, map.entries, alias)
     }
 
     fun appendListQuery(out: Appendable, params: Map<String, Any?>, alias: String? = null): Appendable {
-        appendSelectSql(out)
+        appendSelectSql(out, alias)
         return appendWhereClause(out, params.entries, alias)
     }
 
@@ -580,7 +582,11 @@ class ModelProperties<M>(val session: Session, val tableName: String, val dbCase
     }
 
     fun <D> listData(toData: (Row) -> D): List<D> {
-        return session.list(listQuery(properties), toData);
+        return session.list(listQuery(properties), toData)
+    }
+
+    fun <D> listData(whereClause: String, toData: (Row) -> D): List<D> {
+        return session.list(listQuery(whereClause, mapOf()), toData)
     }
 
     fun <D> listData(whereClause: String, params: Map<String, Any?>, toData: (Row) -> D): List<D> {
@@ -588,7 +594,11 @@ class ModelProperties<M>(val session: Session, val tableName: String, val dbCase
     }
 
     fun listModel(toModel: (Row) -> M): List<M> {
-        return session.list(listQuery(properties), toModel);
+        return session.list(listQuery(properties), toModel)
+    }
+
+    fun listModel(whereClause: String, toModel: (Row) -> M): List<M> {
+        return session.list(listQuery(whereClause, mapOf()), toModel)
     }
 
     fun listModel(whereClause: String, params: Map<String, Any?>, toModel: (Row) -> M): List<M> {

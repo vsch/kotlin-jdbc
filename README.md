@@ -3,10 +3,41 @@
 [![Build Status](https://travis-ci.org/vsch/kotlin-jdbc.svg)](https://travis-ci.org/vsch/kotlin-jdbc)
 [![Maven Central status](https://img.shields.io/maven-central/v/com.vladsch.kotlin-jdbc/kotlin-jdbc.svg)](https://search.maven.org/search?q=g:com.vladsch.kotlin-jdbc)
 
-:information_source: This branch is a work in progress for refactoring the code to eliminate the
-quote database issue and to make the model be associated with a session, instead of having to
-pass session as an argument, you now create a model for the session. This way the model can
-adjust to particulars of the connection. 
+## Version 0.5 API Breaking Release
+
+:information_source: This branch is a rework with breaking changes to refactor models and
+related classes to eliminate having to specify identifier quoting in the model by creating the
+model for a database session. Which makes sense for a database model class.
+
+Biggest change is that the model now takes two template arguments: main model class and its
+associated data class with an optional session instance and identifier quoting string, if not
+given or `null` then default session will be used. For quoting if not given or `null` then the
+connection `metaData.identifierQuoting` will be used. Unless your jdbc driver does not provide
+identifier quoting, there is no need to use anything but he default
+
+Companion object now only has the table name constant string.
+
+All other functions implemented in the `Model` with two abstract members: `toData()` returning
+the data class for the model and `operator invoke` for factory the function of the model. To get
+another instance of a model `myModel` simply invoke it as a function `myModel()`, with optional
+arguments for `session` and `quote`
+
+Identifier quoting is taken from the session information but can be overridden by passing a
+`quote` parameter to `Model` constructor, `null` will use session quoting, anything else will
+use whatever string is passed in.
+
+The model having the session instance information simplifies using models because session no
+longer has to be specified. To get a list of data of the model `myModel.listData()` variations
+can be used or `myModel.listModel()` variations.
+
+Additionally there is now an `alias:String? = null` argument available for sql generating
+functions which will add a table alias to the table name and use the alias for disambiguating
+column names. If generating queries with multiple tables, set the `alias` to empty string `""`
+or the table name to have it added to the column references. An empty table alias or one equal
+to the table name will only be used for column references.
+
+[`Generate Kotlin-Model.groovy`] has been updated to generate the new model format from tables
+in the database.
 
 A light weight library that exposes JDBC API with the convenience of Kotlin and gets out of the
 way when it is not needed.
@@ -30,7 +61,7 @@ import java.sql.Timestamp
 
 // dbCase = true if database columns same as properties
 // dbCase = false if database columns are snake-case versions of property names
-class ValidModel(quote:String? = null) : Model<ValidModel>("tableName", dbCase = true, quote = quote) {
+class ValidModel(session:Session? = null, quote:String? = null) : ModelNoData<ValidModel>("tableName", dbCase = true) {
     var processId: Long? by db.autoKey
     var title: String by db
     var version: String by db
@@ -38,6 +69,8 @@ class ValidModel(quote:String? = null) : Model<ValidModel>("tableName", dbCase =
     var hasOwnColumnName: Int? by db.column("own_name")           
     var updatedAt: Timestamp? by db.auto
     var createdAt: Timestamp? by db.auto
+    
+    override operator fun invoke() = ValidModel(_session, _quote)
 }
 ```
 
@@ -63,14 +96,14 @@ functions, procedures, tables, triggers and views. See [Migrations](#migrations)
 <dependency>
     <groupId>com.vladsch.kotlin-jdbc</groupId>
     <artifactId>kotlin-jdbc</artifactId>
-    <version>0.4.4</version>
+    <version>0.5.0</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```gradle
-compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.4.4"
+compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.5.0"
 ```
 
 ### Example
@@ -377,12 +410,8 @@ Any property marked as `auto` generated will not be used in `UPDATE` or `INSERT`
 
 ##### Identifier Quoting
 
-Column and table names are not quoted by default. If the same database type is used on all
-connections then quoting should be set during initialization through `Model.databaseQuoting`.
-
-When multiple database quoting types are used for different sessions then quote string to be
-used by models should be passed to the model constructor based on the database type for the
-session. This means that models with different quoting strings.
+Each model is attached to a session. Column and table names are quoted by default using the
+connection's `metaData.identifierQuoteString`.
 
 ##### Model Generation
 
@@ -390,14 +419,7 @@ For IntelliJ Ultimate a Database extension script can be installed which will ge
 from the context menu of any table in the database tools window. See
 [Installing IntelliJ Ultimate Database Tools Extension Script](#installing-intellij-ultimate-database-tools-extension-scripts)
 
-##### Companion Helpers
-
-The model's companion implements helper functions for converting result set row to the data
-class, JSON object and creating list queries.
-
 Result set row to model/json/data conversion:
-
-These return conversion function without identifier quoting option:
 
 * `val toModel: (Row) -> M = toModel()`
 * `val toData: (Row) -> D = toData()`
@@ -405,102 +427,114 @@ These return conversion function without identifier quoting option:
 
 These return conversion function with identifier quoting option:
 
-* `fun toModel(quote: String? = null): (Row) -> M`
-* `fun toData(quote: String? = null): (Row) -> D`
-* `fun toJson(quote: String? = null): (Row) -> JsonObject`
-
+**These need updating for version 0.5**
 
 List Query Helpers:
 
-* `fun listQuery(vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): SqlQuery`
-* `fun listQuery(params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): SqlQuery`
-* `fun listQuery(whereClause:String, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): SqlQuery`
-* `fun listQuery(whereClause:String, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): SqlQuery`
+* `fun listQuery(vararg params: Pair<String, Any?>, quote:String =
+  ModelProperties.databaseQuoting): SqlQuery`
+* `fun listQuery(params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting):
+  SqlQuery`
+* `fun listQuery(whereClause:String, vararg params: Pair<String, Any?>, quote:String =
+  ModelProperties.databaseQuoting): SqlQuery`
+* `fun listQuery(whereClause:String, params: Map<String, Any?>, quote:String =
+  ModelProperties.databaseQuoting): SqlQuery`
 
 List results:
 
-* `fun list(session: Session, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): List<D>`
-* `fun list(session: Session, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): List<D>`
-* `fun list(session: Session, whereClause:String, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): List<D>`
-* `fun list(session: Session, whereClause:String, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): List<D>`
+* `fun list(session: Session, vararg params: Pair<String, Any?>, quote:String =
+  ModelProperties.databaseQuoting): List<D>`
+* `fun list(session: Session, params: Map<String, Any?>, quote:String =
+  ModelProperties.databaseQuoting): List<D>`
+* `fun list(session: Session, whereClause:String, vararg params: Pair<String, Any?>,
+  quote:String = ModelProperties.databaseQuoting): List<D>`
+* `fun list(session: Session, whereClause:String, params: Map<String, Any?>, quote:String =
+  ModelProperties.databaseQuoting): List<D>`
 
 JSON Array results:
 
-* `fun jsonArray(session: Session, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): JsonArray`
-* `fun jsonArray(session: Session, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): JsonArray`
-* `fun jsonArray(session: Session, whereClause:String, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): JsonArray`
-* `fun jsonArray(session: Session, whereClause:String, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): JsonArray`
+* `fun jsonArray(session: Session, vararg params: Pair<String, Any?>, quote:String =
+  ModelProperties.databaseQuoting): JsonArray`
+* `fun jsonArray(session: Session, params: Map<String, Any?>, quote:String =
+  ModelProperties.databaseQuoting): JsonArray`
+* `fun jsonArray(session: Session, whereClause:String, vararg params: Pair<String, Any?>,
+  quote:String = ModelProperties.databaseQuoting): JsonArray`
+* `fun jsonArray(session: Session, whereClause:String, params: Map<String, Any?>, quote:String =
+  ModelProperties.databaseQuoting): JsonArray`
 
-```kotlin-a
-data class ValidData(
-    val processId: Long?,
-    val title: String,
-    val version: String,
-    val batch: Int?,
-    val updatedAt: String?,
-    val createdAt: String?
-)
-
-class ValidModel(quote:String? = null) : Model<ValidModel>(tableName, dbCase = true, quote = quote) {
-    var processId: Long? by db.auto.key
-    var title: String by db
-    var version: String by db
-    var batch: Int? by db.default(1)
-    var updatedAt: String? by db.auto
-    var createdAt: String? by db.auto
-
-    fun toData() = ValidData(
-        processId,
-        title,
-        version,
-        batch,
-        updatedAt,
-        createdAt
+```kotlin
+    data class ValidData(
+        val processId: Long?,
+        val noSetter: String,
+        val noSetter2: String,
+        val title: String,
+        val version: String,
+        val unknown: String?,
+        val createdAt: String?,
+        val createdAt2: String?
     )
+    
+    class ValidModel(session: Session? = session(), quote: String? = null) : Model<ValidModel, ValidData>(session, tableName, true, false, quote) {
 
-    companion object : ModelCompanion<ValidModel, ValidData> {
-        override val tableName = "tableName"
-        override fun createModel(quote:String?): ValidModel = ValidModel(quote)
-        override fun createData(model: ValidModel): ValidData = model.toData()
+        var processId: Long? by db.key.auto; private set
+        val noSetter: String by db.auto
+        val noSetter2: String by db.autoKey
+        var title: String by db
+        var version: String by db
+        var unknown: String? by db
+        var createdAt: String? by db.auto; private set
+        val createdAt2: String? by db.auto
+
+        override fun invoke(): ValidModel {
+            return ValidModel(_session, _quote)
+        }
+
+        override fun toData(): ValidData {
+            return ValidData(processId, noSetter, noSetter2, title, version, unknown, createdAt, createdAt2)
+        }
+        
+        companion object {
+            const val tableName = "TableName"
+        }
     }
-}
+
 
 fun useModel() {
     using(session(HikariCP.default())) { session ->
-        // get all rows from table as list
-        val modelList = ValidModel.list(session)
+        // get all rows from table as list of the data class
+        val modelList = ValidModel(session).listData()
 
-        val model = ValidModel()
+        val model = ValidModel(session)
         model.title = "title text"
         model.version = "V1.0"
 
         // execute an insert and set model's key properties from the keys returned by the database
         // batch will be set to 1 since it is not set in properties
-        model.insert(session)
+        model.insert()
 
         // this will delete the model and clear auto.key properties
-        model.delete(session)
+        model.delete()
 
         // this will delete the model but not clear auto.key properties
-        model.deleteKeepAutoKeys(session)
+        model.deleteKeepAutoKeys()
 
         // execute select query for model (based on keys) and load model
-        model.select(session)
+        model.select()
 
         // just insert, don't bother getting keys
-        model.insertIgnoreKeys(session)
+        model.insertIgnoreKeys()
 
         // take a snapshot of current properties
         model.snapshot()
         model.version = "V2.0"
 
         // will only update version since it is the only one changed, does automatic snapshot after update
-        model.update(session)
+        model.update()
 
         // will only update version since it is the only one changed but will reload model from database 
         // if updatedAt field is timestamped on update then it will be loaded with a new value
         model.version = "V3.0"
-        model.updateReload(session)
+        model.updateReload()
     }
 }
 ```
@@ -542,13 +576,10 @@ introspection instead of JDBC in connection configuration.
 
 ![Scripted Extensions Generate Kotlin Model](assets/images/Scripted_Extensions_Generate_Kotlin-Model.png)
 
-Add
-[Generate Scala-Slick-Model.groovy](extensions/com.intellij.database/schema/Generate%20Scala-Slick-Model.groovy)
-for generating a Scala/Slick database model.
+Add [Generate Scala-Slick-Model.groovy] for generating a Scala/Slick database model.
 
-[Kotlin-Enum.kt.js](extensions/com.intellij.database/data/extractors/Kotlin-Enum.kt.js) to
-convert result set data to Kotlin Enum definition. You need to add it to the `data/extractors`
-directory
+[Kotlin-Enum.kt.js] to convert result set data to Kotlin Enum definition. You need to add it to
+the `data/extractors` directory
 
 ![Scripted_Extensions_Generate-Kotlin-Model](assets/images/Scripted_Extensions_Data_Extractors.png)
 
@@ -588,12 +619,10 @@ enum class ChangeHistoryTypes(val id: Int, val type: String) {
 ```
 
 A script for generating a JavaScript enum based on [`enumerated-type`] npm package will generate
-an enum usable in JavaScript
-[JavaScript-Enumerated-Value-Type.kt.js](extensions/com.intellij.database/data/extractors/JavaScript-Enumerated-Value-Type.kt.js)
+an enum usable in JavaScript [JavaScript-Enumerated-Value-Type.kt.js]
 
-A script for generating a markdown table for the table data
-[Markdown-Table.md.js](extensions/com.intellij.database/data/extractors/Markdown-Table.md.js)
-Note: the table above was generated with this script.
+A script for generating a markdown table for the table data [Markdown-Table.md.js] Note: the
+table above was generated with this script.
 
 ## Migrations
 
@@ -816,4 +845,9 @@ Copyright (c) 2018 - Vladimir Schneider
 Copyright (c) 2015 - Kazuhiro Sera
 
 [`enumerated-type`]: https://github.com/vsch/enumerated-type
+[`Generate Kotlin-Model.groovy`]: https://github.com/vsch/kotlin-jdbc/blob/master/extensions/com.intellij.database/schema/Generate%20Kotlin-Model.groovy
+[Generate Scala-Slick-Model.groovy]: extensions/com.intellij.database/schema/Generate%20Scala-Slick-Model.groovy
+[JavaScript-Enumerated-Value-Type.kt.js]: extensions/com.intellij.database/data/extractors/JavaScript-Enumerated-Value-Type.kt.js
+[Kotlin-Enum.kt.js]: extensions/com.intellij.database/data/extractors/Kotlin-Enum.kt.js
+[Markdown-Table.md.js]: extensions/com.intellij.database/data/extractors/Markdown-Table.md.js
 

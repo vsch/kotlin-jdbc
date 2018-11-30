@@ -97,17 +97,18 @@ class ModelTest {
         }
     }
 
-    class ValidModel(session: Session? = session(), quote: String? = null) : Model<ValidModel, ValidModel.Data>(session, "tests", true, false, quote) {
-        data class Data(
-                val processId: Long?,
-                val noSetter: String,
-                val noSetter2: String,
-                val title: String,
-                val version: String,
-                val unknown: String?,
-                val createdAt: String?,
-                val createdAt2: String?
-        )
+    data class ValidData(
+        val processId: Long?,
+        val noSetter: String,
+        val noSetter2: String,
+        val title: String,
+        val version: String,
+        val unknown: String?,
+        val createdAt: String?,
+        val createdAt2: String?
+    )
+
+    class ValidModel(session: Session? = session(), quote: String? = null) : Model<ValidModel, ValidData>(session, tableName, true, false, quote) {
 
         var processId: Long? by db.key.auto; private set
         val noSetter: String by db.auto
@@ -122,8 +123,12 @@ class ModelTest {
             return ValidModel(_session, _quote)
         }
 
-        override fun toData(): Data {
-            return Data(processId, noSetter, noSetter2, title, version, unknown, createdAt, createdAt2)
+        override fun toData(): ValidData {
+            return ValidData(processId, noSetter, noSetter2, title, version, unknown, createdAt, createdAt2)
+        }
+
+        companion object {
+            const val tableName = "tests"
         }
     }
 
@@ -197,13 +202,9 @@ class ModelTest {
         var batch: Int? by db.default
         var createdAt: String? by db.auto; private set
 
-        override fun invoke(): TestModel {
-            return TestModel(_session, _quote)
-        }
+        override fun invoke() = TestModel(_session, _quote)
 
-        override fun toData(): Data {
-            return Data(processId, title, version, batch, createdAt)
-        }
+        override fun toData() = Data(processId, title, version, batch, createdAt)
     }
 
     class TestModelDefaultValue(session: Session? = session(), quote: String? = null) : Model<TestModelDefaultValue, TestModelDefaultValue.Data>(session, "tests", true, false, quote = quote) {

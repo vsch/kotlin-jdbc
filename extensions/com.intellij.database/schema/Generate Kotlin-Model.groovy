@@ -77,7 +77,8 @@ def generate(out, tableName, className, fields) {
     out.println "package $packageName"
     out.println ""
     out.println "import com.vladsch.kotlin.jdbc.Model"
-    out.println "import com.vladsch.kotlin.jdbc.ModelCompanion"
+    out.println "import com.vladsch.kotlin.jdbc.Session"
+//    out.println "import com.vladsch.kotlin.jdbc.ModelCompanion"
     if (timestampCount > 0) out.println "import java.sql.Timestamp"
     if (dateCount > 0) out.println "import java.sql.Date"
     if (timeCount > 0) out.println "import java.sql.Time"
@@ -98,7 +99,7 @@ def generate(out, tableName, className, fields) {
 
     // model class
     out.println "@Suppress(\"MemberVisibilityCanBePrivate\")"
-    out.println "class ${className}Model(quote: String? = null) : Model<${className}Model>(tableName, dbCase = ${dbCase}, quote = quote) {"
+    out.println "class ${className}Model(session:Session? = null, quote: String? = null) : Model<${className}Model, ${className}>(session, tableName, dbCase = ${dbCase}, quote = quote) {"
     def maxWidth = 0
     def lines = []
     fields.each() {
@@ -126,15 +127,20 @@ def generate(out, tableName, className, fields) {
 
     // data copy constructor
     out.println ""
-    out.println "  constructor(other: ${className}, quote: String? = null) : this(quote) {"
+    out.println "  constructor(other: ${className}, session:Session? = null, quote: String? = null) : this(session, quote) {"
     fields.each() {
         out.println "    ${it.name} = other.${it.name}"
     }
+    out.println "    snapshot()"
     out.println "  }"
     out.println ""
 
+    // copy factory
+    out.println "  override operator fun invoke() = ${className}Model(_session, _quote)"
+    out.println ""
+
     // data factory
-    out.println "  fun toData() = ${className}("
+    out.println "  override fun toData() = ${className}("
     sep = "";
     fields.each() {
         out.print sep
@@ -143,11 +149,10 @@ def generate(out, tableName, className, fields) {
     }
     out.println "\n  )"
     out.println ""
-
-    out.println "  companion object : ModelCompanion<${className}Model, ${className}>() {"
-    out.println "      override val tableName = \"${tableName}\""
-    out.println "      override fun createModel(quote:String?): ${className}Model = ${className}Model(quote)"
-    out.println "      override fun createData(model: ${className}Model): ${className} = model.toData()"
+    out.println "  companion object {"
+    out.println "      const val tableName = \"${tableName}\""
+//    out.println "      override fun createModel(quote:String?): ${className}Model = ${className}Model(quote)"
+//    out.println "      override fun createData(model: ${className}Model): ${className} = model.toData()"
     out.println "  }"
     out.println "}"
 }
