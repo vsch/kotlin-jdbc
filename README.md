@@ -3,6 +3,11 @@
 [![Build Status](https://travis-ci.org/vsch/kotlin-jdbc.svg)](https://travis-ci.org/vsch/kotlin-jdbc)
 [![Maven Central status](https://img.shields.io/maven-central/v/com.vladsch.kotlin-jdbc/kotlin-jdbc.svg)](https://search.maven.org/search?q=g:com.vladsch.kotlin-jdbc)
 
+:information_source: This branch is a work in progress for refactoring the code to eliminate the
+quote database issue and to make the model be associated with a session, instead of having to
+pass session as an argument, you now create a model for the session. This way the model can
+adjust to particulars of the connection. 
+
 A light weight library that exposes JDBC API with the convenience of Kotlin and gets out of the
 way when it is not needed.
 
