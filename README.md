@@ -10,25 +10,28 @@ related classes to eliminate having to specify identifier quoting in the model b
 model for a database session. Which makes sense for a database model class.
 
 Biggest change is that the model now takes two template arguments: main model class and its
-associated data class with an optional session instance and identifier quoting string, if not
-given or `null` then default session will be used. For quoting if not given or `null` then the
-connection `metaData.identifierQuoting` will be used. Unless your jdbc driver does not provide
-identifier quoting, there is no need to use anything but he default
+associated data class with an optional session instance and identifier quoting string.
+
+If `session` is not given or `null` then default session will be used.
+
+If `quote` if not given or `null` then the connection `metaData.identifierQuoteString` will be
+used, anything else will use whatever string is passed in. Unless your jdbc driver does not
+provide identifier quoting, there is no need to use anything but the default.
 
 Companion object now only has the table name constant string.
 
 All other functions implemented in the `Model` with two abstract members: `toData()` returning
-the data class for the model and `operator invoke` for factory the function of the model. To get
-another instance of a model `myModel` simply invoke it as a function `myModel()`, with optional
-arguments for `session` and `quote`
+the data class for the model and `operator invoke` for the factory function for the model. To
+get another instance of a model `myModel` invoke the model instance as a function `myModel()`.
 
-Identifier quoting is taken from the session information but can be overridden by passing a
-`quote` parameter to `Model` constructor, `null` will use session quoting, anything else will
-use whatever string is passed in.
+For models that do not need a data class `ModelNoData` is also available which only takes a
+single template argument, as was the case for the `Model` class in previous releases.
 
-The model having the session instance information simplifies using models because session no
-longer has to be specified. To get a list of data of the model `myModel.listData()` variations
-can be used or `myModel.listModel()` variations.
+Having the session instance information in the model simplifies using models because session no
+longer has to be specified for every method performing database access.
+
+Additionally, list results are simplified because neither the session nor the extractor needs to
+be passed, with `myModel.listData()` variations can be used or `myModel.listModel()` variations.
 
 Additionally there is now an `alias:String? = null` argument available for sql generating
 functions which will add a table alias to the table name and use the alias for disambiguating
@@ -38,6 +41,8 @@ to the table name will only be used for column references.
 
 [`Generate Kotlin-Model.groovy`] has been updated to generate the new model format from tables
 in the database.
+
+## Overview
 
 A light weight library that exposes JDBC API with the convenience of Kotlin and gets out of the
 way when it is not needed.
