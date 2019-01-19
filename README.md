@@ -566,7 +566,12 @@ To get full benefit of SQL completions you should also define a database source 
 against which you are developing (or a local clone of it) and configure the SQL dialect for the
 database you are using.
 
-#### Installing IntelliJ Ultimate Database Tools Extension Scripts
+#### Installing Database Tools Extension Scripts
+
+:information_source: Database Tools are available on IntelliJ Ultimate and other IDEs but not in
+the IntelliJ Community Edition
+
+##### Generate Kotlin Models from Tables Script
 
 Download the groovy script for generating a `kotlin-jdbc` model:
 [Generate Kotlin-Model.groovy](extensions/com.intellij.database/schema/Generate%20Kotlin-Model.groovy)
@@ -581,7 +586,56 @@ introspection instead of JDBC in connection configuration.
 
 ![Scripted Extensions Generate Kotlin Model](assets/images/Scripted_Extensions_Generate_Kotlin-Model.png)
 
+If the a file `../model-config.json` file exists relative to the output directory then it will
+be used for determining the model output location and package.
+
+For example:
+
+```json
+{
+  "package-prefix" : "",
+  "skip-unmapped" : false,
+  "file-map": {
+    "play_evolutionModel.kt": "",
+    "migrationModel.kt": "",
+
+    "AuditLogModel.kt": "app/audit/models/AuditLogModel.kt"
+  }
+}
+```
+
+* `package-prefix` if present will be prefixed to the generated package name
+* `skip-unmapped`, if `true`, any model names not present in the mapped will not be generated,
+  if `false` the models will be generated to the output directory.
+* `file-map`, map of model name to file path relative to `model-config.json` file location.
+
+:information_source: the easiest way to generate the file-map is first generate models without
+the file map. Move them to the desired sub-directories and then use the IDE `Copy Relative Path`
+context menu action and multi-caret editing or or a script to generate the mapping from existing
+directory structure and content. If any tables are added in the future they will automatically
+generate in the root and can be moved to the desired sub-directory and mapping added to the
+file-map.
+
+Will not generate models for tables `play_evolutions` and `migrations`, will output `AuditLogs`
+table model to `app/audit/models/` subdirectory with package set to `app.audit.models`
+
+All other tables, if selected will be generated to the output directory with package set to
+`com.sample`
+
+The intended use case is to have a generated models directory with the configuration file and
+all generated models in some sub-directory. When generating models, always select the same
+sub-directory, whose parent directory contains the `model-config.json` file.
+
+If you need to modify the models after they are generated, it is best to copy the auto-generated
+models to another directory where to make the modifications. Subsequent auto-generated models
+should still be generated into the same directory and auto-generated and manual model changes
+should be merged using the compare directory or file action of the IDE.
+
+##### Generate Scala Slick Models from Tables
+
 Add [Generate Scala-Slick-Model.groovy] for generating a Scala/Slick database model.
+
+##### Result Set Conversion Scripts
 
 [Kotlin-Enum.kt.js] to convert result set data to Kotlin Enum definition. You need to add it to
 the `data/extractors` directory
@@ -608,7 +662,7 @@ Result set:
 
 Generated Kotlin enum:
 
-```kotlin-a
+```kotlin
 enum class ChangeHistoryTypes(val id: Int, val type: String) {
   PROCESS(1, "Process"),
   FILE(2, "File"),
@@ -626,8 +680,8 @@ enum class ChangeHistoryTypes(val id: Int, val type: String) {
 A script for generating a JavaScript enum based on [`enumerated-type`] npm package will generate
 an enum usable in JavaScript [JavaScript-Enumerated-Value-Type.kt.js]
 
-A script for generating a markdown table for the table data [Markdown-Table.md.js] Note: the
-table above was generated with this script.
+A script for generating a markdown table for the table data [Markdown-Table.md.js]. The table
+above was generated with this script.
 
 ## Migrations
 

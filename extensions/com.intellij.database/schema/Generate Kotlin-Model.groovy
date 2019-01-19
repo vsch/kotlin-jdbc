@@ -3,6 +3,7 @@ import com.intellij.database.model.DasTable
 import com.intellij.database.model.ObjectKind
 import com.intellij.database.util.Case
 import com.intellij.database.util.DasUtil
+import groovy.json.JsonSlurper
 
 /*
  * Available context bindings:
@@ -10,13 +11,15 @@ import com.intellij.database.util.DasUtil
  *   PROJECT     project
  *   FILES       files helper
  */
-packageName = "com.sample"      // package used for generated class files
+packageName = "com.sample"      // package used for generated class files if no mapping is provided
 classFileNameSuffix = "Model"   // appended to class file name
 
 // KLUDGE: the DasTable and columns does not implement a way to get whether column is nullable, has default or is computed
 forceNullable = (~/^(?:createdAt|created_at|updatedAt|updated_at)$/) // regex for column names which are forced to nullable Kotlin type
 forceAuto = (~/^(?:createdAt|created_at|updatedAt|updated_at)$/) // column names marked auto generated
 snakeCaseTables = false  // if true convert snake_case table names to Pascal case, else leave as is
+
+DEBUG = true  // if true output debug trace to debug.log
 
 // column names marked as boolean when tinyint, only needed if using jdbc introspection which does not report actual declared type so all tinyint are tinyint(3)
 //forceBooleanTinyInt = (~/^(?:deleted|checkedStatus|checked_status|optionState|option_state)$/)
@@ -38,16 +41,73 @@ typeMapping = [
 ]
 
 FILES.chooseDirectoryAndSave("Choose directory", "Choose where to store generated files") { dir ->
-    SELECTION.filter { it instanceof DasTable && it.getKind() == ObjectKind.TABLE }.each { generate(it, dir) }
+    // read in possible map of tables to subdirectories
+    def tableMap = null
+    def packagePrefix = ""
+    def skipUnmapped = false
+    def mapFile = new File(dir, "../model-config.json")
+
+    if (DEBUG) {
+        new File(dir, "../debug.log").withPrintWriter { dbg ->
+            if (mapFile.isFile() && mapFile.canRead()) {
+                def jsonSlurper = new JsonSlurper()
+                def reader = new BufferedReader(new InputStreamReader(new FileInputStream(mapFile), "UTF-8"))
+                data = jsonSlurper.parse(reader)
+                if (DEBUG && data != null) {
+                    packagePrefix = data["package-prefix"] ?: ""
+                    skipUnmapped = data["skip-unmapped"] ?: false
+                    tableMap = data["file-map"]
+
+                    dbg.println("package-prefix: '$packagePrefix'")
+                    dbg.println ""
+                    dbg.println("skip-unmapped: $skipUnmapped")
+                    dbg.println ""
+                    dbg.println "file-map: {"
+                    tableMap.each { dbg.println "    $it" }
+                    dbg.println "}"
+                    dbg.println ""
+                }
+            }
+            SELECTION.filter { it instanceof DasTable && it.getKind() == ObjectKind.TABLE }.each {
+                generate(dbg, it, dir, tableMap, packagePrefix, skipUnmapped)
+            }
+        }
+    } else {
+        def dbg = null
+        if (mapFile.isFile() && mapFile.canRead()) {
+            def jsonSlurper = new JsonSlurper()
+            def reader = new BufferedReader(new InputStreamReader(new FileInputStream(mapFile), "UTF-8"))
+            data = jsonSlurper.parse(reader)
+        }
+        SELECTION.filter { it instanceof DasTable && it.getKind() == ObjectKind.TABLE }.each {
+            generate(dbg, it, dir, tableMap, packagePrefix)
+        }
+    }
 }
 
-def generate(table, dir) {
-    def className = snakeCaseTables ? javaName(singularize(table.getName()), true) : singularize(table.getName())
+def generate(PrintWriter dbg, DasTable table, File dir, Map<String, String> tableMap, String packagePrefix, boolean skipUnmapped) {
+    String className = snakeCaseTables ? javaName(singularize(table.getName()), true) : singularize(table.getName())
     def fields = calcFields(table)
-    new File(dir, className + "${classFileNameSuffix}.kt").withPrintWriter { out -> generate(out, table.getName(), className, fields) }
+    def fileName = className + "${classFileNameSuffix}.kt"
+    def mappedFile = tableMap != null ? tableMap[fileName] : null
+    if (dbg != null) dbg.println "fileName ${fileName} mappedFile ${mappedFile}"
+
+    def file
+    String inPackage
+    if (mappedFile != null && !mappedFile.trim().isEmpty()) {
+        file = new File(dir.parentFile, mappedFile);
+        inPackage = packagePrefix + new File(mappedFile).parent.replace("/", ".")
+    } else {
+        file = new File(dir, fileName)
+        inPackage = packageName
+        if (dbg != null && (skipUnmapped || mappedFile != null)) dbg.println "skipped ${fileName}"
+        if (skipUnmapped || mappedFile != null) return
+    }
+
+    file.withPrintWriter { out -> generateModel(dbg, out, (String)table.getName(), className, fields, inPackage) }
 }
 
-def generate(out, tableName, className, fields) {
+def generateModel(PrintWriter dbg, PrintWriter out, String tableName, String className, fields, String packageName) {
     def dbCase = true
     def keyCount = 0
     def nonKeyCount = 0

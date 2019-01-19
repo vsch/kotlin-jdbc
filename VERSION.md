@@ -5,6 +5,8 @@
 - [TODO](#todo)
     - [High Priority](#high-priority)
 - [0.5.0 API Breaking Release](#050-api-breaking-release)
+- [0.5.0-beta-2](#050-beta-2)
+- [0.5.0-beta-1](#050-beta-1)
 - [0.4.10](#0410)
 - [0.4.8](#048)
 - [0.4.6](#046)
@@ -94,6 +96,21 @@ to the table name will only be used for column references.
 
 [`Generate Kotlin-Model.groovy`] has been updated to generate the new model format from tables
 in the database.
+
+## 0.5.0-beta-2
+
+* Add: `jsonArray` functions to `Model` to list query results directly to `JsonArray` of
+  `JsonObject`.
+
+  :warning: will convert all columns of the query to properties of the `JsonObject` without
+  filtering by model properties.
+
+* Add: `listData` and `listModel` variants with parameter list and no where clause to have the
+  where clause generated from passed parameters.
+
+## 0.5.0-beta-1
+
+* Fix: API Change
 
 ## 0.4.10
 

@@ -589,6 +589,10 @@ class ModelProperties<M>(val session: Session, val tableName: String, val dbCase
         return session.list(listQuery(whereClause, mapOf()), toData)
     }
 
+    fun <D> listData(params: Map<String, Any?>, toData: (Row) -> D): List<D> {
+        return session.list(listQuery(params), toData)
+    }
+
     fun <D> listData(whereClause: String, params: Map<String, Any?>, toData: (Row) -> D): List<D> {
         return session.list(listQuery(whereClause, params), toData)
     }
@@ -599,6 +603,10 @@ class ModelProperties<M>(val session: Session, val tableName: String, val dbCase
 
     fun listModel(whereClause: String, toModel: (Row) -> M): List<M> {
         return session.list(listQuery(whereClause, mapOf()), toModel)
+    }
+
+    fun listModel(params: Map<String, Any?>, toModel: (Row) -> M): List<M> {
+        return session.list(listQuery(params), toModel)
     }
 
     fun listModel(whereClause: String, params: Map<String, Any?>, toModel: (Row) -> M): List<M> {

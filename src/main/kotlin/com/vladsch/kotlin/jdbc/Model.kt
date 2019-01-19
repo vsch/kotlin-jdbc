@@ -97,7 +97,19 @@ abstract class Model<M : Model<M, D>, D>(session: Session?, sqlTable: String, db
 
     fun listData(sqlQuery: SqlQuery) = _db.session.list(sqlQuery, toData)
 
-    fun listData(whereClause: String, params: Map<String, Any?>) = _db.listData(whereClause, params, toData)
+    fun listData(params: Map<String, Any?>, alias: String? = null) = _db.session.list(listQuery(params, alias), toData)
+
+    fun listData(whereClause: String, params: Map<String, Any?>, alias: String? = null) = _db.session.list(listQuery(whereClause, params, alias), toData)
+
+    fun jsonArray() = _db.session.jsonArray(listQuery(), toJsonObject)
+
+    fun jsonArray(whereClause: String) = _db.session.jsonArray(listQuery(whereClause, mapOf()), toJsonObject)
+
+    fun jsonArray(sqlQuery: SqlQuery) = _db.session.jsonArray(sqlQuery, toJsonObject)
+
+    fun jsonArray(params: Map<String, Any?>, alias: String? = null) = _db.session.jsonArray(listQuery(params), toJsonObject)
+
+    fun jsonArray(whereClause: String, params: Map<String, Any?>, alias: String? = null) = _db.session.jsonArray(listQuery(whereClause, params, alias), toJsonObject)
 
     fun listModel() = _db.listModel(toModel)
 
@@ -105,7 +117,9 @@ abstract class Model<M : Model<M, D>, D>(session: Session?, sqlTable: String, db
 
     fun listModel(sqlQuery: SqlQuery) = _db.session.list(sqlQuery, toModel)
 
-    fun listModel(whereClause: String, params: Map<String, Any?>) = _db.listModel(whereClause, params, toModel)
+    fun listModel(params: Map<String, Any?>, alias: String? = null) = _db.session.list(listQuery(params, alias), toModel)
+
+    fun listModel(whereClause: String, params: Map<String, Any?>, alias: String? = null) = _db.session.list(listQuery(whereClause, params, alias), toModel)
 
     // create a new copy, same params
     abstract operator fun invoke(): M
