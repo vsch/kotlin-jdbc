@@ -108,6 +108,9 @@ in the database.
 * Add: `listData` and `listModel` variants with parameter list and no where clause to have the
   where clause generated from passed parameters.
 
+* Add: optional `model-config.json` to be used by Kotlin model generating script to control
+  location and name of generated models.
+
 ## 0.5.0-beta-1
 
 * Fix: API Change
