@@ -108,6 +108,11 @@ in the database.
   Intended use case is to place the `model-config.json` at the project root and map all files in
   it with path relative to project root. Generating models then is not dependent on which
   directory in the project is selected as the directory for generating models.
+* Add: `import-evolutions path min {max}` where path is to the directory holding evolutions and
+  `min` is the minimum evolution to import. `max` is optional and if provided gives the maximum
+  evolution number to import.
+* Fix: `new-evolution` to put down migration script right after the up migration script instead
+  of all up migrations followed by reversed down migrations.
 
 ## 0.5.0-beta-2
 

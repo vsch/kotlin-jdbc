@@ -833,6 +833,10 @@ Commands:
   If there is a previous version to the one requested then all its entity scripts will be copied
   to the new version directory.
 
+* import-evolutions "play/evolutions/directory" "min" "max". Import evolutions converting them
+  to migrations in the current version. `min` is the minimum evolution to import. `max` is
+  optional and if provided gives the maximum evolution number to import.
+
 * new-evolution "play/evolutions/directory" create a new play evolution file from current or
   requested version migrations and rollbacks in the requested directory.
 
