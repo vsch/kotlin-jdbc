@@ -1,7 +1,7 @@
 # Kotlin-JDBC
 
 [![Build Status](https://travis-ci.org/vsch/kotlin-jdbc.svg)](https://travis-ci.org/vsch/kotlin-jdbc)
-[![Maven Central status](https://img.shields.io/maven-central/v/com.vladsch.kotlin-jdbc/kotlin-jdbc.svg)](https://search.maven.org/search?q=g:com.vladsch.kotlin-jdbc)
+[![Maven Central status](https://img.shields.io/maven-central/v/com.vladsch.kotlin-jdbc/kotlin-jdbc.svg)](https://search.maven.org/search?q=g:com.vladsch.kotlin-jdbc)<!-- @IGNORE PREVIOUS: link -->
 
 ## Version 0.5 API Breaking Release
 
@@ -70,11 +70,11 @@ class ValidModel(session:Session? = null, quote:String? = null) : ModelNoData<Va
     var processId: Long? by db.autoKey
     var title: String by db
     var version: String by db
-    var optional: Int? by db           
-    var hasOwnColumnName: Int? by db.column("own_name")           
+    var optional: Int? by db
+    var hasOwnColumnName: Int? by db.column("own_name")
     var updatedAt: Timestamp? by db.auto
     var createdAt: Timestamp? by db.auto
-    
+
     override operator fun invoke() = ValidModel(_session, _quote)
 }
 ```
@@ -87,7 +87,7 @@ even easier to work with SQL queries. See
 
 IntelliJ Ultimate Database Tools extension script for conversion of SQL tables to a Model is
 also available. See
-[Installing IntelliJ Ultimate Database Tools Extension Script](#installing-intellij-ultimate-database-tools-extension-scripts).
+[Installing IntelliJ Ultimate Database Tools Extension Script](#installing-database-tools-extension-scripts).
 
 The library provides a simple migration command processor to implement migrate/rollback
 functionality with version tracking with each version containing a copy of database entities:
@@ -122,7 +122,7 @@ objects or json arrays.
 ```kotlin-a
 import com.vladsch.kotlin.jdbc.*
 
-val session = session("jdbc:h2:mem:hello", "user", "pass") 
+val session = session("jdbc:h2:mem:hello", "user", "pass")
 ```
 
 #### HikariCP
@@ -193,10 +193,10 @@ data class Member(
   val name: String?,
   val createdAt: java.time.ZonedDateTime)
 
-val toMember: (Row) -> Member = { row -> 
+val toMember: (Row) -> Member = { row ->
   Member(
-    row.int("id"), 
-    row.stringOrNull("name"), 
+    row.int("id"),
+    row.stringOrNull("name"),
     row.zonedDateTime("created_at")
   )
 }
@@ -235,7 +235,7 @@ parameters pass the name in both maps.
 
 ```kotlin-a
 sqlCall("""call storedProc(:inParam,:inOutParam,:outParam)""",
-	mapOf("inParam" to "Alice", "inOutParam" to "Bob"), 
+	mapOf("inParam" to "Alice", "inOutParam" to "Bob"),
 	mapOf("inOutParam" to "", "outParam" to ""))
 ```
 
@@ -245,7 +245,7 @@ maps:
 ```kotlin-a
 sqlCall("""call storedProc(:inParam,:inOutParam,:outParam)""")
 	.inParams("inParam" to "Alice")
-	.inOutParms("inOutParam" to "Bob") 
+	.inOutParms("inOutParam" to "Bob")
 	.outParams("outParam" to "")
 ```
 
@@ -274,18 +274,18 @@ In the case, the parameter type has to be explicitly stated, there's a wrapper c
 
 ```kotlin-a
 val param = Parameter(param, String::class.java)
-sqlQuery("""select id, name 
-    from members 
-    where ? is null or ? = name""", 
+sqlQuery("""select id, name
+    from members
+    where ? is null or ? = name""",
     param, param)
 ```
 
 or also with the helper function `param`
 
 ```kotlin-a
-sqlQuery("""select id, name 
-    from members 
-    where ? is null or ? = name""", 
+sqlQuery("""select id, name
+    from members
+    where ? is null or ? = name""",
     null.param<String>(), null.param<String>())
 ```
 
@@ -422,7 +422,7 @@ connection's `metaData.identifierQuoteString`.
 
 For IntelliJ Ultimate a Database extension script can be installed which will generate models
 from the context menu of any table in the database tools window. See
-[Installing IntelliJ Ultimate Database Tools Extension Script](#installing-intellij-ultimate-database-tools-extension-scripts)
+[Installing IntelliJ Ultimate Database Tools Extension Script](#installing-database-tools-extension-scripts)
 
 Result set row to model/json/data conversion:
 
@@ -478,7 +478,7 @@ JSON Array results:
         val createdAt: String?,
         val createdAt2: String?
     )
-    
+
     class ValidModel(session: Session? = session(), quote: String? = null) : Model<ValidModel, ValidData>(session, tableName, true, false, quote) {
 
         var processId: Long? by db.key.auto; private set
@@ -497,7 +497,7 @@ JSON Array results:
         override fun toData(): ValidData {
             return ValidData(processId, noSetter, noSetter2, title, version, unknown, createdAt, createdAt2)
         }
-        
+
         companion object {
             const val tableName = "TableName"
         }
@@ -536,7 +536,7 @@ fun useModel() {
         // will only update version since it is the only one changed, does automatic snapshot after update
         model.update()
 
-        // will only update version since it is the only one changed but will reload model from database 
+        // will only update version since it is the only one changed but will reload model from database
         // if updatedAt field is timestamped on update then it will be loaded with a new value
         model.version = "V3.0"
         model.updateReload()
@@ -860,10 +860,10 @@ Commands:
 * update-all - update all: functions, views, procedures, triggers. This runs the scripts
   corresponding to the database object for the requested version.
 
-* update-procedures  
+* update-procedures
   update-procs - update stored procedures
 
-* update-functions  
+* update-functions
   update-funcs - update functions
 
 * update-triggers - update triggers
@@ -900,7 +900,7 @@ db/
 
 (The MIT License)
 
-Copyright (c) 2018 - Vladimir Schneider  
+Copyright (c) 2018 - Vladimir Schneider
 Copyright (c) 2015 - Kazuhiro Sera
 
 [`enumerated-type`]: https://github.com/vsch/enumerated-type

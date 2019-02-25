@@ -1,8 +1,11 @@
-import com.intellij.database.model.DasConstraint
+import com.intellij.database.model.DasColumn
+import com.intellij.database.model.DasObject
 import com.intellij.database.model.DasTable
 import com.intellij.database.model.ObjectKind
 import com.intellij.database.util.Case
 import com.intellij.database.util.DasUtil
+import com.intellij.openapi.util.text.StringUtil
+import com.intellij.psi.codeStyle.NameUtil
 import groovy.json.JsonSlurper
 
 /*
@@ -40,17 +43,34 @@ typeMapping = [
         (~/(?i)/)                   : "String"
 ]
 
-FILES.chooseDirectoryAndSave("Choose directory", "Choose where to store generated files") { dir ->
+FILES.chooseDirectoryAndSave("Choose directory", "Choose where to store generated files") { File dir ->
     // read in possible map of tables to subdirectories
     def tableMap = null
-    def packagePrefix = ""
-    def skipUnmapped = false
-    def mapFile = new File(dir, "../model-config.json")
+    String packagePrefix = ""
+    boolean skipUnmapped = false
+    File exportDir = dir
+    File mapFile = null
+
+    def File tryDir = dir
+    while (tryDir != null && tryDir.exists() && tryDir.isDirectory()) {
+        def File tryMap = new File(tryDir, "model-config.json")
+        if (tryMap.isFile() && tryMap.canRead()) {
+            mapFile = tryMap
+            exportDir = tryDir
+            break
+        }
+
+        if (tryDir.name == "gen") break
+
+        tryDir = tryDir.parentFile
+    }
 
     if (DEBUG) {
-        new File(dir, "../debug.log").withPrintWriter { dbg ->
+        new File(exportDir, "debug.log").withPrintWriter { PrintWriter dbg ->
+            dbg.println("exportDir: ${exportDir.path}, mapFile: ${mapFile}")
+
             if (mapFile.isFile() && mapFile.canRead()) {
-                def jsonSlurper = new JsonSlurper()
+                JsonSlurper jsonSlurper = new JsonSlurper()
                 def reader = new BufferedReader(new InputStreamReader(new FileInputStream(mapFile), "UTF-8"))
                 data = jsonSlurper.parse(reader)
                 if (DEBUG && data != null) {
@@ -68,34 +88,40 @@ FILES.chooseDirectoryAndSave("Choose directory", "Choose where to store generate
                     dbg.println ""
                 }
             }
-            SELECTION.filter { it instanceof DasTable && it.getKind() == ObjectKind.TABLE }.each {
-                generate(dbg, it, dir, tableMap, packagePrefix, skipUnmapped)
+            SELECTION.filter { DasObject it -> it instanceof DasTable && it.getKind() == ObjectKind.TABLE }.each { DasTable it ->
+                generate(dbg, it, exportDir, tableMap, packagePrefix, skipUnmapped)
             }
         }
     } else {
-        def dbg = null
+        PrintWriter dbg = null
+
         if (mapFile.isFile() && mapFile.canRead()) {
-            def jsonSlurper = new JsonSlurper()
-            def reader = new BufferedReader(new InputStreamReader(new FileInputStream(mapFile), "UTF-8"))
+            JsonSlurper jsonSlurper = new JsonSlurper()
+            BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(mapFile), "UTF-8"))
             data = jsonSlurper.parse(reader)
+            skipUnmapped = data["skip-unmapped"] ?: false
         }
-        SELECTION.filter { it instanceof DasTable && it.getKind() == ObjectKind.TABLE }.each {
-            generate(dbg, it, dir, tableMap, packagePrefix)
+
+        SELECTION.filter { DasObject it -> it instanceof DasTable && it.getKind() == ObjectKind.TABLE }.each { DasTable it ->
+            generate(dbg, it, exportDir, tableMap, packagePrefix, skipUnmapped)
         }
     }
 }
 
-def generate(PrintWriter dbg, DasTable table, File dir, Map<String, String> tableMap, String packagePrefix, boolean skipUnmapped) {
+void generate(PrintWriter dbg, DasTable table, File dir, tableMap, String packagePrefix, boolean skipUnmapped) {
     String className = snakeCaseTables ? javaName(singularize(table.getName()), true) : singularize(table.getName())
+    dbg.println("className: ${className}, tableName: ${table.getName()}, singular: ${singularize(table.getName())}")
+
     def fields = calcFields(table)
-    def fileName = className + "${classFileNameSuffix}.kt"
+    String fileName = className + "${classFileNameSuffix}.kt"
+
     def mappedFile = tableMap != null ? tableMap[fileName] : null
     if (dbg != null) dbg.println "fileName ${fileName} mappedFile ${mappedFile}"
 
     def file
     String inPackage
     if (mappedFile != null && !mappedFile.trim().isEmpty()) {
-        file = new File(dir.parentFile, mappedFile);
+        file = new File(dir, mappedFile);
         inPackage = packagePrefix + new File(mappedFile).parent.replace("/", ".")
     } else {
         file = new File(dir, fileName)
@@ -104,10 +130,10 @@ def generate(PrintWriter dbg, DasTable table, File dir, Map<String, String> tabl
         if (skipUnmapped || mappedFile != null) return
     }
 
-    file.withPrintWriter { out -> generateModel(dbg, out, (String)table.getName(), className, fields, inPackage) }
+    file.withPrintWriter { out -> generateModel(dbg, out, (String) table.getName(), className, fields, inPackage) }
 }
 
-def generateModel(PrintWriter dbg, PrintWriter out, String tableName, String className, fields, String packageName) {
+void generateModel(PrintWriter dbg, PrintWriter out, String tableName, String className, def fields, String packageName) {
     def dbCase = true
     def keyCount = 0
     def nonKeyCount = 0
@@ -218,9 +244,8 @@ def generateModel(PrintWriter dbg, PrintWriter out, String tableName, String cla
 }
 
 def calcFields(table) {
-    def constraints = ((DasTable) table).getDbChildren(DasConstraint.class, ObjectKind.CHECK);
     def colIndex = 0
-    DasUtil.getColumns(((DasTable) table)).reduce([]) { fields, col ->
+    DasUtil.getColumns(table).reduce([]) { def fields, DasColumn col ->
         def spec = Case.LOWER.apply(col.getDataType().getSpecification())
         def typeStr = (String) typeMapping.find { p, t -> p.matcher(spec).find() }.value
         def colName = (String) col.getName()
@@ -248,25 +273,26 @@ def calcFields(table) {
                            key     : DasUtil.isPrimary(col),
                            auto    : DasUtil.isAutoGenerated(col) || forceAuto.matcher(colName),
                            annos   : ""]]
+        fields
     }
 }
 
-def singularize(String str) {
-    def s = com.intellij.psi.codeStyle.NameUtil.splitNameIntoWords(str).collect { it }
-    def singleLast = com.intellij.openapi.util.text.StringUtil.unpluralize(s[-1])
-    return str.substring(0, str.length() - s[-1].length()) + singleLast
+static String singularize(String str) {
+    String[] s = NameUtil.splitNameIntoWords(str).collect { it }
+    String lastSingular = StringUtil.unpluralize(s[-1])
+    return str.substring(0, str.length() - s[-1].length()) + lastSingular
 }
 
-def pluralize(String str) {
-    def s = com.intellij.psi.codeStyle.NameUtil.splitNameIntoWords(str).collect { it }
-    def pluralLast = com.intellij.openapi.util.text.StringUtil.pluralize(s[-1])
-    return str.substring(0, str.length() - s[-1].length()) + pluralLast
+static String pluralize(String str) {
+    String[] s = NameUtil.splitNameIntoWords(str).collect { it }
+    String lastPlural = StringUtil.pluralize(s[-1])
+    return str.substring(0, str.length() - s[-1].length()) + lastPlural
 }
 
-def javaName(str, capitalize) {
-    def s = com.intellij.psi.codeStyle.NameUtil.splitNameIntoWords(str)
+static String javaName(String str, boolean capitalize) {
+    String s = NameUtil.splitNameIntoWords(str)
             .collect { Case.LOWER.apply(it).capitalize() }
             .join("")
             .replaceAll(/[^\p{javaJavaIdentifierPart}[_]]/, "_")
-    capitalize || s.length() == 1 ? s : Case.LOWER.apply(s[0]) + s[1..-1]
+    (capitalize || s.length() == 1) ? s : Case.LOWER.apply(s[0]) + s[1..-1]
 }

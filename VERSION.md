@@ -217,7 +217,7 @@ To expand to `SELECT * FROM Table WHERE column in (?,?,?)` with parameters of `1
   table data. See:
 * Add: IntelliJ Ultimate Database Tools data extraction script to generate Kotlin enum from
   table data. See:
-  [Installing IntelliJ Ultimate Database Tools Extension Scripts](README.md#installing-intellij-ultimate-database-tools-extension-scripts)
+  [Installing IntelliJ Ultimate Database Tools Extension Scripts](README.md#installing-database-tools-extension-scripts)
 * Fix: table validation for out of order lines to ignore trailing , otherwise the last line out
   of order does not match.
 * Fix: init command when run on a database without `migrations` table will use db versions table
