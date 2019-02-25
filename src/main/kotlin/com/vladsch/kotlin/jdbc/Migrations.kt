@@ -1109,8 +1109,12 @@ LIMIT 1
 
                             val minEvolution: Int = minEvoText.toIntOrNull()
                                     ?: throw IllegalArgumentException("MinEvolution argument must be an integer")
-                            val maxEvolution: Int? = if (maxEvoText == null) null else maxEvoText.toIntOrNull()
-                                    ?: throw IllegalArgumentException("MaxEvolution argument, if provided, must be an integer")
+
+                            val maxEvolution: Int? = if (maxEvoText == null) null else {
+                                val maxEvo = maxEvoText.toIntOrNull()
+                                if (maxEvo == null) i--
+                                maxEvo
+                            }
 
                             if (dbVersion != null) {
                                 importEvolutions(pathDir, dbVersion!!, minEvolution, maxEvolution, dbPath)
