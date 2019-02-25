@@ -10,8 +10,9 @@ import java.sql.SQLException
 class Migrations(val session: Session, val migrationSession: Session, val dbEntityExtractor: DbEntityExtractor, val resourceClass: Class<*>) {
 
     companion object {
-        private val logger = LoggerFactory.getLogger(Migrations::class.java)!!
+        private val LOG = LoggerFactory.getLogger(Migrations::class.java)!!
         val MIGRATIONS_FILE_NAME = DbEntity.TABLE.addSuffix("migrations")
+        val CLEAN_COMMENT = "(?<=^|\n)#".toRegex()
     }
 
     var quiet = false
@@ -145,7 +146,7 @@ class Migrations(val session: Session, val migrationSession: Session, val dbEnti
                 out.append("----------------------------------------------------------------------------------------------\n")
             }
 
-            logger.error(out.toString())
+            LOG.error(out.toString())
             errorAppendable?.append(out)
         }
     }
@@ -162,13 +163,13 @@ class Migrations(val session: Session, val migrationSession: Session, val dbEnti
                 val tableName = entity.extractEntityName(dbEntityExtractor, tableSql)
                 if (tableName == null) {
                     val s = "Invalid SQL ${entity.displayName} file ${tableFile.path}, cannot find ${entity.displayName} name"
-                    logger.error(s)
+                    LOG.error(s)
                     errorAppendable?.appendln(s)
                     logTableDetails(entity.displayName, errorAppendable, tableSql, null)
                     validationPassed = false
                 } else if (tableName + entity.fileSuffix != tableFile.name) {
                     val s = "File ${tableFile.path} for ${entity.displayName} $tableName should be named $tableName${entity.fileSuffix}"
-                    logger.error(s)
+                    LOG.error(s)
                     errorAppendable?.appendln(s)
                     logTableDetails(entity.displayName, errorAppendable, tableSql, null)
                     validationPassed = false
@@ -185,13 +186,13 @@ class Migrations(val session: Session, val migrationSession: Session, val dbEnti
                     val tableName = entity.extractEntityName(dbEntityExtractor, tableSql)
                     if (tableName == null) {
                         val s = "Invalid SQL ${entity.displayName} file ${tableFile.path}, cannot find ${entity.displayName} name"
-                        logger.error(s)
+                        LOG.error(s)
                         errorAppendable?.appendln(s)
                         logTableDetails(entity.displayName, errorAppendable, tableSql, null)
                         validationPassed = false
                     } else if (tableName + entity.fileSuffix != tableFile.name) {
                         val s = "File ${tableFile.path} for ${entity.displayName} $tableName should be named $tableName${entity.fileSuffix}"
-                        logger.error(s)
+                        LOG.error(s)
                         errorAppendable?.appendln(s)
                         logTableDetails(entity.displayName, errorAppendable, tableSql, null)
                         validationPassed = false
@@ -203,9 +204,9 @@ class Migrations(val session: Session, val migrationSession: Session, val dbEnti
                                 if (validationPassed) {
                                     //                                    val tmp = 0
                                 }
-                                if (verbose) logger.error(s)
+                                if (verbose) LOG.error(s)
                                 if (errorAppendable != null) {
-                                    if (!verbose) logger.error(s)
+                                    if (!verbose) LOG.error(s)
                                     errorAppendable.appendln(s)
                                 }
                                 logTableDetails(entity.displayName, errorAppendable, tableSql, tableScript)
@@ -215,9 +216,9 @@ class Migrations(val session: Session, val migrationSession: Session, val dbEnti
                     }
                 } else {
                     val s = "Table validation failed for ${tableFile.path}, resource is missing"
-                    if (verbose) logger.error(s)
+                    if (verbose) LOG.error(s)
                     if (errorAppendable != null) {
-                        if (!verbose) logger.error(s)
+                        if (!verbose) LOG.error(s)
                         errorAppendable.appendln(s)
                     }
                     logTableDetails(entity.displayName, errorAppendable, null, tableScript)
@@ -231,9 +232,9 @@ class Migrations(val session: Session, val migrationSession: Session, val dbEnti
                 if (tableFile.name != MIGRATIONS_FILE_NAME) {
                     if (!tableSet.contains(tableFile.path)) {
                         val s = "Table validation failed for ${tableFile.path}, no database table for resource"
-                        if (verbose) logger.error(s)
+                        if (verbose) LOG.error(s)
                         if (errorAppendable != null) {
-                            if (!verbose) logger.error(s)
+                            if (!verbose) LOG.error(s)
                             errorAppendable.appendln(s)
                         }
                         validationPassed = false
@@ -271,7 +272,7 @@ class Migrations(val session: Session, val migrationSession: Session, val dbEnti
                 val entitySqlContents = entityEntry.entitySql
 
                 val query = sqlQuery(entitySqlContents)
-                logger.info("$opType $entityRealName from $entityFile")
+                LOG.info("$opType $entityRealName from $entityFile")
                 migration.invokeWith { session ->
                     migration.insertMigrationAfter(entityFile, entitySqlContents) {
                         if (dropEntityIfExists != null) {
@@ -294,7 +295,7 @@ class Migrations(val session: Session, val migrationSession: Session, val dbEnti
         dbEntities.forEach { dbEntityName ->
             if (!entities.containsKey(dbEntityName.toLowerCase())) {
                 val dropEntitySql = dbEntityExtractor.getDropEntitySql(entity, dbEntityName)
-                logger.info("Dropping ${entity.displayName} $dbEntityName")
+                LOG.info("Dropping ${entity.displayName} $dbEntityName")
                 session.execute(sqlQuery(dropEntitySql))
             }
         }
@@ -365,9 +366,9 @@ LIMIT 1
                 }
 
                 if (latestMatchedVersion != null) {
-                    logger.info("Matched version $latestMatchedVersion based on table schema")
+                    LOG.info("Matched version $latestMatchedVersion based on table schema")
                 } else {
-                    logger.info("No version matched based on table schema, setting version to V0_0_0")
+                    LOG.info("No version matched based on table schema, setting version to V0_0_0")
                 }
             }
 
@@ -384,7 +385,7 @@ LIMIT 1
             if (tableEntities.contains("migrations")) {
                 // run the file found for the version
                 val tableEntry = tableEntities["migrations"]!!
-                logger.info("Creating migrations table from ${dbTableResourceDir.path}/${tableEntry.entityResourcePath}")
+                LOG.info("Creating migrations table from ${dbTableResourceDir.path}/${tableEntry.entityResourcePath}")
 
                 scriptName = tableEntry.entityResourcePath
                 scriptSql = tableEntry.entitySql
@@ -423,7 +424,7 @@ LIMIT 1
 
         val versionCompare = currentVersion.versionCompare(migration.version)
         if (versionCompare > 0) {
-            logger.info("Migrate: requested version ${migration.version} is less than current version $currentVersion, use rollback instead")
+            LOG.info("Migrate: requested version ${migration.version} is less than current version $currentVersion, use rollback instead")
             return
         } else if (versionCompare <= 0) {
             // need to run all up migrations from current version which have not been run
@@ -440,13 +441,13 @@ LIMIT 1
                         // apply the migration
                         val sqlScript = getResourceAsString(resourceClass, entityScript.entityResourcePath)
                         currentMigration.insertUpMigrationAfter(entityScript.entityResourcePath, sqlScript) {
-                            logger.info("Migrate ${entityScript.entityResourcePath}")
+                            LOG.info("Migrate ${entityScript.entityResourcePath}")
                             runBatchScript(entity, currentMigration, migrationScriptPath, appliedMigrations, sqlScript, entityScript)
                         }
                     }
                 }
             } else {
-                logger.debug("Migrate: no migrations in current version $currentVersion")
+                LOG.debug("Migrate: no migrations in current version $currentVersion")
             }
 
             if (versionCompare < 0) {
@@ -468,12 +469,12 @@ LIMIT 1
                             val appliedMigrations = versionMigration.getVersionBatchesNameMap()
                             val sqlScript = getResourceAsString(resourceClass, entityScript.entityResourcePath)
                             versionMigration.insertUpMigrationAfter(entityScript.entityResourcePath, sqlScript) {
-                                logger.info("Migrate ${entityScript.entityResourcePath}")
+                                LOG.info("Migrate ${entityScript.entityResourcePath}")
                                 runBatchScript(entity, versionMigration, entityScript.entityResourcePath, appliedMigrations, sqlScript, entityScript)
                             }
                         }
                     } else {
-                        logger.debug("Migrate: no up migrations in version $version")
+                        LOG.debug("Migrate: no up migrations in version $version")
                     }
                 }
             }
@@ -519,11 +520,11 @@ LIMIT 1
                 if (opType == DbEntity.MIGRATION) {
                     if (appliedMigrations == null || !appliedMigrations.containsKey(migrationPartName)) {
                         migration.insertUpMigrationAfter(migrationPartName, sql) {
-                            logger.info("Migrate ${entityData.entityResourcePath} part [$index:$startLine-${line - 1}]")
+                            LOG.info("Migrate ${entityData.entityResourcePath} part [$index:$startLine-${line - 1}]")
                             try {
                                 session.execute(query)
                             } catch (e: SQLException) {
-                                logger.error("SQLException: ${e.message} on SQL:\n$sql\n")
+                                LOG.error("SQLException: ${e.message} on SQL:\n$sql\n")
                                 throw e
                             }
                         }
@@ -531,7 +532,7 @@ LIMIT 1
                 } else {
                     if (appliedMigrations == null || appliedMigrations.containsKey(migrationPartName)) {
                         migration.insertDownMigrationAfter(migrationPartName, sql) {
-                            logger.info("Rollback ${entityData.entityResourcePath} part [$index:$startLine-${line - 1}]")
+                            LOG.info("Rollback ${entityData.entityResourcePath} part [$index:$startLine-${line - 1}]")
                             session.execute(query)
                         }
                     }
@@ -549,11 +550,11 @@ LIMIT 1
         val currentVersion = getCurrentVersion()
         if (currentVersion == null) {
             // no current version nothing to rollback
-            logger.info("Rollback: nothing to rollback")
+            LOG.info("Rollback: nothing to rollback")
         } else {
             val versionCompare = currentVersion.versionCompare(migration.version)
             if (versionCompare < 0) {
-                logger.info("Rollback: requested version ${migration.version} is greater than current version $currentVersion, use migrate instead")
+                LOG.info("Rollback: requested version ${migration.version} is greater than current version $currentVersion, use migrate instead")
                 return
             } else if (versionCompare >= 0) {
                 // need to run all down migrations from current version for all up migrations that were run
@@ -573,13 +574,13 @@ LIMIT 1
                             // apply the down migration
                             val sqlScript = getResourceAsString(resourceClass, entityScript.entityResourcePath)
                             currentMigration.insertDownMigrationAfter(entityScript.entityResourcePath, sqlScript) {
-                                logger.info("Rollback ${entityScript.entityResourcePath}")
+                                LOG.info("Rollback ${entityScript.entityResourcePath}")
                                 runBatchScript(entity, currentMigration, entityScript.entityResourcePath, null, sqlScript, entityScript)
                             }
                         }
                     }
                 } else {
-                    logger.debug("Rollback: no down migrations in current version $currentVersion")
+                    LOG.debug("Rollback: no down migrations in current version $currentVersion")
                 }
 
                 if (versionCompare > 0) {
@@ -603,12 +604,12 @@ LIMIT 1
                                 val migrationScriptPath = entityScript.entityResourcePath
                                 val sqlScript = getResourceAsString(resourceClass, entityScript.entityResourcePath)
                                 versionMigration.insertDownMigrationAfter(entityScript.entityResourcePath, sqlScript) {
-                                    logger.info("Rollback ${entityScript.entityResourcePath}")
+                                    LOG.info("Rollback ${entityScript.entityResourcePath}")
                                     runBatchScript(entity, versionMigration, migrationScriptPath, null, sqlScript, entityScript)
                                 }
                             }
                         } else {
-                            logger.debug("Rollback: no down migrations in version $version")
+                            LOG.debug("Rollback: no down migrations in version $version")
                         }
                     }
                 }
@@ -636,7 +637,7 @@ LIMIT 1
                     prevMigration.insertMigrationAfter("<rollback>", "") {}
                 } else {
                     // no previous version to roll back to for table or proc info
-                    logger.debug("Rollback: rolled back to start of history at pre-migrations for ${migration.version}")
+                    LOG.debug("Rollback: rolled back to start of history at pre-migrations for ${migration.version}")
                     migration.insertMigrationAfter("<rollback>", "# start of history") {}
                 }
             } else {
@@ -798,44 +799,33 @@ LIMIT 1
     fun newEvolution(evolutionsDir: File, dbVersion: String) {
         evolutionsDir.ensureExistingDirectory("evolutions path")
 
-        logger.info("Generated new play evolution in ${evolutionsDir.path}")
+        LOG.info("Generated new play evolution in ${evolutionsDir.path}")
 
         val sb = StringBuilder()
+
         val versionMigrations = DbEntity.MIGRATION.getEntityResourceScripts(resourceClass, dbEntityExtractor, dbVersion)
-                .values.toList()
-                .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
-
-        val cleanComment = "(?<=^|\n)#".toRegex()
-
-        if (!versionMigrations.isEmpty()) {
-            sb.appendln("# --- !Ups")
-            versionMigrations.forEach { entityScript ->
-                // apply the migration
-                val sqlScript = getResourceAsString(resourceClass, entityScript.entityResourcePath)
-                logger.info("Adding to !Ups ${entityScript.entityResourcePath}")
-                sb.append("-- ").appendln(entityScript.entityResourcePath)
-                sb.appendln(sqlScript.replace(cleanComment, "-- "))
-            }
-        } else {
-            logger.info("Migrate: no up migrations in version $dbVersion")
-        }
+                .values
 
         val versionRollbacks = DbEntity.ROLLBACK.getEntityResourceScripts(resourceClass, dbEntityExtractor, dbVersion)
-                .values.toList()
-                .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
-                .reversed()
+                .values
 
-        if (!versionRollbacks.isEmpty()) {
-            sb.appendln("# --- !Downs")
-            versionRollbacks.forEach { entityScript ->
-                // apply the migration
-                val sqlScript = getResourceAsString(resourceClass, entityScript.entityResourcePath)
-                logger.info("Adding to !Downs ${entityScript.entityResourcePath}")
-                sb.append("-- ").appendln(entityScript.entityResourcePath)
-                sb.appendln(sqlScript.replace(cleanComment, "-- "))
+        val migrationsMap = versionMigrations.map { it -> it.entityResourceName.replace("up.sql$".toRegex(), "") to it }.toMap()
+        val rollbacksMap = versionRollbacks.map { it -> it.entityResourceName.replace("down.sql$".toRegex(), "") to it }.toMap()
+
+        val entityNames = HashSet<String>()
+        entityNames.addAll(migrationsMap.keys)
+        entityNames.addAll(rollbacksMap.keys)
+
+        val entityNameList = entityNames.toList()
+                .sortedWith(DbEntity.MIGRATIONS_NAME_COMPARATOR)
+
+        entityNameList.forEach { entityName ->
+            migrationsMap[entityName]?.let { it ->
+                appendEntityScript(sb, it, "# --- !Ups")
             }
-        } else {
-            logger.info("Migrate: no down migrations in version $dbVersion")
+            rollbacksMap[entityName]?.let { it ->
+                appendEntityScript(sb, it, "# --- !Downs")
+            }
         }
 
         if (!sb.isEmpty()) {
@@ -853,16 +843,24 @@ LIMIT 1
 
             val evolutionFile = evolutionsDir + "$lastMigration.sql"
             evolutionFile.writeText(sb.toString())
-            logger.info("Generated new play evolution $lastMigration.sql in ${evolutionsDir.path}")
+            LOG.info("Generated new play evolution $lastMigration.sql in ${evolutionsDir.path}")
         } else {
-            logger.info("No migrations in $dbVersion for generating play evolution")
+            LOG.info("No migrations in $dbVersion for generating play evolution")
         }
+    }
+
+    private fun appendEntityScript(sb: StringBuilder, it: DbEntity.EntityData, commentPrefix: String): StringBuilder {
+        sb.appendln(commentPrefix)
+        val sqlScript = getResourceAsString(resourceClass, it.entityResourcePath)
+        LOG.info("Adding to !Ups ${it.entityResourcePath}")
+        sb.append("-- ").appendln(it.entityResourcePath)
+        return sb.appendln(sqlScript.replace(CLEAN_COMMENT, "-- "))
     }
 
     fun importEvolutions(evolutionsDir: File, dbVersion: String, minEvolution: Int, maxEvolution: Int?, dbPath: File) {
         evolutionsDir.ensureExistingDirectory("evolutions path")
 
-        logger.info("Import play evolutions in ${evolutionsDir.path}, from [$minEvolution, ${maxEvolution ?: ""}]")
+        LOG.info("Import play evolutions in ${evolutionsDir.path}, from [$minEvolution, ${maxEvolution ?: ""}]")
 
         val files = ArrayList<File>()
         val useMaxEvolution = maxEvolution ?: Int.MAX_VALUE
@@ -871,61 +869,88 @@ LIMIT 1
                 val evolutionNumber = it.nameWithoutExtension.toIntOrNull()
                 if (evolutionNumber != null) {
                     if (evolutionNumber in minEvolution..useMaxEvolution) {
-                        logger.info("Adding evolution file $it")
+                        LOG.info("Adding evolution file $it")
                         files.add(it)
                     }
                 }
             }
         }
 
-        files.sortBy { it.name.toInt() }
+        files.sortBy { it.nameWithoutExtension.toInt() }
 
-        files.forEach {
-            val lines = getFileContent(it).split("\n")
-            val (migrationFile, rollbackFile) = newEntityFile(DbEntity.MIGRATION, dbPath, dbVersion, "evolution.${it.nameWithoutExtension}")
+        files.forEach { file ->
+            val lines = getFileContent(file).split("\n")
 
             // find the "# --- !Ups" and "# --- !Downs"
+            val commonPrefix = StringBuilder()
             val ups = StringBuilder()
             val downs = StringBuilder()
 
             var sawUps = false
             var sawDowns = false
+            var part = 1
 
-            lines.forEach {
+            lines.forEach { line ->
                 val UPS = "# --- !Ups"
                 val DOWNS = "# --- !Downs"
-                val trimmed = it.trim()
+                val trimmed = line.trim()
                 when {
                     trimmed == UPS -> {
-                        if (sawUps) throw IllegalArgumentException("!Ups appears more than once in an evolution file")
+                        if (sawDowns || sawUps) {
+                            // one part is done
+                            generateMigration(dbPath, dbVersion, file, part, ups, downs, true)
+                            sawUps = false
+                            sawDowns = false
+                            part++
+                        }
+
+                        // copy common prefix to both
+                        ups.append(commonPrefix)
+                        downs.append(commonPrefix)
+                        commonPrefix.clear()
+
                         sawUps = true
-                        ups.append(it).append("\n")
+                        sawDowns = false
+                        ups.append(line).append("\n")
                     }
 
                     trimmed == DOWNS -> {
-                        if (sawDowns) throw IllegalArgumentException("!Ups appears more than once in an evolution file")
+                        downs.append(commonPrefix)
+                        commonPrefix.clear()
                         sawDowns = true
-                        downs.append(it).append("\n")
+                        downs.append(line).append("\n")
                     }
 
                     else -> {
                         if (!sawUps && !sawDowns) {
-                            ups.append(it).append("\n")
-                            downs.append(it).append("\n")
-                        } else if (sawUps) {
-                            ups.append(it).append("\n")
+                            commonPrefix.append(line).append("\n")
+                        } else if (sawUps && !sawDowns) {
+                            ups.append(line).append("\n")
                         } else {
-                            downs.append(it).append("\n")
+                            if (trimmed.isEmpty() || trimmed.startsWith("# ") || trimmed.startsWith("// ")) {
+                                commonPrefix.append(line).append("\n")
+                            } else {
+                                downs.append(commonPrefix)
+                                commonPrefix.clear()
+                                downs.append(line).append("\n")
+                            }
                         }
                     }
                 }
             }
 
-            migrationFile.appendText(ups.toString(), Charset.forName("UTF-8"))
-            rollbackFile.appendText(downs.toString(), Charset.forName("UTF-8"))
-
-            logger.info("Generated migration ${migrationFile.name} and rollback ${rollbackFile.name} for evolution ${it.nameWithoutExtension}")
+            generateMigration(dbPath, dbVersion, file, part, ups, downs, false)
         }
+    }
+
+    private fun generateMigration(dbPath: File, dbVersion: String, file: File, part: Int, ups: StringBuilder, downs: StringBuilder, moreParts: Boolean) {
+        val partText = if (part > 1 || moreParts) ".$part" else ""
+        val (migrationFile, rollbackFile) = newEntityFile(DbEntity.MIGRATION, dbPath, dbVersion, "evolution.${file.nameWithoutExtension}$partText")
+        migrationFile.appendText(ups.toString(), Charset.forName("UTF-8"))
+        rollbackFile.appendText(downs.toString(), Charset.forName("UTF-8"))
+        LOG.info("Generated migration ${migrationFile.name} and rollback ${rollbackFile.name} for evolution ${file.nameWithoutExtension}$partText")
+        ups.clear()
+        downs.clear()
     }
 
     /**

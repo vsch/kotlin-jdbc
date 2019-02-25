@@ -163,6 +163,21 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
         }
     }
 
+    object MIGRATIONS_NAME_COMPARATOR : Comparator<String> {
+        override fun compare(o1: String?, o2: String?): Int {
+            val (num1, name1) = o1.extractLeadingDigits()
+            val (num2, name2) = o2.extractLeadingDigits()
+
+            return if (num1 != null && num2 != null) {
+                val nums = num1.compareTo(num2)
+                if (nums == 0) name1.compareTo(name2)
+                else nums
+            } else {
+                name1.compareTo(name2)
+            }
+        }
+    }
+
     fun extractEntityName(dbEntityExtractor: DbEntityExtractor, entitySql: String):String? {
         val entityNameRegEx = dbEntityExtractor.getExtractEntityNameRegEx(this) ?: return null
         return extractEntityName(entityNameRegEx, entitySql)
