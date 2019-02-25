@@ -40,7 +40,8 @@ or the table name to have it added to the column references. An empty table alia
 to the table name will only be used for column references.
 
 [`Generate Kotlin-Model.groovy`] has been updated to generate the new model format from tables
-in the database.
+in the database and optionally use a `model-config.json` to provide table to generated model
+file. See:
 
 ## Overview
 
@@ -586,35 +587,45 @@ introspection instead of JDBC in connection configuration.
 
 ![Scripted Extensions Generate Kotlin Model](assets/images/Scripted_Extensions_Generate_Kotlin-Model.png)
 
-If the a file `../model-config.json` file exists relative to the output directory then it will
-be used for determining the model output location and package.
+If the a file `model-config.json` file exists in output directory or its along the parent path
+then it will be used for determining the models actual output file and package.
 
 For example:
 
 ```json
 {
   "package-prefix" : "",
+  "remove-prefix" : "gen/main/kotlin/",
   "skip-unmapped" : false,
   "file-map": {
     "play_evolutionModel.kt": "",
     "migrationModel.kt": "",
 
-    "AuditLogModel.kt": "app/audit/models/AuditLogModel.kt"
+    "ProcessInstanceModel.kt": "gen/main/kotlin/com/vladsch/kotlin/models/process/ProcessInstanceModel.kt",
+    "ProcessModel.kt": "gen/main/kotlin/com/vladsch/kotlin/models/process/ProcessModel.kt",
+
+    "": "gen/main/kotlin/com/vladsch/kotlin/models/"
   }
 }
 ```
 
+* `remove-prefix` if present and matches the mapped file name prefix, will be removed from the
+  mapped file before prefixing with `package-prefix`
 * `package-prefix` if present will be prefixed to the generated package name
 * `skip-unmapped`, if `true`, any model names not present in the mapped will not be generated,
-  if `false` the models will be generated to the output directory.
+  if `false` the models will be generated to the output directory. Ignored if empty file name
+  mapping exists.
 * `file-map`, map of model name to file path relative to `model-config.json` file location.
+  * an empty name entry will match any file not explicitly matched by other entries and allows
+    directing unmapped entries to a default location.
 
-:information_source: the easiest way to generate the file-map is first generate models without
-the file map. Move them to the desired sub-directories and then use the IDE `Copy Relative Path`
-context menu action and multi-caret editing or or a script to generate the mapping from existing
-directory structure and content. If any tables are added in the future they will automatically
-generate in the root and can be moved to the desired sub-directory and mapping added to the
-file-map.
+
+:information_source: the easiest way to generate the file-map is first generate models with
+default mapping the file map. Move them to the desired sub-directories and then use the IDE
+`Copy Relative Path` context menu action and multi-caret editing or or a script to generate the
+mapping from existing directory structure and content. If any tables are added in the future
+they will automatically generate in the root and can be moved to the desired sub-directory and
+mapping added to the file-map.
 
 Will not generate models for tables `play_evolutions` and `migrations`, will output `AuditLogs`
 table model to `app/audit/models/` subdirectory with package set to `app.audit.models`
@@ -623,13 +634,14 @@ All other tables, if selected will be generated to the output directory with pac
 `com.sample`
 
 The intended use case is to have a generated models directory with the configuration file and
-all generated models in some sub-directory. When generating models, always select the same
-sub-directory, whose parent directory contains the `model-config.json` file.
+all generated models in the project directory. When generating models, select any sub-directory
+of the project and the files will be generated in the correct location, especially if default
+file location mapping was provided.
 
 If you need to modify the models after they are generated, it is best to copy the auto-generated
-models to another directory where to make the modifications. Subsequent auto-generated models
-should still be generated into the same directory and auto-generated and manual model changes
-should be merged using the compare directory or file action of the IDE.
+models to another directory as the source used in the project. Subsequent auto-generated models
+should still be generated into the same directory and compared and/or merged into manually
+changed model using the compare directory/file action of the IDE.
 
 ##### Generate Scala Slick Models from Tables
 

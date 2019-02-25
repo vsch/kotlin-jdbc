@@ -47,6 +47,7 @@ FILES.chooseDirectoryAndSave("Choose directory", "Choose where to store generate
     // read in possible map of tables to subdirectories
     def tableMap = null
     String packagePrefix = ""
+    String removePrefix = ""
     boolean skipUnmapped = false
     File exportDir = dir
     File mapFile = null
@@ -75,6 +76,7 @@ FILES.chooseDirectoryAndSave("Choose directory", "Choose where to store generate
                 data = jsonSlurper.parse(reader)
                 if (DEBUG && data != null) {
                     packagePrefix = data["package-prefix"] ?: ""
+                    removePrefix = data["remove-prefix"] ?: ""
                     skipUnmapped = data["skip-unmapped"] ?: false
                     tableMap = data["file-map"]
 
@@ -89,7 +91,7 @@ FILES.chooseDirectoryAndSave("Choose directory", "Choose where to store generate
                 }
             }
             SELECTION.filter { DasObject it -> it instanceof DasTable && it.getKind() == ObjectKind.TABLE }.each { DasTable it ->
-                generate(dbg, it, exportDir, tableMap, packagePrefix, skipUnmapped)
+                generate(dbg, it, exportDir, tableMap, packagePrefix, removePrefix, skipUnmapped)
             }
         }
     } else {
@@ -99,30 +101,34 @@ FILES.chooseDirectoryAndSave("Choose directory", "Choose where to store generate
             JsonSlurper jsonSlurper = new JsonSlurper()
             BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(mapFile), "UTF-8"))
             data = jsonSlurper.parse(reader)
+            packagePrefix = data["package-prefix"] ?: ""
+            removePrefix = data["remove-prefix"] ?: ""
             skipUnmapped = data["skip-unmapped"] ?: false
+            tableMap = data["file-map"]
         }
 
         SELECTION.filter { DasObject it -> it instanceof DasTable && it.getKind() == ObjectKind.TABLE }.each { DasTable it ->
-            generate(dbg, it, exportDir, tableMap, packagePrefix, skipUnmapped)
+            generate(dbg, it, exportDir, tableMap, packagePrefix, removePrefix, skipUnmapped)
         }
     }
 }
 
-void generate(PrintWriter dbg, DasTable table, File dir, tableMap, String packagePrefix, boolean skipUnmapped) {
+void generate(PrintWriter dbg, DasTable table, File dir, tableMap, String packagePrefix, String removePrefix, boolean skipUnmapped) {
     String className = snakeCaseTables ? javaName(singularize(table.getName()), true) : singularize(table.getName())
     dbg.println("className: ${className}, tableName: ${table.getName()}, singular: ${singularize(table.getName())}")
 
     def fields = calcFields(table)
     String fileName = className + "${classFileNameSuffix}.kt"
 
-    def mappedFile = tableMap != null ? tableMap[fileName] : null
+    def mappedFile = tableMap != null ? tableMap[fileName] ?: (tableMap[""] != null ? tableMap[""] + fileName : null) : null
     if (dbg != null) dbg.println "fileName ${fileName} mappedFile ${mappedFile}"
 
     def file
     String inPackage
     if (mappedFile != null && !mappedFile.trim().isEmpty()) {
         file = new File(dir, mappedFile);
-        inPackage = packagePrefix + new File(mappedFile).parent.replace("/", ".")
+        String unprefixed = removePrefix == "" || !mappedFile.startsWith(removePrefix) ? mappedFile : mappedFile.substring(removePrefix.length())
+        inPackage = packagePrefix + new File(unprefixed).parent.replace("/", ".")
     } else {
         file = new File(dir, fileName)
         inPackage = packageName

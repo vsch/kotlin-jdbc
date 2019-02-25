@@ -3,6 +3,7 @@ package com.vladsch.kotlin.jdbc
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.FileWriter
+import java.nio.charset.Charset
 import java.sql.SQLException
 
 @Suppress("MemberVisibilityCanBePrivate")
@@ -200,7 +201,7 @@ class Migrations(val session: Session, val migrationSession: Session, val dbEnti
                             if (!equalWithOutOfOrderLines(tableSql, tableScript)) {
                                 val s = "Table validation failed for ${tableFile.path}, database and resource differ"
                                 if (validationPassed) {
-//                                    val tmp = 0
+                                    //                                    val tmp = 0
                                 }
                                 if (verbose) logger.error(s)
                                 if (errorAppendable != null) {
@@ -355,7 +356,7 @@ LIMIT 1
 
             if (dbVersion == null) {
                 val versionList = getVersions()
-                    .sortedWith(Comparator(String::versionCompare))
+                        .sortedWith(Comparator(String::versionCompare))
 
                 versionList.forEach { it ->
                     if (validateTableResourceFiles(it, null)) {
@@ -451,13 +452,13 @@ LIMIT 1
             if (versionCompare < 0) {
                 // need to run all migrations from later versions up to requested version
                 val versionList = getVersions()
-                    .filter { it.versionCompare(currentVersion) > 0 && (it.versionCompare(migration.version) <= 0) }
-                    .sortedWith(Comparator(String::versionCompare))
+                        .filter { it.versionCompare(currentVersion) > 0 && (it.versionCompare(migration.version) <= 0) }
+                        .sortedWith(Comparator(String::versionCompare))
 
                 versionList.forEach { version ->
                     val versionMigrations = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, version)
-                        .values.toList()
-                        .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
+                            .values.toList()
+                            .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
 
                     val versionMigration = migration.withVersion(version)
 
@@ -497,12 +498,12 @@ LIMIT 1
     }
 
     private fun runBatchScript(
-        opType: DbEntity,
-        migration: MigrationSession,
-        migrationScriptPath: String,
-        appliedMigrations: Map<String, MigrationSession.Migration>?,
-        sqlScript: String,
-        entityData: DbEntity.EntityData
+            opType: DbEntity,
+            migration: MigrationSession,
+            migrationScriptPath: String,
+            appliedMigrations: Map<String, MigrationSession.Migration>?,
+            sqlScript: String,
+            entityData: DbEntity.EntityData
     ) {
         val sqlParts = sqlScript.replace(";\n", "\n;").split(';')
         var line = 1
@@ -557,9 +558,9 @@ LIMIT 1
             } else if (versionCompare >= 0) {
                 // need to run all down migrations from current version for all up migrations that were run
                 val migrations = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, currentVersion)
-                    .values.toList()
-                    .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
-                    .reversed()
+                        .values.toList()
+                        .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
+                        .reversed()
 
                 val appliedMigrations = migration.getVersionBatchesNameMap()
 
@@ -584,15 +585,15 @@ LIMIT 1
                 if (versionCompare > 0) {
                     // need to run all migrations from earlier versions down up to but not including requested version
                     val versionList = getVersions()
-                        .filter { it.compareTo(currentVersion) < 0 && it.compareTo(migration.version) > 0 }
-                        .sortedWith(Comparator(String::versionCompare))
-                        .reversed()
+                            .filter { it.compareTo(currentVersion) < 0 && it.compareTo(migration.version) > 0 }
+                            .sortedWith(Comparator(String::versionCompare))
+                            .reversed()
 
                     versionList.forEach { version ->
                         val versionMigrations = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, version)
-                            .values.toList()
-                            .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
-                            .reversed()
+                                .values.toList()
+                                .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
+                                .reversed()
 
                         val versionMigration = migration.withVersion(version)
 
@@ -744,12 +745,12 @@ LIMIT 1
                 val entityFile = versionDir + resourceName
 
                 val entitySample = getResourceAsString(resourceClass, it)
-                entityFile.writeText(entitySample.replace("__VERSION__".toRegex(), dbVersion.replace('_','.')))
+                entityFile.writeText(entitySample.replace("__VERSION__".toRegex(), dbVersion.replace('_', '.')))
             }
         }
     }
 
-    fun newEntityFile(entity: DbEntity, dbDir: File, dbVersion: String, entityName: String) {
+    fun newEntityFile(entity: DbEntity, dbDir: File, dbVersion: String, entityName: String): Pair<File, File> {
         val versionDir = getVersionDirectory(dbDir, dbVersion, false)
 
         val entityDir = versionDir + entity.dbEntityDirectory
@@ -783,11 +784,14 @@ LIMIT 1
 
             migrationFile.writeText(migrationSample.replace("__VERSION__".toRegex(), dbVersion).replace("__TITLE__".toRegex(), entityName))
             rollbackFile.writeText(rollbackSample.replace("__VERSION__".toRegex(), dbVersion).replace("__TITLE__".toRegex(), entityName))
+
+            return Pair(migrationFile, rollbackFile)
         } else {
             val entityFile = entityDir + "$entityName${entity.fileSuffix}"
-
             val entitySample = entity.getEntitySample(dbDir, resourceClass)
             entityFile.writeText(entitySample.replace("__VERSION__".toRegex(), dbVersion).replace("__NAME__".toRegex(), entityName))
+
+            return Pair(entityFile, entityFile)
         }
     }
 
@@ -798,8 +802,8 @@ LIMIT 1
 
         val sb = StringBuilder()
         val versionMigrations = DbEntity.MIGRATION.getEntityResourceScripts(resourceClass, dbEntityExtractor, dbVersion)
-            .values.toList()
-            .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
+                .values.toList()
+                .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
 
         val cleanComment = "(?<=^|\n)#".toRegex()
 
@@ -817,9 +821,9 @@ LIMIT 1
         }
 
         val versionRollbacks = DbEntity.ROLLBACK.getEntityResourceScripts(resourceClass, dbEntityExtractor, dbVersion)
-            .values.toList()
-            .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
-            .reversed()
+                .values.toList()
+                .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
+                .reversed()
 
         if (!versionRollbacks.isEmpty()) {
             sb.appendln("# --- !Downs")
@@ -852,6 +856,75 @@ LIMIT 1
             logger.info("Generated new play evolution $lastMigration.sql in ${evolutionsDir.path}")
         } else {
             logger.info("No migrations in $dbVersion for generating play evolution")
+        }
+    }
+
+    fun importEvolutions(evolutionsDir: File, dbVersion: String, minEvolution: Int, maxEvolution: Int?, dbPath: File) {
+        evolutionsDir.ensureExistingDirectory("evolutions path")
+
+        logger.info("Import play evolutions in ${evolutionsDir.path}, from [$minEvolution, ${maxEvolution ?: ""}]")
+
+        val files = ArrayList<File>()
+        val useMaxEvolution = maxEvolution ?: Int.MAX_VALUE
+        evolutionsDir.listFiles().forEach {
+            if (it.isFile && it.canRead()) {
+                val evolutionNumber = it.nameWithoutExtension.toIntOrNull()
+                if (evolutionNumber != null) {
+                    if (evolutionNumber in minEvolution..useMaxEvolution) {
+                        logger.info("Adding evolution file $it")
+                        files.add(it)
+                    }
+                }
+            }
+        }
+
+        files.sortBy { it.name.toInt() }
+
+        files.forEach {
+            val lines = getFileContent(it).split("\n")
+            val (migrationFile, rollbackFile) = newEntityFile(DbEntity.MIGRATION, dbPath, dbVersion, "evolution.${it.nameWithoutExtension}")
+
+            // find the "# --- !Ups" and "# --- !Downs"
+            val ups = StringBuilder()
+            val downs = StringBuilder()
+
+            var sawUps = false
+            var sawDowns = false
+
+            lines.forEach {
+                val UPS = "# --- !Ups"
+                val DOWNS = "# --- !Downs"
+                val trimmed = it.trim()
+                when {
+                    trimmed == UPS -> {
+                        if (sawUps) throw IllegalArgumentException("!Ups appears more than once in an evolution file")
+                        sawUps = true
+                        ups.append(it).append("\n")
+                    }
+
+                    trimmed == DOWNS -> {
+                        if (sawDowns) throw IllegalArgumentException("!Ups appears more than once in an evolution file")
+                        sawDowns = true
+                        downs.append(it).append("\n")
+                    }
+
+                    else -> {
+                        if (!sawUps && !sawDowns) {
+                            ups.append(it).append("\n")
+                            downs.append(it).append("\n")
+                        } else if (sawUps) {
+                            ups.append(it).append("\n")
+                        } else {
+                            downs.append(it).append("\n")
+                        }
+                    }
+                }
+            }
+
+            migrationFile.appendText(ups.toString(), Charset.forName("UTF-8"))
+            rollbackFile.appendText(downs.toString(), Charset.forName("UTF-8"))
+
+            logger.info("Generated migration ${migrationFile.name} and rollback ${rollbackFile.name} for evolution ${it.nameWithoutExtension}")
         }
     }
 
@@ -986,6 +1059,41 @@ LIMIT 1
                             }
                         }
 
+                        "import-evolutions" -> {
+                            if (args.size < i) {
+                                throw IllegalArgumentException("import-evolution option requires a path argument")
+                            }
+
+                            val path = args[i++]
+
+                            if (args.size < i) {
+                                throw IllegalArgumentException("import-evolution option requires a min evolution argument")
+                            }
+
+                            val minEvoText = args[i++]
+                            val maxEvoText: String? =
+                                    if (args.size < i) {
+                                        null
+                                    } else {
+                                        args[i++]
+                                    }
+
+                            val pathDir = File(path).ensureExistingDirectory("evolutions path")
+
+                            if (dbVersion == null) dbVersion = getCurrentVersion()
+
+                            val minEvolution: Int = minEvoText.toIntOrNull()
+                                    ?: throw IllegalArgumentException("MinEvolution argument must be an integer")
+                            val maxEvolution: Int? = if (maxEvoText == null) null else maxEvoText.toIntOrNull()
+                                    ?: throw IllegalArgumentException("MaxEvolution argument, if provided, must be an integer")
+
+                            if (dbVersion != null) {
+                                importEvolutions(pathDir, dbVersion!!, minEvolution, maxEvolution, dbPath)
+                            } else {
+                                throw IllegalArgumentException("import-evolution option requires a database which has a current migration version")
+                            }
+                        }
+
                         "dump-tables" -> {
                             if (dbVersion == null) dbVersion = getCurrentVersion()
                             dumpTables(dbPath, dbVersion!!)
@@ -1019,7 +1127,7 @@ LIMIT 1
                         "rollback" -> {
                             // here need to apply down migrations from current version to given version or if none given then rollback the last batch which was not rolled back
                             if (migration == null) migration = initMigrations(dbVersion ?: getPreviousVersion(getCurrentVersion()
-                                ?: "V0_0_0"))
+                                    ?: "V0_0_0"))
 
                             rollback(migration!!)
                         }
@@ -1151,8 +1259,8 @@ LIMIT 1
 
                     tx.begin()
                     val migrationSql = migrationSession.getMigrationSql(
-                        migrationSession.lastScriptName ?: "",
-                        migrationSession.lastScriptSql ?: ""
+                            migrationSession.lastScriptName ?: "",
+                            migrationSession.lastScriptSql ?: ""
                     ).inParams("lastProblem" to e.message)
 
                     tx.execute(migrationSql)

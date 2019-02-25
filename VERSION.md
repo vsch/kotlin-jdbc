@@ -5,6 +5,7 @@
 - [TODO](#todo)
     - [High Priority](#high-priority)
 - [0.5.0 API Breaking Release](#050-api-breaking-release)
+- [0.5.0-beta-3](#050-beta-3)
 - [0.5.0-beta-2](#050-beta-2)
 - [0.5.0-beta-1](#050-beta-1)
 - [0.4.10](#0410)
@@ -96,6 +97,17 @@ to the table name will only be used for column references.
 
 [`Generate Kotlin-Model.groovy`] has been updated to generate the new model format from tables
 in the database.
+
+## 0.5.0-beta-3
+
+* Fix: `Generate Kotlin-Model.groovy` now will look for the model map file starting from the
+  directory selected for generation and go up, until encountering directory named `gen` or
+  hitting the root directory or finding the `model-config.json` file. Mappings in this file are
+  now relative to the directory of the `model-config.json` file.
+
+  Intended use case is to place the `model-config.json` at the project root and map all files in
+  it with path relative to project root. Generating models then is not dependent on which
+  directory in the project is selected as the directory for generating models.
 
 ## 0.5.0-beta-2
 
