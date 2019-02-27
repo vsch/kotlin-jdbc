@@ -14,12 +14,12 @@ import groovy.json.JsonSlurper
  *   PROJECT     project
  *   FILES       files helper
  */
-DEBUG = false                    // if true output debug trace to debug.log
-classFileNameSuffix = "Model"   // appended to class file name
-snakeCaseTables = false         // if true convert snake_case table names to Pascal case, else leave as is
-indentSpaces = "  "           // spaces for each indent level
+DEBUG = false                       // if true output debug trace to debug.log
+classFileNameSuffix = "Model"       // appended to class file name
+snakeCaseTables = false             // if true convert snake_case table names to Pascal case, else leave as is
+indentSpaces = "  "                 // spaces for each indent level
 fileExtension = ".scala"
-convertTimeBasedToString = true   // to convert all date, time and timestamp to String in the model
+convertTimeBasedToString = false    // to convert all date, time and timestamp to String in the model
 
 // column names marked as boolean when tinyint, only needed if using jdbc introspection which does not report actual declared type so all tinyint are tinyint(3)
 //forceBooleanTinyInt = (~/^(?:deleted|checkedStatus|checked_status|optionState|option_state)$/)
