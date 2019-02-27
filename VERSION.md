@@ -101,13 +101,26 @@ in the database.
 ## 0.5.0-beta-3
 
 * Fix: `Generate Kotlin-Model.groovy` now will look for the model map file starting from the
-  directory selected for generation and go up, until encountering directory named `gen` or
-  hitting the root directory or finding the `model-config.json` file. Mappings in this file are
-  now relative to the directory of the `model-config.json` file.
+  directory selected for generation and go up, until encountering directory with sub-directory
+  `.idea`, hitting the root directory or finding `model-config.json` file. Mappings in
+  this file are now relative to the directory of the `model-config.json` file.
+
+  if `.idea` sub-directory was seen then will assume that this is the project root and if no
+  `model-config.json` file is provided then will use the destination directory, without the
+  project directory prefix and one more directory removed to generate the package for generated
+  files. If the first sub-directory is marked as `sources root` then the package will be
+  correct. Otherwise create a `model-config.json`.
 
   Intended use case is to place the `model-config.json` at the project root and map all files in
   it with path relative to project root. Generating models then is not dependent on which
   directory in the project is selected as the directory for generating models.
+* Fix: `Generate Scala-Slick-Model.groovy` to work like `Generate Kotlin-Model.groovy`
+* Fix: make `Generate Kotlin-Model.groovy` and `Generate Scala-Slick-Model.groovy` more generic
+  with the differences isolated to the last generate method.
+* Fix: model generation scripts to get nullability and default value for column from database
+  information. No longer kludging based on column names.
+* Add: `Scala-Object-Enum.kt.js` to generate an `object` with fields mimicking enum values,
+  needs work to make real Scala enums.
 * Add: `import-evolutions path min {max}` where path is to the directory holding evolutions and
   `min` is the minimum evolution to import. `max` is optional and if provided gives the maximum
   evolution number to import.

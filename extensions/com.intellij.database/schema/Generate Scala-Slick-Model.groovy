@@ -1,8 +1,12 @@
-import com.intellij.database.model.DasConstraint
+import com.intellij.database.model.DasColumn
+import com.intellij.database.model.DasObject
 import com.intellij.database.model.DasTable
 import com.intellij.database.model.ObjectKind
 import com.intellij.database.util.Case
 import com.intellij.database.util.DasUtil
+import com.intellij.openapi.util.text.StringUtil
+import com.intellij.psi.codeStyle.NameUtil
+import groovy.json.JsonSlurper
 
 /*
  * Available context bindings:
@@ -10,14 +14,12 @@ import com.intellij.database.util.DasUtil
  *   PROJECT     project
  *   FILES       files helper
  */
-packageName = "com.sample" // package used for generated class files
-classFileNameSuffix = "Model" // appended to class file name
-
-// KLUDGE: the DasTable and columns does not implement a way to get whether column is nullable, has default or is computed
-forceNullable = (~/^(?:createdAt|created_at|updatedAt|updated_at)$/) // regex for column names which are forced to nullable Kotlin type
-forceAuto = (~/^(?:createdAt|created_at|updatedAt|updated_at)$/) // column names marked auto generated
-forceTimestampString = (~/^(?:createdAt|created_at|updatedAt|updated_at)$/) // column names if timestamp type will be changed to String
-snakeCaseTables = false  // if true convert snake_case table names to Pascal case, else leave as is
+DEBUG = false                    // if true output debug trace to debug.log
+classFileNameSuffix = "Model"   // appended to class file name
+snakeCaseTables = false         // if true convert snake_case table names to Pascal case, else leave as is
+indentSpaces = "  "           // spaces for each indent level
+fileExtension = ".scala"
+convertTimeBasedToString = true   // to convert all date, time and timestamp to String in the model
 
 // column names marked as boolean when tinyint, only needed if using jdbc introspection which does not report actual declared type so all tinyint are tinyint(3)
 //forceBooleanTinyInt = (~/^(?:deleted|checkedStatus|checked_status|optionState|option_state)$/)
@@ -25,7 +27,18 @@ forceBooleanTinyInt = ""
 
 downsizeLongIdToInt = true // if true changes id columns which would be declared Long to Int, change this to false to leave them as Long
 
-typeMapping = [
+typeMapping = convertTimeBasedToString ? [
+        (~/(?i)tinyint\(1\)/)       : "Boolean",
+        (~/(?i)tinyint/)            : "TinyInt",     // changed to Int if column name not in forceBooleanTinyInt
+        (~/(?i)bigint/)             : "Long",
+        (~/(?i)int/)                : "Int",
+        (~/(?i)float/)              : "Float",
+        (~/(?i)double|decimal|real/): "Double",
+        (~/(?i)datetime|timestamp/) : "String",
+        (~/(?i)date/)               : "String",
+        (~/(?i)time/)               : "String",
+        (~/(?i)/)                   : "String"
+] : [
         (~/(?i)tinyint\(1\)/)       : "Boolean",
         (~/(?i)tinyint/)            : "TinyInt",     // changed to Int if column name not in forceBooleanTinyInt
         (~/(?i)bigint/)             : "Long",
@@ -38,24 +51,208 @@ typeMapping = [
         (~/(?i)/)                   : "String"
 ]
 
-FILES.chooseDirectoryAndSave("Choose directory", "Choose where to store generated files") { dir ->
-    SELECTION.filter { it instanceof DasTable && it.getKind() == ObjectKind.TABLE }.each { generate(it, dir) }
+FILES.chooseDirectoryAndSave("Choose directory", "Choose where to store generated files") { File dir ->
+    // read in possible map of tables to subdirectories
+    def tableMap = null
+    String packagePrefix = ""
+    String removePrefix = ""
+    boolean skipUnmapped = false
+    File exportDir = dir
+    File mapFile = null
+    File projectDir = null
+
+    def File tryDir = dir
+    while (tryDir != null && tryDir.exists() && tryDir.isDirectory()) {
+        def File tryMap = new File(tryDir, "model-config.json")
+        if (tryMap.isFile() && tryMap.canRead()) {
+            mapFile = tryMap
+            exportDir = tryDir
+            break
+        }
+
+        // see if this directory has .idea, then must be project root
+        tryMap = new File(tryDir, ".idea")
+        if (tryMap.isDirectory() && tryMap.exists()) {
+            projectDir = tryDir
+            break
+        }
+
+        tryDir = tryDir.parentFile
+    }
+
+    String packageName
+
+    if (projectDir != null) {
+        packageName = exportDir.path.substring(projectDir.path.length() + 1).replace('/', '.')
+        // now drop first part since it is most likely sources root and not part of the package path
+        int dot = packageName.indexOf('.')
+        if (dot > 0) packageName = packageName.substring(dot + 1)
+    } else {
+        packageName = "com.sample"
+    }
+
+    if (DEBUG) {
+        new File(exportDir, "debug.log").withPrintWriter { PrintWriter dbg ->
+            dbg.println("exportDir: ${exportDir.path}, mapFile: ${mapFile}")
+
+            if (mapFile != null && mapFile.isFile() && mapFile.canRead()) {
+                JsonSlurper jsonSlurper = new JsonSlurper()
+                def reader = new BufferedReader(new InputStreamReader(new FileInputStream(mapFile), "UTF-8"))
+                data = jsonSlurper.parse(reader)
+                if (DEBUG && data != null) {
+                    packagePrefix = data["package-prefix"] ?: ""
+                    removePrefix = data["remove-prefix"] ?: ""
+                    skipUnmapped = data["skip-unmapped"] ?: false
+                    tableMap = data["file-map"]
+
+                    dbg.println("package-prefix: '$packagePrefix'")
+                    dbg.println ""
+                    dbg.println("skip-unmapped: $skipUnmapped")
+                    dbg.println ""
+                    dbg.println "file-map: {"
+                    tableMap.each { dbg.println "    $it" }
+                    dbg.println "}"
+                    dbg.println ""
+                }
+            }
+            SELECTION.filter { DasObject it -> it instanceof DasTable && it.getKind() == ObjectKind.TABLE }.each { DasTable it ->
+                generate(dbg, it, exportDir, tableMap, packageName, packagePrefix, removePrefix, skipUnmapped)
+            }
+        }
+    } else {
+        PrintWriter dbg = null
+
+        if (mapFile != null && mapFile.isFile() && mapFile.canRead()) {
+            JsonSlurper jsonSlurper = new JsonSlurper()
+            BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(mapFile), "UTF-8"))
+            data = jsonSlurper.parse(reader)
+            packagePrefix = data["package-prefix"] ?: ""
+            removePrefix = data["remove-prefix"] ?: ""
+            skipUnmapped = data["skip-unmapped"] ?: false
+            tableMap = data["file-map"]
+        }
+
+        SELECTION.filter { DasObject it -> it instanceof DasTable && it.getKind() == ObjectKind.TABLE }.each { DasTable it ->
+            generate(dbg, it, exportDir, tableMap, packageName, packagePrefix, removePrefix, skipUnmapped)
+        }
+    }
 }
 
-def generate(table, dir) {
-    def className = snakeCaseTables ? javaName(singularize(table.getName()), true) : singularize(table.getName())
+void generate(PrintWriter dbg, DasTable table, File dir, tableMap, String packageName, String packagePrefix, String removePrefix, boolean skipUnmapped) {
+    String className = snakeCaseTables ? toJavaName(toSingular(table.getName()), true) : toSingular(table.getName())
+    dbg.println("className: ${className}, tableName: ${table.getName()}, singular: ${toSingular(table.getName())}")
+
     def fields = calcFields(table)
-    new File(dir, className + "${classFileNameSuffix}.scala").withPrintWriter { out -> generate(out, table.getName(), className, fields) }
+    String fileName = className + "${classFileNameSuffix}$fileExtension"
+
+    def mappedFile = tableMap != null ? tableMap[fileName] : null
+    if (mappedFile == null && tableMap != null && tableMap[""] != null) {
+        mappedFile = suffixOnceWith(tableMap[""], "/") + fileName
+    }
+
+    if (dbg != null) dbg.println "fileName ${fileName} mappedFile ${mappedFile}"
+
+    def file
+    if (mappedFile != null && !mappedFile.trim().isEmpty()) {
+        file = new File(dir, mappedFile);
+        String unprefixed = (removePrefix == "" || !mappedFile.startsWith(removePrefix)) ? mappedFile : mappedFile.substring(removePrefix.length())
+        packageName = packagePrefix + new File(unprefixed).parent.replace("/", ".")
+    } else {
+        file = new File(dir, fileName)
+        packageName = packageName
+        if (dbg != null && (skipUnmapped || mappedFile != null)) dbg.println "skipped ${fileName}"
+        if (skipUnmapped || mappedFile != null) return
+    }
+
+    file.withPrintWriter { out -> generateModel(dbg, out, (String) table.getName(), className, fields, packageName) }
 }
 
-static def rightPad(text, len) {
+static String defaultValue(def value) {
+    String text = (String) value
+    return text == null ? "" : (text == "CURRENT_TIMESTAMP" ? " $text" : " '$text'")
+}
+
+def calcFields(table) {
+    def colIndex = 0
+    DasUtil.getColumns(table).reduce([]) { def fields, DasColumn col ->
+        def dataType = col.getDataType()
+        def spec = dataType.getSpecification()
+        def suffix = dataType.suffix
+        def typeStr = (String) typeMapping.find { p, t -> p.matcher(Case.LOWER.apply(spec)).find() }.value
+        def colName = (String) col.getName()
+        def colNameLower = (String) Case.LOWER.apply(colName)
+        colIndex++
+        def colType = downsizeLongIdToInt && typeStr == "Long" && DasUtil.isPrimary(col) || DasUtil.isForeign(col) && colNameLower.endsWith("id") ? "Int" : typeStr
+        def javaColName = (String) toJavaName(colName, false)
+        if (typeStr == "TinyInt") {
+            if (forceBooleanTinyInt && javaColName.matches(forceBooleanTinyInt)) {
+                colType = "Boolean"
+            } else {
+                colType = "Int"
+            }
+        }
+        def attrs = col.getTable().getColumnAttrs(col)
+        def columnDefault = col.getDefault()
+        def isAutoInc = DasUtil.isAutoGenerated(col)
+        def isAuto = isAutoInc || columnDefault == "CURRENT_TIMESTAMP" || attrs.contains(DasColumn.Attribute.COMPUTED)
+        fields += [[
+                           name    : javaColName,
+                           column  : colName,
+                           type    : colType,
+                           suffix  : suffix,
+                           col     : col,
+                           spec    : spec,
+                           attrs   : attrs,
+                           default : columnDefault,
+//                           constraints : constraints.reduce("") { all, constraint ->
+//                               all += "[ name: ${constraint.name}, " + "kind: ${constraint.getKind()}," + "]"
+//                           },
+                           notNull : col.isNotNull(),
+                           autoInc : isAutoInc,
+                           nullable: !col.isNotNull() || isAuto || columnDefault != null,
+                           key     : DasUtil.isPrimary(col),
+                           auto    : isAuto,
+                           annos   : ""]]
+        fields
+    }
+}
+
+static String rightPad(String text, int len) {
     def padded = text
     def pad = len - text.length()
     while (pad-- > 0) padded += " "
     return padded
 }
 
-def generate(out, tableName, className, fields) {
+static String suffixOnceWith(String str, String suffix) {
+    return str.endsWith(suffix) ? str : "$str$suffix";
+}
+
+static String lowerFirst(String str) {
+    return str.length() > 0 ? Case.LOWER.apply(str[0]) + str[1..-1] : str
+}
+
+static String toSingular(String str) {
+    String[] s = NameUtil.splitNameIntoWords(str).collect { it }
+    String lastSingular = StringUtil.unpluralize(s[-1]) ?: ""
+    return str.substring(0, str.length() - s[-1].length()) + lastSingular
+}
+
+static String toPlural(String str) {
+    String[] s = NameUtil.splitNameIntoWords(str).collect { it }
+    String lastPlural = StringUtil.pluralize(s[-1]) ?: ""
+    return str.substring(0, str.length() - s[-1].length()) + lastPlural
+}
+
+static String toJavaName(String str, boolean capitalize) {
+    String s = NameUtil.splitNameIntoWords(str)
+            .collect { Case.LOWER.apply(it).capitalize() }
+            .join("")
+            .replaceAll(/[^\p{javaJavaIdentifierPart}[_]]/, "_")
+    (capitalize || s.length() == 1) ? s : Case.LOWER.apply(s[0]) + s[1..-1]
+}
+
+void generateModel(PrintWriter dbg, PrintWriter out, String tableName, String className, def fields, String packageName) {
     def dbCase = true
     def keyCount = 0
     def nonKeyCount = 0
@@ -83,6 +280,7 @@ def generate(out, tableName, className, fields) {
     }
 
     out.println "package $packageName"
+    out.println ""
 
     def timeFields = (timestampCount > 0 ? 1 : 0) + (dateCount > 0 ? 1 : 0) + (timeCount > 0 ? 1 : 0)
     def importSql = "import java.sql."
@@ -108,7 +306,10 @@ def generate(out, tableName, className, fields) {
         out.println importSql
         out.println ""
     }
-    out.println ""
+
+//    out.println "import ai.x.play.json.Jsonx"
+//    out.println "import play.api.db.slick.HasDatabaseConfigProvider"
+//    out.println "import play.api.libs.json.OFormat"
     out.println "import play.api.db.slick.HasDatabaseConfigProvider"
     out.println "import play.api.libs.json.{Json, OFormat}"
     out.println "import slick.jdbc.JdbcProfile"
@@ -122,9 +323,9 @@ def generate(out, tableName, className, fields) {
     }
 
     fields.each() {
-        out.print "  * @param "
-        if (it.annos != "") out.println "  ${it.annos}"
-        out.print "${rightPad(it.name, len)} ${it.nullable ? 'Option[' + it.type + ']':it.type}"
+        out.print "${indentSpaces}* @param "
+        if (it.annos != "") out.println "${indentSpaces}${it.annos}"
+        out.print "${rightPad(it.name, len)} ${it.nullable ? 'Option[' + it.type + ']' : it.type}"
         out.println ""
     }
 //    out.println "  * @param stepInstanceId    Int"
@@ -146,30 +347,30 @@ def generate(out, tableName, className, fields) {
     sep = "";
     fields.each() {
         out.print sep
-        out.print "  ${it.name}: ${it.nullable ? 'Option[' + it.type + '] = None':it.type}"
+        out.print "${indentSpaces}${it.name}: ${it.nullable ? 'Option[' + it.type + '] = None' : it.type}"
         sep = ",\n"
         if (it.annos != "") out.print " // ${it.annos}"
     }
-
     out.println "\n)"
     out.println ""
 
     out.println "object ${className}Model {"
-    out.println "  implicit val ${lowerFirst(className)}Format: OFormat[${className}Model] = Json.format[${className}Model]"
+//    out.println "${indentSpaces}implicit val ${lowerFirst(className)}Format: OFormat[${className}Model] = Jsonx.formatCaseClass[${className}Model]"
+    out.println "${indentSpaces}implicit val ${lowerFirst(className)}Format: OFormat[${className}Model] = Json.format[${className}Model]"
     out.println "}"
     out.println ""
 
     out.println "trait ${className}Component {"
-    out.println "  self: HasDatabaseConfigProvider[JdbcProfile] =>"
+    out.println "${indentSpaces}self: HasDatabaseConfigProvider[JdbcProfile] =>"
     out.println ""
-    out.println "  import profile.api._"
+    out.println "${indentSpaces}import profile.api._"
     out.println ""
-    out.println "  class ${className}(tag: Tag) extends Table[${className}Model](tag, \"${tableName}\") {"
+    out.println "${indentSpaces}class ${className}(tag: Tag) extends Table[${className}Model](tag, \"${tableName}\") {"
     sep = ""
     fields.each() {
         out.print sep
         varType = "${it.nullable ? 'Option[' + it.type + ']' : it.type}"
-        out.print "    def ${it.name}: Rep[${varType}] = column[${varType}](\"${it.name}\""
+        out.print "${indentSpaces}${indentSpaces}def ${it.name}: Rep[${varType}] = column[${varType}](\"${it.name}\""
         if (it.key) out.print ", O.PrimaryKey"
         if (it.auto) out.print ", O.AutoInc"
         out.print ")"
@@ -182,16 +383,15 @@ def generate(out, tableName, className, fields) {
 //    out.println "    def stepId: Rep[Int] = column[Int]("stepId")"
 //    out.println ""
 
-
-    out.println "    def * : ProvenShape[${className}Model] = ("
-//    out.println "      stepInstanceId.?,"
-//    out.println "      stepId,"
+    out.println "${indentSpaces}${indentSpaces}def * : ProvenShape[${className}Model] = ("
+//    out.println "${indentSpaces}${indentSpaces}${indentSpaces}stepInstanceId.?,"
+//    out.println "${indentSpaces}${indentSpaces}${indentSpaces}stepId,"
     sep = ""
     fields.each() {
         out.print sep
         sep = ",\n"
 //        def varType = "${it.nullable ? 'Option[' + it.type + ']' : it.type}"
-        out.print "      ${it.name}"
+        out.print "${indentSpaces}${indentSpaces}${indentSpaces}${it.name}"
         if (it.key && !it.nullable) out.print ".?"
 //        if (it.annos != "") out.print " // ${it.annos}"
     }
@@ -202,7 +402,7 @@ def generate(out, tableName, className, fields) {
 //    out.println "              Option[String], // startedAt"
 //    out.println "              Option[String], // createdAt"
     out.println ""
-    out.println "    ) <> ( { tuple: ("
+    out.println "${indentSpaces}${indentSpaces}) <> ( { tuple: ("
     sep = ""
     suffix = ""
     extraPad = ""
@@ -211,9 +411,9 @@ def generate(out, tableName, className, fields) {
         sep = ","
         varType = "${it.nullable || it.key ? 'Option[' + it.type + ']' : it.type}"
         out.print extraPad
-        out.print "      ${varType}"
+        out.print "${indentSpaces}${indentSpaces}${indentSpaces}${varType}"
         suffix = " // ${it.name}\n"
-        extraPad = "  "
+        extraPad = "${indentSpaces}"
 //        if (it.key) out.print ".?"
 //        if (it.annos != "") out.print " // ${it.annos}"
     }
@@ -223,8 +423,8 @@ def generate(out, tableName, className, fields) {
 //    out.println "      StepInstanceModel("
 //    out.println "        stepInstanceId = tuple._1,"
 //    out.println "        stepId = tuple._2,"
-    out.println "      ) =>"
-    out.println "      ${className}Model("
+    out.println "${indentSpaces}${indentSpaces}${indentSpaces}) =>"
+    out.println "${indentSpaces}${indentSpaces}${indentSpaces}${className}Model("
     sep = ""
     suffix = ""
     tuple = 1
@@ -232,17 +432,17 @@ def generate(out, tableName, className, fields) {
         out.print sep + suffix
         sep = ","
         varType = "${it.nullable || it.key ? 'Option[' + it.type + ']' : it.type}"
-        out.print "        ${it.name} = tuple._${tuple++}"
+        out.print "${indentSpaces}${indentSpaces}${indentSpaces}${indentSpaces}${it.name} = tuple._${tuple++}"
         suffix = "\n"
 //        if (it.key) out.print ".?"
 //        if (it.annos != "") out.print " // ${it.annos}"
     }
     out.print suffix
 
-    out.println "      )"
-    out.println "    }, {"
-    out.println "      ps: ${className}Model =>"
-    out.println "        Some(("
+    out.println "${indentSpaces}${indentSpaces}${indentSpaces})"
+    out.println "${indentSpaces}${indentSpaces}}, {"
+    out.println "${indentSpaces}${indentSpaces}${indentSpaces}ps: ${className}Model =>"
+    out.println "${indentSpaces}${indentSpaces}${indentSpaces}${indentSpaces}Some(("
 //    out.println "          ps.stepInstanceId,"
 //    out.println "          ps.stepId,"
     sep = ""
@@ -252,74 +452,16 @@ def generate(out, tableName, className, fields) {
         out.print sep + suffix
         sep = ","
         varType = "${it.nullable || it.key ? 'Option[' + it.type + ']' : it.type}"
-        out.print "          ps.${it.name}"
+        out.print "${indentSpaces}${indentSpaces}${indentSpaces}${indentSpaces}${indentSpaces}ps.${it.name}"
         suffix = "\n"
 //        if (it.key) out.print ".?"
 //        if (it.annos != "") out.print " // ${it.annos}"
     }
     out.print suffix
-    out.println "        ))"
-    out.println "    })"
-    out.println "  }"
+    out.println "${indentSpaces}${indentSpaces}${indentSpaces}${indentSpaces}))"
+    out.println "${indentSpaces}${indentSpaces}})"
+    out.println "${indentSpaces}}"
     out.println ""
-    out.println "  val ${lowerFirst(pluralize(className))}: TableQuery[${className}] = TableQuery[${className}] // Query Object"
+    out.println "${indentSpaces}val ${lowerFirst(toPlural(className))}: TableQuery[${className}] = TableQuery[${className}] // Query Object"
     out.println "}"
-}
-
-def calcFields(table) {
-    def constraints = ((DasTable) table).getDbChildren(DasConstraint.class, ObjectKind.CHECK);
-    def colIndex = 0
-    DasUtil.getColumns(((DasTable) table)).reduce([]) { fields, col ->
-        def spec = Case.LOWER.apply(col.getDataType().getSpecification())
-        def typeStr = (String) typeMapping.find { p, t -> p.matcher(spec).find() }.value
-        def colName = (String) col.getName()
-        def colNameLower = (String) Case.LOWER.apply(colName)
-        colIndex++
-        def colType = downsizeLongIdToInt && typeStr == "Long" && DasUtil.isPrimary(col) || DasUtil.isForeign(col) && colNameLower.endsWith("id") ? "Int" : typeStr
-        def javaColName = (String) javaName(colName, false)
-        if (typeStr == "TinyInt") {
-            if (forceBooleanTinyInt && javaColName.matches(forceBooleanTinyInt)) {
-                colType = "Boolean"
-            } else {
-                colType = "Int"
-            }
-        }
-        fields += [[
-                           name    : javaColName,
-                           column  : colName,
-                           type    : forceTimestampString.matcher(colName) && colType in ['Timestamp'/*, 'Date', 'Datetime', 'Time'*/] ? "String": colType,
-                           col     : col,
-                           spec    : spec,
-//                           constraints : constraints.reduce("") { all, constraint ->
-//                               all += "[ name: ${constraint.name}, " + "kind: ${constraint.getKind()}," + "]"
-//                           },
-                           nullable: DasUtil.isAutoGenerated(col) || forceNullable.matcher(colName),
-                           key     : DasUtil.isPrimary(col),
-                           auto    : DasUtil.isAutoGenerated(col) || forceAuto.matcher(colName),
-                           annos   : ""]]
-    }
-}
-
-def singularize(String str) {
-    def s = com.intellij.psi.codeStyle.NameUtil.splitNameIntoWords(str).collect { it }
-    def singleLast = com.intellij.openapi.util.text.StringUtil.unpluralize(s[-1])
-    return str.substring(0, str.length() - s[-1].length()) + singleLast
-}
-
-def pluralize(String str) {
-    def s = com.intellij.psi.codeStyle.NameUtil.splitNameIntoWords(str).collect { it }
-    def pluralLast = com.intellij.openapi.util.text.StringUtil.pluralize(s[-1])
-    return str.substring(0, str.length() - s[-1].length()) + pluralLast
-}
-
-def lowerFirst(str) {
-    return str.length() > 0 ? Case.LOWER.apply(str[0]) + str[1..-1] : str
-}
-
-def javaName(str, capitalize) {
-    def s = com.intellij.psi.codeStyle.NameUtil.splitNameIntoWords(str)
-            .collect { Case.LOWER.apply(it).capitalize() }
-            .join("")
-            .replaceAll(/[^\p{javaJavaIdentifierPart}[_]]/, "_")
-    capitalize || s.length() == 1 ? s : Case.LOWER.apply(s[0]) + s[1..-1]
 }

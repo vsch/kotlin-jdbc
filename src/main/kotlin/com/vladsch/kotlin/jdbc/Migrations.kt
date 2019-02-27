@@ -927,7 +927,7 @@ LIMIT 1
                         } else if (sawUps && !sawDowns) {
                             ups.append(line).append("\n")
                         } else {
-                            if (trimmed.isEmpty() || trimmed.startsWith("# ") || trimmed.startsWith("// ")) {
+                            if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith("-- ")) {
                                 commonPrefix.append(line).append("\n")
                             } else {
                                 downs.append(commonPrefix)
