@@ -14,10 +14,10 @@ import groovy.json.JsonSlurper
  *   PROJECT     project
  *   FILES       files helper
  */
-DEBUG = false                    // if true output debug trace to debug.log
+DEBUG = false                   // if true output debug trace to debug.log
 classFileNameSuffix = "Model"   // appended to class file name
 snakeCaseTables = false         // if true convert snake_case table names to Pascal case, else leave as is
-indentSpaces = "    "           // spaces for each indent level
+sp = "    "                     // spaces for each indent level
 fileExtension = ".kt"
 
 // column names marked as boolean when tinyint, only needed if using jdbc introspection which does not report actual declared type so all tinyint are tinyint(3)
@@ -302,7 +302,7 @@ void generateModel(PrintWriter dbg, PrintWriter out, String tableName, String cl
     fields.each() {
         def line = ""
         if (it.annos != "") line += "  ${it.annos}"
-        line += "${indentSpaces}var ${it.name}: ${it.type}"
+        line += "${sp}var ${it.name}: ${it.type}"
         if (it.nullable) line += "?"
         line += " by db"
         if (it.auto && it.key) line += ".autoKey"
@@ -325,32 +325,32 @@ void generateModel(PrintWriter dbg, PrintWriter out, String tableName, String cl
 
     // data copy constructor
     out.println ""
-    out.println "${indentSpaces}constructor(other: ${className}, session: Session? = null, quote: String? = null) : this(session, quote) {"
+    out.println "${sp}constructor(other: ${className}, session: Session? = null, quote: String? = null) : this(session, quote) {"
     fields.each() {
-        out.println "${indentSpaces}${indentSpaces}${it.name} = other.${it.name}"
+        out.println "${sp}${sp}${it.name} = other.${it.name}"
     }
-    out.println "${indentSpaces}${indentSpaces}snapshot()"
-    out.println "${indentSpaces}}"
+    out.println "${sp}${sp}snapshot()"
+    out.println "${sp}}"
     out.println ""
 
     // copy factory
-    out.println "${indentSpaces}override operator fun invoke() = ${className}Model(_session, _quote)"
+    out.println "${sp}override operator fun invoke() = ${className}Model(_session, _quote)"
     out.println ""
 
     // data factory
-    out.println "${indentSpaces}override fun toData() = ${className}("
+    out.println "${sp}override fun toData() = ${className}("
     sep = "";
     fields.each() {
         out.print sep
         sep = ",\n";
-        out.print "${indentSpaces}${indentSpaces}${it.name}"
+        out.print "${sp}${sp}${it.name}"
     }
-    out.println "\n${indentSpaces})"
+    out.println "\n${sp})"
     out.println ""
-    out.println "${indentSpaces}companion object {"
-    out.println "${indentSpaces}${indentSpaces}const val tableName = \"${tableName}\""
-//    out.println "${indentSpaces}${indentSpaces}override fun createModel(quote:String?): ${className}Model = ${className}Model(quote)"
-//    out.println "${indentSpaces}${indentSpaces}override fun createData(model: ${className}Model): ${className} = model.toData()"
-    out.println "${indentSpaces}}"
+    out.println "${sp}companion object {"
+    out.println "${sp}${sp}const val tableName = \"${tableName}\""
+//    out.println "${sp}${sp}override fun createModel(quote:String?): ${className}Model = ${className}Model(quote)"
+//    out.println "${sp}${sp}override fun createData(model: ${className}Model): ${className} = model.toData()"
+    out.println "${sp}}"
     out.println "}"
 }

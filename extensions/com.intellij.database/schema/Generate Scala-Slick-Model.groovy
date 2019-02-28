@@ -16,18 +16,19 @@ import groovy.json.JsonSlurper
  */
 DEBUG = false                       // if true output debug trace to debug.log
 classFileNameSuffix = "Model"       // appended to class file name
+apiFileNameSuffix = "Gen"           // appended to class file name
 snakeCaseTables = false             // if true convert snake_case table names to Pascal case, else leave as is
-indentSpaces = "  "                 // spaces for each indent level
+sp = "  "                           // spaces for each indent level
 fileExtension = ".scala"
+downsizeLongIdToInt = true          // if true changes id columns which would be declared Long to Int, change this to false to leave them as Long
 convertTimeBasedToString = false    // to convert all date, time and timestamp to String in the model
+addToApi = true                     // create database Model class with Date/Timestamp and Api class with String if model has Date/Time/Timestamp fields
 
 // column names marked as boolean when tinyint, only needed if using jdbc introspection which does not report actual declared type so all tinyint are tinyint(3)
 //forceBooleanTinyInt = (~/^(?:deleted|checkedStatus|checked_status|optionState|option_state)$/)
 forceBooleanTinyInt = ""
 
-downsizeLongIdToInt = true // if true changes id columns which would be declared Long to Int, change this to false to leave them as Long
-
-typeMapping = convertTimeBasedToString ? [
+typeMappingTimeBasedToString = [
         (~/(?i)tinyint\(1\)/)       : "Boolean",
         (~/(?i)tinyint/)            : "TinyInt",     // changed to Int if column name not in forceBooleanTinyInt
         (~/(?i)bigint/)             : "Long",
@@ -38,7 +39,9 @@ typeMapping = convertTimeBasedToString ? [
         (~/(?i)date/)               : "String",
         (~/(?i)time/)               : "String",
         (~/(?i)/)                   : "String"
-] : [
+]
+
+typeMappingTimeBased = [
         (~/(?i)tinyint\(1\)/)       : "Boolean",
         (~/(?i)tinyint/)            : "TinyInt",     // changed to Int if column name not in forceBooleanTinyInt
         (~/(?i)bigint/)             : "Long",
@@ -50,6 +53,8 @@ typeMapping = convertTimeBasedToString ? [
         (~/(?i)time/)               : "Time",
         (~/(?i)/)                   : "String"
 ]
+
+typeMapping = convertTimeBasedToString ? typeMappingTimeBasedToString : typeMappingTimeBased
 
 FILES.chooseDirectoryAndSave("Choose directory", "Choose where to store generated files") { File dir ->
     // read in possible map of tables to subdirectories
@@ -142,7 +147,6 @@ void generate(PrintWriter dbg, DasTable table, File dir, tableMap, String packag
     String className = snakeCaseTables ? toJavaName(toSingular(table.getName()), true) : toSingular(table.getName())
     dbg.println("className: ${className}, tableName: ${table.getName()}, singular: ${toSingular(table.getName())}")
 
-    def fields = calcFields(table)
     String fileName = className + "${classFileNameSuffix}$fileExtension"
 
     def mappedFile = tableMap != null ? tableMap[fileName] : null
@@ -164,7 +168,18 @@ void generate(PrintWriter dbg, DasTable table, File dir, tableMap, String packag
         if (skipUnmapped || mappedFile != null) return
     }
 
-    file.withPrintWriter { out -> generateModel(dbg, out, (String) table.getName(), className, fields, packageName) }
+    if (addToApi) {
+        def modelFields = calcFields(table, typeMappingTimeBased)
+        def timeFields = file.withPrintWriter { out -> generateModel(dbg, out, (String) table.getName(), className, modelFields, packageName, true) }
+        if (timeFields > 0) {
+            def apiFields = calcFields(table, typeMappingTimeBasedToString)
+            def apiFile = new File(file.parentFile.path, className + "${apiFileNameSuffix}$fileExtension")
+            apiFile.withPrintWriter { out -> generateApi(dbg, out, (String) table.getName(), className, apiFields, packageName) }
+        }
+    } else {
+        def fields = calcFields(table, typeMapping)
+        file.withPrintWriter { out -> generateModel(dbg, out, (String) table.getName(), className, fields, packageName, false) }
+    }
 }
 
 static String defaultValue(def value) {
@@ -172,23 +187,27 @@ static String defaultValue(def value) {
     return text == null ? "" : (text == "CURRENT_TIMESTAMP" ? " $text" : " '$text'")
 }
 
-def calcFields(table) {
+def calcFields(table, typeMapping) {
     def colIndex = 0
     DasUtil.getColumns(table).reduce([]) { def fields, DasColumn col ->
         def dataType = col.getDataType()
         def spec = dataType.getSpecification()
         def suffix = dataType.suffix
         def typeStr = (String) typeMapping.find { p, t -> p.matcher(Case.LOWER.apply(spec)).find() }.value
+        def timebasedTypeStr = (String) typeMappingTimeBased.find { p, t -> p.matcher(Case.LOWER.apply(spec)).find() }.value
         def colName = (String) col.getName()
         def colNameLower = (String) Case.LOWER.apply(colName)
         colIndex++
         def colType = downsizeLongIdToInt && typeStr == "Long" && DasUtil.isPrimary(col) || DasUtil.isForeign(col) && colNameLower.endsWith("id") ? "Int" : typeStr
+        def timebasedColType = downsizeLongIdToInt && timebasedTypeStr == "Long" && DasUtil.isPrimary(col) || DasUtil.isForeign(col) && colNameLower.endsWith("id") ? "Int" : timebasedTypeStr
         def javaColName = (String) toJavaName(colName, false)
         if (typeStr == "TinyInt") {
             if (forceBooleanTinyInt && javaColName.matches(forceBooleanTinyInt)) {
                 colType = "Boolean"
+                timebasedColType = colType
             } else {
                 colType = "Int"
+                timebasedColType = colType
             }
         }
         def attrs = col.getTable().getColumnAttrs(col)
@@ -199,6 +218,7 @@ def calcFields(table) {
                            name    : javaColName,
                            column  : colName,
                            type    : colType,
+                           timeType: timebasedColType,
                            suffix  : suffix,
                            col     : col,
                            spec    : spec,
@@ -252,7 +272,7 @@ static String toJavaName(String str, boolean capitalize) {
     (capitalize || s.length() == 1) ? s : Case.LOWER.apply(s[0]) + s[1..-1]
 }
 
-void generateModel(PrintWriter dbg, PrintWriter out, String tableName, String className, def fields, String packageName) {
+int generateModel(PrintWriter dbg, PrintWriter out, String tableName, String className, def fields, String packageName, boolean addToApi) {
     def dbCase = true
     def keyCount = 0
     def nonKeyCount = 0
@@ -284,25 +304,33 @@ void generateModel(PrintWriter dbg, PrintWriter out, String tableName, String cl
 
     def timeFields = (timestampCount > 0 ? 1 : 0) + (dateCount > 0 ? 1 : 0) + (timeCount > 0 ? 1 : 0)
     def importSql = "import java.sql."
+//    def importConversion = "import helpers.DateConversion."
     def sep = ""
     if (timeFields == 1) {
         importSql += (dateCount > 0 ? "Date" : "") + (timeCount > 0 ? "Time" : "") + (timestampCount > 0 ? "Timestamp" : "")
+//        importConversion += (dateCount > 0 ? "asDateString" : "") + (timeCount > 0 ? "asTimeString" : "") + (timestampCount > 0 ? "asTimestampString" : "")
     } else {
         sep = "{"
         if (dateCount > 0) {
             importSql += sep + "Date"
+//            importConversion += sep + "asDateString"
             sep = ", "
         }
         if (timeCount > 0) {
             importSql += sep + "Time"
+//            importConversion += sep + "asTimeString"
             sep = ", "
         }
         if (timestampCount > 0) {
             importSql += sep + "Timestamp"
+//            importConversion += sep + "asTimestampString"
             sep = ", "
         }
+        importSql += "}"
     }
+
     if (timeFields > 0) {
+//        out.println importConversion
         out.println importSql
         out.println ""
     }
@@ -311,7 +339,9 @@ void generateModel(PrintWriter dbg, PrintWriter out, String tableName, String cl
 //    out.println "import play.api.db.slick.HasDatabaseConfigProvider"
 //    out.println "import play.api.libs.json.OFormat"
     out.println "import play.api.db.slick.HasDatabaseConfigProvider"
-    out.println "import play.api.libs.json.{Json, OFormat}"
+    if (!addToApi || timeFields == 0) {
+        out.println "import play.api.libs.json.{Json, OFormat}"
+    }
     out.println "import slick.jdbc.JdbcProfile"
     out.println "import slick.lifted.ProvenShape"
     out.println ""
@@ -323,8 +353,8 @@ void generateModel(PrintWriter dbg, PrintWriter out, String tableName, String cl
     }
 
     fields.each() {
-        out.print "${indentSpaces}* @param "
-        if (it.annos != "") out.println "${indentSpaces}${it.annos}"
+        out.print "${sp}* @param "
+        if (it.annos != "") out.println "${sp}${it.annos}"
         out.print "${rightPad(it.name, len)} ${it.nullable ? 'Option[' + it.type + ']' : it.type}"
         out.println ""
     }
@@ -347,30 +377,39 @@ void generateModel(PrintWriter dbg, PrintWriter out, String tableName, String cl
     sep = "";
     fields.each() {
         out.print sep
-        out.print "${indentSpaces}${it.name}: ${it.nullable ? 'Option[' + it.type + '] = None' : it.type}"
+        out.print "${sp}${it.name}: ${it.nullable ? 'Option[' + it.type + '] = None' : it.type}"
         sep = ",\n"
         if (it.annos != "") out.print " // ${it.annos}"
     }
-    out.println "\n)"
-    out.println ""
 
-    out.println "object ${className}Model {"
-//    out.println "${indentSpaces}implicit val ${lowerFirst(className)}Format: OFormat[${className}Model] = Jsonx.formatCaseClass[${className}Model]"
-    out.println "${indentSpaces}implicit val ${lowerFirst(className)}Format: OFormat[${className}Model] = Json.format[${className}Model]"
-    out.println "}"
-    out.println ""
+    if (addToApi && timeFields > 0) {
+        out.println "\n) {"
+        out.println ""
+        out.println "${sp}def toApi: ${className}Api = ${className}Api.fromModel(this)"
+        out.println "}"
+        out.println ""
+    } else {
+        out.println "\n)"
+        out.println ""
+
+        out.println "object ${className}Model {"
+//    out.println "${sp}implicit val ${lowerFirst(className)}Format: OFormat[${className}Model] = Jsonx.formatCaseClass[${className}Model]"
+        out.println "${sp}implicit val ${lowerFirst(className)}Format: OFormat[${className}Model] = Json.format[${className}Model]"
+        out.println "}"
+        out.println ""
+    }
 
     out.println "trait ${className}Component {"
-    out.println "${indentSpaces}self: HasDatabaseConfigProvider[JdbcProfile] =>"
+    out.println "${sp}self: HasDatabaseConfigProvider[JdbcProfile] =>"
     out.println ""
-    out.println "${indentSpaces}import profile.api._"
+    out.println "${sp}import profile.api._"
     out.println ""
-    out.println "${indentSpaces}class ${className}(tag: Tag) extends Table[${className}Model](tag, \"${tableName}\") {"
+    out.println "${sp}class ${className}(tag: Tag) extends Table[${className}Model](tag, \"${tableName}\") {"
     sep = ""
     fields.each() {
         out.print sep
         varType = "${it.nullable ? 'Option[' + it.type + ']' : it.type}"
-        out.print "${indentSpaces}${indentSpaces}def ${it.name}: Rep[${varType}] = column[${varType}](\"${it.name}\""
+        out.print "${sp}${sp}def ${it.name}: Rep[${varType}] = column[${varType}](\"${it.name}\""
         if (it.key) out.print ", O.PrimaryKey"
         if (it.auto) out.print ", O.AutoInc"
         out.print ")"
@@ -383,15 +422,15 @@ void generateModel(PrintWriter dbg, PrintWriter out, String tableName, String cl
 //    out.println "    def stepId: Rep[Int] = column[Int]("stepId")"
 //    out.println ""
 
-    out.println "${indentSpaces}${indentSpaces}def * : ProvenShape[${className}Model] = ("
-//    out.println "${indentSpaces}${indentSpaces}${indentSpaces}stepInstanceId.?,"
-//    out.println "${indentSpaces}${indentSpaces}${indentSpaces}stepId,"
+    out.println "${sp}${sp}def * : ProvenShape[${className}Model] = ("
+//    out.println "${sp}${sp}${sp}stepInstanceId.?,"
+//    out.println "${sp}${sp}${sp}stepId,"
     sep = ""
     fields.each() {
         out.print sep
         sep = ",\n"
 //        def varType = "${it.nullable ? 'Option[' + it.type + ']' : it.type}"
-        out.print "${indentSpaces}${indentSpaces}${indentSpaces}${it.name}"
+        out.print "${sp}${sp}${sp}${it.name}"
         if (it.key && !it.nullable) out.print ".?"
 //        if (it.annos != "") out.print " // ${it.annos}"
     }
@@ -402,7 +441,7 @@ void generateModel(PrintWriter dbg, PrintWriter out, String tableName, String cl
 //    out.println "              Option[String], // startedAt"
 //    out.println "              Option[String], // createdAt"
     out.println ""
-    out.println "${indentSpaces}${indentSpaces}) <> ( { tuple: ("
+    out.println "${sp}${sp}) <> ( { tuple: ("
     sep = ""
     suffix = ""
     extraPad = ""
@@ -411,9 +450,9 @@ void generateModel(PrintWriter dbg, PrintWriter out, String tableName, String cl
         sep = ","
         varType = "${it.nullable || it.key ? 'Option[' + it.type + ']' : it.type}"
         out.print extraPad
-        out.print "${indentSpaces}${indentSpaces}${indentSpaces}${varType}"
+        out.print "${sp}${sp}${sp}${varType}"
         suffix = " // ${it.name}\n"
-        extraPad = "${indentSpaces}"
+        extraPad = "${sp}"
 //        if (it.key) out.print ".?"
 //        if (it.annos != "") out.print " // ${it.annos}"
     }
@@ -423,8 +462,8 @@ void generateModel(PrintWriter dbg, PrintWriter out, String tableName, String cl
 //    out.println "      StepInstanceModel("
 //    out.println "        stepInstanceId = tuple._1,"
 //    out.println "        stepId = tuple._2,"
-    out.println "${indentSpaces}${indentSpaces}${indentSpaces}) =>"
-    out.println "${indentSpaces}${indentSpaces}${indentSpaces}${className}Model("
+    out.println "${sp}${sp}${sp}) =>"
+    out.println "${sp}${sp}${sp}${className}Model("
     sep = ""
     suffix = ""
     tuple = 1
@@ -432,17 +471,17 @@ void generateModel(PrintWriter dbg, PrintWriter out, String tableName, String cl
         out.print sep + suffix
         sep = ","
         varType = "${it.nullable || it.key ? 'Option[' + it.type + ']' : it.type}"
-        out.print "${indentSpaces}${indentSpaces}${indentSpaces}${indentSpaces}${it.name} = tuple._${tuple++}"
+        out.print "${sp}${sp}${sp}${sp}${it.name} = tuple._${tuple++}"
         suffix = "\n"
 //        if (it.key) out.print ".?"
 //        if (it.annos != "") out.print " // ${it.annos}"
     }
     out.print suffix
 
-    out.println "${indentSpaces}${indentSpaces}${indentSpaces})"
-    out.println "${indentSpaces}${indentSpaces}}, {"
-    out.println "${indentSpaces}${indentSpaces}${indentSpaces}ps: ${className}Model =>"
-    out.println "${indentSpaces}${indentSpaces}${indentSpaces}${indentSpaces}Some(("
+    out.println "${sp}${sp}${sp})"
+    out.println "${sp}${sp}}, {"
+    out.println "${sp}${sp}${sp}ps: ${className}Model =>"
+    out.println "${sp}${sp}${sp}${sp}Some(("
 //    out.println "          ps.stepInstanceId,"
 //    out.println "          ps.stepId,"
     sep = ""
@@ -452,16 +491,158 @@ void generateModel(PrintWriter dbg, PrintWriter out, String tableName, String cl
         out.print sep + suffix
         sep = ","
         varType = "${it.nullable || it.key ? 'Option[' + it.type + ']' : it.type}"
-        out.print "${indentSpaces}${indentSpaces}${indentSpaces}${indentSpaces}${indentSpaces}ps.${it.name}"
+        out.print "${sp}${sp}${sp}${sp}${sp}ps.${it.name}"
         suffix = "\n"
 //        if (it.key) out.print ".?"
 //        if (it.annos != "") out.print " // ${it.annos}"
     }
     out.print suffix
-    out.println "${indentSpaces}${indentSpaces}${indentSpaces}${indentSpaces}))"
-    out.println "${indentSpaces}${indentSpaces}})"
-    out.println "${indentSpaces}}"
+    out.println "${sp}${sp}${sp}${sp}))"
+    out.println "${sp}${sp}})"
+    out.println "${sp}}"
     out.println ""
-    out.println "${indentSpaces}val ${lowerFirst(toPlural(className))}: TableQuery[${className}] = TableQuery[${className}] // Query Object"
+    out.println "${sp}val ${lowerFirst(toPlural(className))}: TableQuery[${className}] = TableQuery[${className}] // Query Object"
+    out.println "}"
+
+    return timeFields
+}
+
+void generateApi(PrintWriter dbg, PrintWriter out, String tableName, String className, def fields, String packageName) {
+    def dbCase = true
+    def keyCount = 0
+    def nonKeyCount = 0
+    def timestampCount = 0
+    def dateCount = 0
+    def timeCount = 0
+    fields.each() {
+        if (it.name != it.column) dbCase = false
+        if (it.key) keyCount++
+        else nonKeyCount++
+
+        if (it.timeType == "Timestamp") timestampCount++
+        else if (it.timeType == "Date") dateCount++
+        else if (it.timeType == "Time") timeCount++
+    }
+
+    // set single key to nullable and auto
+    if (keyCount == 1 && nonKeyCount > 0) {
+        fields.each() {
+            if (it.key) {
+                it.nullable = true
+                it.auto = true
+            }
+        }
+    }
+
+    out.println "package $packageName"
+    out.println ""
+
+    def timeFields = (timestampCount > 0 ? 1 : 0) + (dateCount > 0 ? 1 : 0) + (timeCount > 0 ? 1 : 0)
+    def importSql = "import helpers.DateConversion."
+    def sep = ""
+    if (false && timeFields == 1) {
+        importSql += (dateCount > 0 ? "asDate" : "") + (timeCount > 0 ? "asTime" : "") + (timestampCount > 0 ? "asTimestamp" : "")
+    } else {
+        sep = "{"
+        if (dateCount > 0) {
+            importSql += sep + "asDate, asDateString"
+            sep = ", "
+        }
+        if (timeCount > 0) {
+            importSql += sep + "asTime, asTimeString"
+            sep = ", "
+        }
+        if (timestampCount > 0) {
+            importSql += sep + "asTimestamp, asTimestampString"
+            sep = ", "
+        }
+        importSql += "}"
+    }
+    if (timeFields > 0) {
+        out.println importSql
+    }
+
+//    out.println "import ai.x.play.json.Jsonx"
+//    out.println "import play.api.db.slick.HasDatabaseConfigProvider"
+//    out.println "import play.api.libs.json.OFormat"
+//    out.println "import play.api.db.slick.HasDatabaseConfigProvider"
+    out.println "import play.api.libs.json.{Json, OFormat}"
+//    out.println "import slick.jdbc.JdbcProfile"
+//    out.println "import slick.lifted.ProvenShape"
+    out.println ""
+    out.println "/**"
+    sep = "";
+    def len = 0
+    fields.each() {
+        if (len < it.name.length()) len = it.name.length()
+    }
+
+    fields.each() {
+        out.print "${sp}* @param "
+        if (it.annos != "") out.println "${sp}${it.annos}"
+        out.print "${rightPad(it.name, len)} ${it.nullable ? 'Option[' + it.type + ']' : it.type}"
+        out.println ""
+    }
+//    out.println "  * @param stepInstanceId    Int"
+//    out.println "  * @param stepId            Int"
+//    out.println "  * @param userUuid          Option[String]"
+//    out.println "  * @param comment           Option[String]"
+    out.println "  */"
+
+    out.println ""
+//    case class StepInstanceModel(
+//      stepInstanceId: Option[Int] = None,
+//      stepId: Int,
+//      processInstanceId: Int,
+//      createdAt: Option[String],
+//      updatedAt: Option[String],
+//      deadlineAt: Option[Date],
+//    )
+    out.println "case class ${className}Api("
+    sep = "";
+    fields.each() {
+        out.print sep
+        out.print "${sp}${it.name}: ${it.nullable ? 'Option[' + it.type + '] = None' : it.type}"
+        sep = ",\n"
+        if (it.annos != "") out.print " // ${it.annos}"
+    }
+
+    out.println "\n) {"
+    out.println ""
+    out.println "${sp}def toModel: ${className}Model = {"
+    out.println "${sp}${sp}${className}Model("
+    sep = ""
+    fields.each() {
+        out.print sep
+        sep = ",\n"
+        if (it.timeType == "Timestamp") out.print "${sp}${sp}${sp}${it.name} = asTimestamp(this.${it.name})"
+        else if (it.timeType == "Date") out.print "${sp}${sp}${sp}${it.name} = asDate(this.${it.name})"
+        else if (it.timeType == "Time") out.print "${sp}${sp}${sp}${it.name} = asTime(this.${it.name})"
+        else out.print "${sp}${sp}${sp}${it.name} = this.${it.name}"
+    }
+    out.println ""
+    out.println "${sp}${sp})"
+    out.println "${sp}}"
+    out.println "}"
+    out.println ""
+
+    out.println "object ${className}Api {"
+//    out.println "${sp}implicit val ${lowerFirst(className)}Format: OFormat[${className}Model] = Jsonx.formatCaseClass[${className}Model]"
+    out.println "${sp}implicit val ${lowerFirst(className)}Api: OFormat[${className}Api] = Json.format[${className}Api]"
+    out.println ""
+    out.println "${sp}def fromModel(other: ${className}Model): ${className}Api = {"
+    out.println "${sp}${sp}${className}Api("
+    sep = ""
+    fields.each() {
+        out.print sep
+        sep = ",\n"
+        if (it.timeType == "Timestamp") out.print "${sp}${sp}${sp}${it.name} = asTimestampString(other.${it.name})"
+        else if (it.timeType == "Date") out.print "${sp}${sp}${sp}${it.name} = asDateString(other.${it.name})"
+        else if (it.timeType == "Time") out.print "${sp}${sp}${sp}${it.name} = asTimeString(other.${it.name})"
+        else out.print "${sp}${sp}${sp}${it.name} = other.${it.name}"
+    }
+    out.println ""
+    out.println "${sp}${sp})"
+    out.println "${sp}}"
     out.println "}"
 }
