@@ -100,6 +100,8 @@ in the database.
 
 ## 0.5.0-beta-3
 
+* Add: option to Scala model script to generate a separate Database model and an Api Model used
+  for REST api data exchange.
 * Fix: `Generate Kotlin-Model.groovy` now will look for the model map file starting from the
   directory selected for generation and go up, until encountering directory with sub-directory
   `.idea`, hitting the root directory or finding `model-config.json` file. Mappings in
