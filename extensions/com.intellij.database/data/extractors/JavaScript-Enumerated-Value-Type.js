@@ -109,29 +109,33 @@ function javaName(str, capitalize, pluralize, dropLastId) {
 
 // com.intellij.openapi.util.text.StringUtil.escapeXml(str)
 function displayName(str, pluralize, dropLastId) {
-    var s = [];
-    var spl = com.intellij.psi.codeStyle.NameUtil.splitNameIntoWords(str);
+    if (/^[A-Z_]+$/.test(str)) {
+        return str;
+    } else {
+        var s = [];
+        var spl = com.intellij.psi.codeStyle.NameUtil.splitNameIntoWords(str);
 
-    var iMax = spl.length;
-    for (i = 0; i < iMax; i++) {
-        var part = spl[i].toString();
-        if (!(dropLastId && i + 1 === iMax && iMax > 1 && part.toLowerCase() === "id")) {
-            s.push(part);
+        var iMax = spl.length;
+        for (i = 0; i < iMax; i++) {
+            var part = spl[i].toString();
+            if (!(dropLastId && i + 1 === iMax && iMax > 1 && part.toLowerCase() === "id")) {
+                s.push(part);
+            }
         }
+
+        s = s.map(function (value, i) {
+            var part = value;
+            if (pluralize && i + 1 === s.length) {
+                part = com.intellij.openapi.util.text.StringUtil.pluralize(part) || part;
+            }
+
+            return part.substr(0, 1).toUpperCase() + part.substring(1).toLowerCase();
+        });
+
+        return s.map(function (it) {
+            return it.replace(/[^a-zA-Z0-9_$]+/, " ");
+        }).join(" ").replace(/\\s+/, " ");
     }
-
-    s = s.map(function (value, i) {
-        var part = value;
-        if (pluralize && i + 1 === s.length) {
-            part = com.intellij.openapi.util.text.StringUtil.pluralize(part) || part;
-        }
-
-        return part.substr(0, 1).toUpperCase() + part.substring(1).toLowerCase();
-    });
-
-    return s.map(function (it) {
-        return it.replace(/[^a-zA-Z0-9_$]+/, " ");
-    }).join(" ").replace(/\\s+/, " ");
 }
 
 function snakeName(str, capitalize, pluralize, dropLastId) {
@@ -361,15 +365,16 @@ forAllNamedEnumValues(function (name, value, index) {
 outputln("// NOTE: this definition is used for WebStorm Code Completions to work");
 outputln("const ", enumName, "Value = {");
 
-output("    value: { ", enumIdVar, ": 0, ");
+output("    value: {", enumIdVar, ": 0");
+sep = ", ";
 forAllEnumParams(function (nameAs, type, colIndex) {
     if (colIndex) {
-        output(javaName(nameAs, false, false, false), ": ");
+        output(sep, javaName(nameAs, false, false, false), ": ");
         var elementValue = type === "String" ? '""' : 0;
-        output(elementValue, ", ");
+        output(elementValue);
     }
 });
-outputln("},\n");
+outputln(sep, "_displayName: \"\"},\n");
 
 outputln("    get ", enumIdVar, "() { return this.value.", enumIdVar, "; },");
 forAllEnumParams(function (nameAs, type, colIndex) {
@@ -394,15 +399,16 @@ forAllNamedEnumValues(function (name, value, index) {
 }, "", "", "");
 outputln();
 outputln("    ", enumIdVar, "(arg, defaultValue = undefined) { return ", enumName, "Value; },");
-outputln("    get dropdownChoices() { return [{value: 0, label: \"label\"}, ]; }");
+outputln("    get dropdownChoices() { return [{value: 0, label: \"label\"}]; },");
 outputln("};");
 outputln();
 
 outputln("// this definition is used for actual definition");
 outputln("let _", enumName, " = {");
 
+sep = ", ";
 forAllNamedEnumValues(function (name, value, index) {
-    var arr = ["    ", name, ": { "];
+    var arr = ["    ", name, ": {"];
 
     var enumDisplayValue;
 
@@ -410,7 +416,7 @@ forAllNamedEnumValues(function (name, value, index) {
         if (!colIndex) {
             arr.push(enumIdVar, ": ");
         } else {
-            arr.push(javaName(nameAs, false, false, false), ": ");
+            arr.push(sep, javaName(nameAs, false, false, false), ": ");
         }
         var columnElement = columns[colIndex][index];
 
@@ -419,18 +425,18 @@ forAllNamedEnumValues(function (name, value, index) {
         }
 
         var elementValue = type === "String" ? '"' + columnElement.replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + '"' : columnElement;
-        arr.push(elementValue, ", ");
+        arr.push(elementValue);
     }, "", "", "");
 
-    arr.push("_", enumValueVar, ": ", '"' + enumDisplayValue.replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + '"', ", ");
-    arr.push(" },\n");
+    arr.push(sep, "_displayName: ", '"' + enumDisplayValue.replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + '"');
+    arr.push("},\n");
     return arr.join("");
 });
 
 outputln("};");
 
 outputln();
-outputln(enumName, " = new Enum(\"", enumName, "\", _", enumName, ", ", enumName, "Value, \"", enumIdVar, "\", \"_", enumValueVar, "\");");
+outputln(enumName, " = new Enum(\"", enumName, "\", _", enumName, ", ", enumName, "Value, \"", enumIdVar, "\", \"_displayName\");");
 outputln();
 outputln("export default ", enumName, ";");
 outputln();
