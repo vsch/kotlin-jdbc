@@ -5,6 +5,7 @@
 - [TODO](#todo)
     - [High Priority](#high-priority)
 - [0.5.0 API Breaking Release](#050-api-breaking-release)
+- [0.5.0-beta-4](#050-beta-4)
 - [0.5.0-beta-3](#050-beta-3)
 - [0.5.0-beta-2](#050-beta-2)
 - [0.5.0-beta-1](#050-beta-1)
@@ -98,8 +99,17 @@ to the table name will only be used for column references.
 [`Generate Kotlin-Model.groovy`] has been updated to generate the new model format from tables
 in the database.
 
+## 0.5.0-beta-4
+
+* Fix: [JavaScript-Enumerated-Value-Type.js] for latest version of [`enumerated-type`] with
+      objects for values and `dropdownChoices` property of `{ value: xxx, label: "yyy", }`
+      automatically generated from the enum id column and enum type column.
+
+
 ## 0.5.0-beta-3
 
+* Fix: [JavaScript-Enumerated-Value-Type.js] for latest version of [`enumerated-type`] with
+  object value containing the id and type instead of constants.
 * Add: option to Scala model script to generate a separate Database model and an Api Model used
   for REST api data exchange.
 * Fix: `Generate Kotlin-Model.groovy` now will look for the model map file starting from the
@@ -384,4 +394,7 @@ To expand to `SELECT * FROM Table WHERE column in (?,?,?)` with parameters of `1
 * Initial release
 
 [`Generate Kotlin-Model.groovy`]: https://github.com/vsch/kotlin-jdbc/blob/master/extensions/com.intellij.database/schema/Generate%20Kotlin-Model.groovy
+[JavaScript-Enumerated-Value-Type.js]: extensions/com.intellij.database/data/extractors/JavaScript-Enumerated-Value-Type.js
+[`enumerated-type`]: https://github.com/vsch/enumerated-type
+
 

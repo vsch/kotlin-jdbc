@@ -1,5 +1,5 @@
 /*
-   Data extractor of table data to JavaScript Enum based on values using npm 'enumerated-type' package
+   Data extractor of table data to Kotlin Enum based on values
 
    First non-numeric column is considered the name of the enum values, the rest will be used as properties of the enum value
 
@@ -35,7 +35,7 @@ var NEWLINE = "\n";
 
 function output() {
     for (var i = 0; i < arguments.length; i++) {
-        OUT.append(arguments[i]);
+        OUT.append(arguments[i].toString());
     }
 }
 
@@ -204,7 +204,7 @@ for (i = 0; i < iMax; i++) {
         var jMax = column.length;
         var j;
         for (j = 0; j < jMax; j++) {
-            enumValueNames.push(javaName(column[j], false, false, false));
+            enumValueNames.push(snakeName(column[j], false, false, false).toUpperCase());
         }
 
         break;
@@ -214,8 +214,9 @@ for (i = 0; i < iMax; i++) {
 // use default enum value names
 if (enumNamesColumn < 0) {
     enumNamesColumn = 0;
+    var valueName = snakeName(columnNames[0], false, false, true).toUpperCase();
     enumValueNames = columns[0].map(function (value) {
-        return columnNames[0] + "_" + value;
+        return valueName + "_" + value;
     });
 }
 
@@ -227,7 +228,6 @@ enumNames = columnNames
         if (index === 0 && javaName(value, true, true, true).toLowerCase() === enumName.toLowerCase()) {
             name = "id";
         }
-
         enumNameColumns[name] = index;
         return name;
     });
@@ -258,41 +258,7 @@ function forAllEnumParams(callback, prefix, delimiter, suffix) {
         var type = columnTypes[enumNameColumn];
         var out = callback(value, type, enumNameColumn);
         if (out !== undefined && out !== null) {
-            if (sep !== undefined) {
-                output(sep);
-            }
-            sep = delimiter;
-            output(out);
-            hadOutput = true;
-        }
-    });
-
-    if (hadOutput && suffix !== undefined && suffix !== null) {
-        output(suffix);
-    }
-}
-
-/**
- * @param callback      (name, value, index) return
- * @param prefix        will be output iff enumNames is not empty and have output
- * @param delimiter     will be used between outputs
- * @param suffix        will be output iff enumNames is not empty and have output
- */
-function forAllEnumValues(callback, prefix, delimiter, suffix) {
-    var sep = prefix;
-    var hadOutput = false;
-    enumValueNames.forEach(function (value, index) {
-        if (sep !== undefined) {
             output(sep);
-        }
-
-        sep = delimiter;
-        var enumValue = columns[0][index];
-        var out = callback(value, enumValue, index);
-        if (out !== undefined && out !== null) {
-            if (sep !== undefined) {
-                output(sep);
-            }
             sep = delimiter;
             output(out);
             hadOutput = true;
@@ -303,102 +269,38 @@ function forAllEnumValues(callback, prefix, delimiter, suffix) {
         output(suffix);
     }
 }
-
-/**
- * @param callback      (name, value, index) return
- * @param prefix        will be output iff enumNames is not empty and have output
- * @param delimiter     will be used between outputs
- * @param suffix        will be output iff enumNames is not empty and have output
- */
-function forAllNamedEnumValues(callback, prefix, delimiter, suffix) {
-    if (enumNamesColumn > 0) {
-        forAllEnumValues(callback, prefix, delimiter, suffix);
-    }
-}
-
-var sep = "";
 
 // Start of output
-outputln("import Enum from 'enumerated-type';");
-outputln();
-var idPrefix = (snakeName(columnNames[0], false, false, true) + "_").toUpperCase();
-var enumValueVar = javaName(columnNames[0], false, false, true);
-var enumIdVar = javaName(columnNames[0]);
+// may need constructor
+if (packageName) {
+    outputln("package " + packageName);
+    outputln("");
+}
 
-forAllNamedEnumValues(function (name, value, index) {
-    return ["export const ", idPrefix, snakeName(name, false, false, true).toUpperCase(), "_ID = ", value, ";\n"].join("");
-}, "", "", "\n");
+output("object " + enumName);
 
-outputln("// NOTE: this definition is used for WebStorm Code Completions to work");
-outputln("const ", enumName, "Value = {");
-outputln("    value: 0,");
-outputln("    get ", javaName(columnNames[0], false, false, false), "() { return this.value; },");
-forAllEnumParams(function (nameAs, type, colIndex) {
-    if (colIndex) {
-        outputln("    get ", javaName(nameAs, false, false, true), "() {");
-        outputln("        switch (this.value) {");
-        outputln("            // @formatter:off");
-        forAllNamedEnumValues(function (name, value, index) {
-            var columnElement = columns[colIndex][index];
-            // var elementValue = colIndex === 1 ? idPrefix + snakeName(name).toUpperCase() : type === "String" ? '"' + columnElement.replace(/\\/g,"\\\\").replace(/"/g,"\\\"") + '"': columnElement;
-            var elementValue = type === "String" ? '"' + columnElement.replace(/\\/g,"\\\\").replace(/"/g,"\\\"") + '"': columnElement;
-            return ["            case ", idPrefix, snakeName(name).toUpperCase(), "_ID : return ", elementValue, ";\n"].join("");
-        }, "", "", "");
-        outputln("            // @formatter:on");
-        outputln("            default:");
-        outputln("                throw `IllegalStateException, unhandled ", enumIdVar, " ${this.value} of ", enumName, ".${this.name}`;");
-        outputln("        }");
-        outputln("    },");
-    }
+// forAllEnumParams(function (name, type, isId, colIndex) {
+//     return "val " + name + ": " + type;
+// }, "(", ", ", ")");
+
+outputln(" {");
+
+var sep = "";
+enumValueNames.forEach(function (value, enumValueIndex) {
+    output(sep);
+    sep = ",\n";
+    output("  val ", value, " = ", columns[0][enumValueIndex]);
+
+    // forAllEnumParams(function (name, type, colIndex) {
+    //     var columnElement = columns[colIndex][enumValueIndex];
+    //     return type === "String" ? '"' + columnElement.replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + '"' : columnElement;
+    // }, "(", ", ", ")");
 });
-forAllNamedEnumValues(function (name, value, index) {
-    return ["    get is", javaName(name, true, false, false), "() { return this.value === ", idPrefix, snakeName(name).toUpperCase(), "_ID; },\n"].join("");
-}, "", "", "");
-outputln("};");
-outputln();
-outputln("// NOTE: this definition is used for WebStorm Code Completions to work");
-outputln("let ", enumName, " = {");
-forAllNamedEnumValues(function (name, value, index) {
-    return ["    ", name, ": ", enumName, "Value, // ", value, "\n"].join("");
-}, "", "", "");
-outputln();
-outputln("    value(arg) {");
-outputln("        return ", enumName, "Value;");
-outputln("    },");
-outputln("};");
-outputln();
-outputln("// this definition is used for actual definition");
-outputln("let _", enumName, " = {");
-forAllNamedEnumValues(function (name, value, index) {
-    return ["    ", name, ": ", idPrefix, snakeName(name).toUpperCase(), "_ID, // ", value, "\n"].join("");
-}, "", "", "");
-outputln("};");
-outputln();
-outputln(enumName, " = new Enum(\"", enumName, "\", _", enumName, ", ", enumName, "Value);");
-outputln();
-outputln("export default ", enumName, ";");
-outputln();
+// outputln(";");
 
-outputln("/**");
-outputln(" * Sample function with switch for handling all enum values and generating exceptions,");
-outputln(" * use the copy/paste Luke, use the copy/paste");
-outputln(" *");
-outputln(" * @param ", enumIdVar, " {*} enum value or value which can be converted to enum value");
-outputln(" */");
-outputln("function dummy(", enumIdVar, ") {");
-outputln("    const ", enumValueVar, " = ", enumName, ".value(", enumIdVar, ");");
-outputln("    switch (", enumValueVar, ") {");
+// forAllEnumParams(function (name, type, colIndex) {
+//     return ["    fun ", javaName(columnNames[colIndex]), "(", name, ": ", type, "): ", enumName, "? = values().find { it.", name, " == ", name, " }"].join("");
+// }, "\n  companion object {\n", "\n", "\n  }\n");
 
-forAllNamedEnumValues(function (name, value, index) {
-    return ["        case ", enumName, ".", name, ":\n"].join("");
-}, "", "", "");
-
-outputln("            break;");
-outputln("");
-outputln("        default:");
-outputln("            // throw an error instead of silently doing nothing if more types are added in the future");
-outputln("            if (", enumValueVar, ") throw `IllegalStateException unhandled ", enumName, ".${", enumValueVar, ".name} value ${", enumValueVar, ".value}`;");
-outputln("            // comment out if non-enum values are allowed and ignored");
-outputln("            else throw `IllegalArgumentException unknown ", enumName, " value ${", enumIdVar, "}`;");
-outputln("    }");
 outputln("}");
+

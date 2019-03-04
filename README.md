@@ -690,7 +690,7 @@ enum class ChangeHistoryTypes(val id: Int, val type: String) {
 ```
 
 A script for generating a JavaScript enum based on [`enumerated-type`] npm package will generate
-an enum usable in JavaScript [JavaScript-Enumerated-Value-Type.kt.js]
+an enum usable in JavaScript [JavaScript-Enumerated-Value-Type.js]
 
 A script for generating a markdown table for the table data [Markdown-Table.md.js]. The table
 above was generated with this script.
@@ -922,7 +922,7 @@ Copyright (c) 2015 - Kazuhiro Sera
 [`enumerated-type`]: https://github.com/vsch/enumerated-type
 [`Generate Kotlin-Model.groovy`]: https://github.com/vsch/kotlin-jdbc/blob/master/extensions/com.intellij.database/schema/Generate%20Kotlin-Model.groovy
 [Generate Scala-Slick-Model.groovy]: extensions/com.intellij.database/schema/Generate%20Scala-Slick-Model.groovy
-[JavaScript-Enumerated-Value-Type.kt.js]: extensions/com.intellij.database/data/extractors/JavaScript-Enumerated-Value-Type.kt.js
-[Kotlin-Enum.kt.js]: extensions/com.intellij.database/data/extractors/Kotlin-Enum.kt.js
+[JavaScript-Enumerated-Value-Type.js]: extensions/com.intellij.database/data/extractors/JavaScript-Enumerated-Value-Type.js
+[Kotlin-Enum.kt.js]: extensions/com.intellij.database/data/extractors/Kotlin-Enum.js
 [Markdown-Table.md.js]: extensions/com.intellij.database/data/extractors/Markdown-Table.md.js
 
