@@ -398,8 +398,10 @@ forAllNamedEnumValues(function (name, value, index) {
     return ["    ", name, ": ", enumName, "Value, // ", value, "\n"].join("");
 }, "", "", "");
 outputln();
-outputln("    ", enumIdVar, "(arg, defaultValue = undefined) { return ", enumName, "Value; },");
-outputln("    get dropdownChoices() { return [{value: 0, label: \"label\"}]; },");
+outputln("    value(arg, defaultValue = undefined) { return ", enumName, "Value; }, // return an item with ", enumIdVar, " matching arg or defaultValue");
+outputln("    ", enumIdVar, "(arg) { return ", enumName, "Value.", enumIdVar, "; }, // return the arg if it matches an item's ", enumIdVar, " or ", enumValueNames[0], ".", enumIdVar);
+outputln("    get dropdownChoices() { return [{value: 0, label: \"label\"}]; }, // return dropdownChoices array");
+outputln("    dropdownChoicesExcluding() { return [{value: 0, label: \"label\"}]; }, // return dropdownChoices array excluding ones for items passed as arguments to the function");
 outputln("};");
 outputln();
 
