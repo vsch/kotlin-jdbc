@@ -8,6 +8,7 @@
 
 var packageName = "";    // package used for generated class files
 var enumNameSuffix = "";  // appended to class file name
+var DEBUG = false;
 
 function eachWithIdx(iterable, f) {
     var i = iterable.iterator();
@@ -66,16 +67,14 @@ function isNumeric(arg) {
  * @returns {boolean}
  */
 function allStrings(arr) {
-    var iMax = arr.length;
-    for (i = 0; i < iMax; i++) {
+    // if (DEBUG) outputln("// iMax: " + arr.length);
+    for (var i = 0; i < arr.length; i++) {
+        // if (DEBUG) outputln("// arr[", i, "]: ", arr[i]);
         if (!arr[i].toString().match(/[a-zA-Z_][a-zA-Z_0-9]*/)) {
             return false;
         }
     }
     return true;
-    // return arr.every(function (value) {
-    //     return value.match(/[a-zA-Z_][a-zA-Z_0-9]*/);
-    // });
 }
 
 // com.intellij.openapi.util.text.StringUtil.escapeXml(str)
@@ -83,10 +82,9 @@ function javaName(str, capitalize, pluralize, dropLastId) {
     var s = [];
     var spl = com.intellij.psi.codeStyle.NameUtil.splitNameIntoWords(str);
 
-    var iMax = spl.length;
-    for (i = 0; i < iMax; i++) {
+    for (var i = 0; i < spl.length; i++) {
         var part = spl[i].toString();
-        if (!(dropLastId && i + 1 === iMax && iMax > 1 && part.toLowerCase() === "id")) {
+        if (!(dropLastId && i + 1 === spl.length && spl.length > 1 && part.toLowerCase() === "id")) {
             s.push(part);
         }
     }
@@ -104,7 +102,7 @@ function javaName(str, capitalize, pluralize, dropLastId) {
         return it.replace(/[^a-zA-Z0-9_$]+/, "_");
     }).join("");
 
-    return capitalize || name.length === 1 ? name : name.substr(0, 1).toLowerCase() + name.substring(1)
+    return capitalize || name.length === 1 ? name : name.substr(0, 1).toLowerCase() + name.substring(1);
 }
 
 // com.intellij.openapi.util.text.StringUtil.escapeXml(str)
@@ -115,10 +113,9 @@ function displayName(str, pluralize, dropLastId) {
         var s = [];
         var spl = com.intellij.psi.codeStyle.NameUtil.splitNameIntoWords(str);
 
-        var iMax = spl.length;
-        for (i = 0; i < iMax; i++) {
+        for (var i = 0; i < spl.length; i++) {
             var part = spl[i].toString();
-            if (!(dropLastId && i + 1 === iMax && iMax > 1 && part.toLowerCase() === "id")) {
+            if (!(dropLastId && i + 1 === spl.length && spl.length > 1 && part.toLowerCase() === "id")) {
                 s.push(part);
             }
         }
@@ -142,10 +139,9 @@ function snakeName(str, capitalize, pluralize, dropLastId) {
     var s = [];
     var spl = com.intellij.psi.codeStyle.NameUtil.splitNameIntoWords(str);
 
-    var iMax = spl.length;
-    for (i = 0; i < iMax; i++) {
+    for (var i = 0; i < spl.length; i++) {
         var part = spl[i].toString();
-        if (!(dropLastId && i + 1 === iMax && iMax > 1 && part.toLowerCase() === "id")) {
+        if (!(dropLastId && i + 1 === spl.length && spl.length > 1 && part.toLowerCase() === "id")) {
             s.push(part);
         }
     }
@@ -201,11 +197,15 @@ columnNames = mapEach(COLUMNS, function (col) {
     return col.name();
 });
 
+if (DEBUG) outputln("// columnNames: " + columnNames);
+
 eachWithIdx(ROWS, function (row) {
     rows.push(mapEach(COLUMNS, function (col) {
         return FORMATTER.format(row, col);
     }));
 });
+
+if (DEBUG) outputln("// rows: " + rows);
 
 columns = rows[0].map(function () {
     return [];
@@ -215,8 +215,10 @@ columns = rows[0].map(function () {
 rows.forEach(function (row, rowIndex) {
     row.forEach(function (value, columnIndex) {
         columns[columnIndex].push(value);
-    })
+    });
 });
+
+if (DEBUG) outputln("// columns: " + columns);
 
 // name taken from the first column, less id if it is not just id
 enumName = javaName(columnNames[0], true, true, true);
@@ -224,23 +226,24 @@ if (enumName === "") {
     enumName = "TestEnum";
 }
 
+if (DEBUG) outputln("// enumName: " + enumName);
+
 // find first non-numeric column for enum names
-var iMax = columns.length;
-var i;
-for (i = 0; i < iMax; i++) {
+for (var i = 0; i < columns.length; i++) {
     var column = columns[i];
+    if (DEBUG) outputln("// columns[", i, "]: ", column, " allStrings: ", allStrings(column));
+
     if (allStrings(column)) {
         enumNamesColumn = i;
         enumValueNames = [];
-        var jMax = column.length;
-        var j;
-        for (j = 0; j < jMax; j++) {
+        for (var j = 0; j < column.length; j++) {
             enumValueNames.push(javaName(column[j], false, false, false));
         }
-
         break;
     }
 }
+
+if (DEBUG) outputln("// enumValueNames: " + enumValueNames);
 
 // use default enum value names
 if (enumNamesColumn < 0) {
@@ -249,6 +252,8 @@ if (enumNamesColumn < 0) {
         return columnNames[0] + "_" + value;
     });
 }
+
+if (DEBUG) outputln("// enumNamesColumn: " + enumNamesColumn);
 
 enumNameColumns = {};
 enumNames = columnNames
@@ -370,7 +375,7 @@ sep = ", ";
 forAllEnumParams(function (nameAs, type, colIndex) {
     if (colIndex) {
         output(sep, javaName(nameAs, false, false, false), ": ");
-        var elementValue = type === "String" ? '""' : 0;
+        var elementValue = type === "String" ? '""' : "0";
         output(elementValue);
     }
 });
@@ -409,12 +414,16 @@ outputln("// this definition is used for actual definition");
 outputln("let _", enumName, " = {");
 
 sep = ", ";
+if (DEBUG) outputln("// enumName: ", enumName, " enumIdVar: ", enumIdVar, " enumValueVar: ", enumValueVar);
+
 forAllNamedEnumValues(function (name, value, index) {
     var arr = ["    ", name, ": {"];
 
     var enumDisplayValue;
 
     forAllEnumParams(function (nameAs, type, colIndex) {
+        if (DEBUG) outputln("// nameAs: ", nameAs, " type: ", type, " colIndex: ", colIndex);
+
         if (!colIndex) {
             arr.push(enumIdVar, ": ");
         } else {
@@ -422,7 +431,7 @@ forAllNamedEnumValues(function (name, value, index) {
         }
         var columnElement = columns[colIndex][index];
 
-        if (nameAs === enumValueVar) {
+        if (colIndex === enumNamesColumn) {
             enumDisplayValue = displayName(columnElement, false, false);
         }
 
