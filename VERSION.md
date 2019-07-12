@@ -5,6 +5,7 @@
 - [TODO](#todo)
     - [High Priority](#high-priority)
 - [0.5.0 API Breaking Release](#050-api-breaking-release)
+- [0.5.0-beta-5](#050-beta-5)
 - [0.5.0-beta-4](#050-beta-4)
 - [0.5.0-beta-3](#050-beta-3)
 - [0.5.0-beta-2](#050-beta-2)
@@ -98,6 +99,11 @@ to the table name will only be used for column references.
 
 [`Generate Kotlin-Model.groovy`] has been updated to generate the new model format from tables
 in the database.
+
+## 0.5.0-beta-5
+
+* Fix: Rollback used string compare instead of version compare, causing 0_7_2 to match 0_7_20
+  rollback.
 
 ## 0.5.0-beta-4
 

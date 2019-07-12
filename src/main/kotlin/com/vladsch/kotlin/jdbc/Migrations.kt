@@ -586,7 +586,7 @@ LIMIT 1
                 if (versionCompare > 0) {
                     // need to run all migrations from earlier versions down up to but not including requested version
                     val versionList = getVersions()
-                            .filter { it.compareTo(currentVersion) < 0 && it.compareTo(migration.version) > 0 }
+                            .filter { it.versionCompare(currentVersion) < 0 && it.versionCompare(migration.version) > 0 }
                             .sortedWith(Comparator(String::versionCompare))
                             .reversed()
 
