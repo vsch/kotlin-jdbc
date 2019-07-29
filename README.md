@@ -41,7 +41,15 @@ to the table name will only be used for column references.
 
 [`Generate Kotlin-Model.groovy`] has been updated to generate the new model format from tables
 in the database and optionally use a `model-config.json` to provide table to generated model
-file. See:
+file.
+
+### :warning: 0.5.0-beta-6 Adds *profileName* after `db/`
+
+Breaking change in resource `db/` adds profile name after `db/` to allow multi-database
+migrations, with `default` being the default profile name.
+
+To migrate previous `db/` structure move all directories other than `templates` under
+`db/` to `db/default`
 
 ## Overview
 
@@ -822,7 +830,7 @@ Commands:
 
 * new-major - create a new version directory with major version incremented, from current or
   requested version.
-  
+
   specific profile name is required
 
 * new-minor - create a new version directory with minor version incremented, from current or
