@@ -5,22 +5,36 @@ import java.io.File
 import java.io.FileWriter
 import java.nio.charset.Charset
 import java.sql.SQLException
+import kotlin.system.exitProcess
 
 @Suppress("MemberVisibilityCanBePrivate")
-class Migrations(val session: Session, val migrationSession: Session, val dbEntityExtractor: DbEntityExtractor, val resourceClass: Class<*>) {
+class Migrations(val sessions: Map<String, Session>, val migrationSessions: Map<String, Session>, val dbEntityExtractor: DbEntityExtractor, val resourceClass: Class<*>) {
+    constructor(session: Session, migrationSession: Session, dbEntityExtractor: DbEntityExtractor, resourceClass: Class<*>)
+        : this(mapOf(DEFAULT_PROFILE to session), mapOf(DEFAULT_PROFILE to migrationSession), dbEntityExtractor, resourceClass)
 
     companion object {
         private val LOG = LoggerFactory.getLogger(Migrations::class.java)!!
         val MIGRATIONS_FILE_NAME = DbEntity.TABLE.addSuffix("migrations")
         val CLEAN_COMMENT = "(?<=^|\n)#".toRegex()
+        val DEFAULT_PROFILE = "default"
+        val MIGRATIONS_TABLE = "migrations"
     }
 
     var quiet = false
     var verbose = false
     var detailed = false
+    var dbProfile: String? = null
+    var migration: MigrationSession? = null
 
     fun getVersions(): List<String> {
-        return getResourceFiles(resourceClass, "/db").filter { it.matches(DbVersion.regex) }.map { it.toUpperCase() }.sortedWith(Comparator(String::versionCompare))
+        return getResourceFiles(resourceClass, "/db/$dbProfile").filter { it.matches(DbVersion.regex) }.map { it.toUpperCase() }.sortedWith(Comparator(String::versionCompare))
+    }
+
+    fun getDbProfiles(): List<String> {
+        return sessions.keys.toList()
+        //        val dbFiles = getResourceFiles(resourceClass, "/db")
+        //        val dbProfiles = dbFiles.filter { it != "templates"}
+        //        return dbProfiles.filter { sessions.containsKey(it) }
     }
 
     fun getPreviousVersion(version: String): String? {
@@ -38,6 +52,9 @@ class Migrations(val session: Session, val migrationSession: Session, val dbEnti
         val versions = getVersions()
         return if (versions.isEmpty()) "V0_0_0" else versions.last()
     }
+
+    val session: Session get() = sessions[dbProfile] ?: sessions[DEFAULT_PROFILE]!!
+    val migrationSession: Session get() = migrationSessions[dbProfile] ?: sessions[DEFAULT_PROFILE]!!
 
     private fun doForEachEntity(entity: DbEntity, tablesDir: File, entities: List<String>, consumer: (tableFile: File, tableScript: String) -> Unit) {
         val entityFixer = dbEntityExtractor.entityScriptFixer(entity, session)
@@ -57,19 +74,19 @@ class Migrations(val session: Session, val migrationSession: Session, val dbEnti
     }
 
     fun forEachEntity(entity: DbEntity, dbDir: File, dbVersion: String, consumer: (tableFile: File, tableScript: String) -> Unit) {
-        val tablesDir = entity.getEntityDirectory(dbDir, dbVersion, true)
+        val tablesDir = entity.getEntityDirectory(dbDir, dbProfile!!, dbVersion, true)
         val tables = dbEntityExtractor.getDbEntities(entity, session)
         doForEachEntity(DbEntity.TABLE, tablesDir, tables, consumer)
     }
 
     fun forEachEntity(entity: DbEntity, dbVersion: String, consumer: (tableFile: File, tableScript: String) -> Unit) {
-        val tablesDir = entity.getEntityResourceDirectory(dbVersion)
+        val tablesDir = entity.getEntityResourceDirectory(dbProfile!!, dbVersion)
         val tables = dbEntityExtractor.getDbEntities(entity, session)
         doForEachEntity(DbEntity.TABLE, tablesDir, tables, consumer)
     }
 
     fun forEachEntityFile(dbDir: File, dbVersion: String, consumer: (tableFile: File) -> Unit, entity: DbEntity) {
-        val tablesDir = entity.getEntityDirectory(dbDir, dbVersion, true)
+        val tablesDir = entity.getEntityDirectory(dbDir, dbProfile!!, dbVersion, true)
         val tableFiles = entity.getEntityFiles(tablesDir)
 
         // delete all existing table sql files
@@ -80,8 +97,8 @@ class Migrations(val session: Session, val migrationSession: Session, val dbEnti
     }
 
     fun forEachEntityResourceFile(entity: DbEntity, dbVersion: String, consumer: (tableFile: File) -> Unit) {
-        val tablesDir = entity.getEntityResourceDirectory(dbVersion)
-        val tableFiles = entity.getEntityResourceFiles(resourceClass, dbVersion)
+        val tablesDir = entity.getEntityResourceDirectory(dbProfile!!, dbVersion)
+        val tableFiles = entity.getEntityResourceFiles(resourceClass, dbProfile!!, dbVersion)
 
         // delete all existing table sql files
         tableFiles.forEach {
@@ -259,7 +276,7 @@ class Migrations(val session: Session, val migrationSession: Session, val dbEnti
         // may need to create table directory
         val tables = dbEntityExtractor.getDbEntities(entity, session)
         val tableSet = tables.map { it.toLowerCase() }.toSet()
-        val entities = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, migration.version)
+        val entities = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, migration.migrations.dbProfile!!, migration.version)
 
         runEntitiesSql(migration, entities, "Creating table", null) { tableSet.contains(it.toLowerCase()) }
     }
@@ -287,7 +304,7 @@ class Migrations(val session: Session, val migrationSession: Session, val dbEnti
 
     fun updateEntities(entity: DbEntity, migration: MigrationSession, excludeFilter: ((String) -> Boolean)? = null) {
         // may need to create table directory
-        val entities = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, migration.version)
+        val entities = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, migration.migrations.dbProfile!!, migration.version)
         runEntitiesSql(migration, entities, "Update ${entity.displayName}", if (entity == DbEntity.TABLE) null else entity.dbEntity, excludeFilter)
 
         // delete all which do not exist in files
@@ -350,14 +367,22 @@ LIMIT 1
         val entity = DbEntity.TABLE
 
         var migration: MigrationSession
-        val tables = dbEntityExtractor.getDbEntities(entity, session)
+        val entityFixer = dbEntityExtractor.entityScriptFixer(DbEntity.TABLE, session)
+        val entitySql = sqlQuery(dbEntityExtractor.getShowEntitySql(DbEntity.TABLE, MIGRATIONS_TABLE))
+        val entityCreate = try {
+            session.first(entitySql) {
+                it.string(2)
+            }
+        } catch (e: Exception) {
+            null
+        }
 
-        if (tables.filter { it.toLowerCase() == "migrations" }.isEmpty()) {
+        if (entityCreate == null) {
             var latestMatchedVersion: String? = null
 
             if (dbVersion == null) {
                 val versionList = getVersions()
-                        .sortedWith(Comparator(String::versionCompare))
+                    .sortedWith(Comparator(String::versionCompare))
 
                 versionList.forEach { it ->
                     if (validateTableResourceFiles(it, null)) {
@@ -374,19 +399,19 @@ LIMIT 1
 
             val useDbVersion = dbVersion ?: "V0_0_0"
 
-            val dbTableResourceDir = entity.getEntityResourceDirectory(useDbVersion)
-            val tableEntities = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, useDbVersion)
+            val dbTableResourceDir = entity.getEntityResourceDirectory(dbProfile!!, useDbVersion)
+            val tableEntities = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, dbProfile!!, useDbVersion)
 
             // create the table
             val scriptName: String
             val scriptSql: String
             migration = MigrationSession(1, useDbVersion, this)
 
-            if (tableEntities.contains("migrations")) {
+            if (tableEntities.contains(MIGRATIONS_TABLE)) {
                 // run the file found for the version
-                val tableEntry = tableEntities["migrations"]!!
-                LOG.info("Creating migrations table from ${dbTableResourceDir.path}/${tableEntry.entityResourcePath}")
+                val tableEntry = tableEntities[MIGRATIONS_TABLE]!!
 
+                LOG.info("Creating migrations table from ${dbTableResourceDir.path}/${tableEntry.entityResourcePath}")
                 scriptName = tableEntry.entityResourcePath
                 scriptSql = tableEntry.entitySql
             } else {
@@ -428,7 +453,7 @@ LIMIT 1
             return
         } else if (versionCompare <= 0) {
             // need to run all up migrations from current version which have not been run
-            val migrations = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, currentVersion).values.toList().sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
+            val migrations = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, dbProfile!!, currentVersion).values.toList().sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
 
             if (!migrations.isEmpty()) {
                 val appliedMigrations = migration.getVersionBatchesNameMap()
@@ -453,13 +478,13 @@ LIMIT 1
             if (versionCompare < 0) {
                 // need to run all migrations from later versions up to requested version
                 val versionList = getVersions()
-                        .filter { it.versionCompare(currentVersion) > 0 && (it.versionCompare(migration.version) <= 0) }
-                        .sortedWith(Comparator(String::versionCompare))
+                    .filter { it.versionCompare(currentVersion) > 0 && (it.versionCompare(migration.version) <= 0) }
+                    .sortedWith(Comparator(String::versionCompare))
 
                 versionList.forEach { version ->
-                    val versionMigrations = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, version)
-                            .values.toList()
-                            .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
+                    val versionMigrations = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, dbProfile!!, version)
+                        .values.toList()
+                        .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
 
                     val versionMigration = migration.withVersion(version)
 
@@ -499,12 +524,12 @@ LIMIT 1
     }
 
     private fun runBatchScript(
-            opType: DbEntity,
-            migration: MigrationSession,
-            migrationScriptPath: String,
-            appliedMigrations: Map<String, MigrationSession.Migration>?,
-            sqlScript: String,
-            entityData: DbEntity.EntityData
+        opType: DbEntity,
+        migration: MigrationSession,
+        migrationScriptPath: String,
+        appliedMigrations: Map<String, MigrationSession.Migration>?,
+        sqlScript: String,
+        entityData: DbEntity.EntityData
     ) {
         val sqlParts = sqlScript.replace(";\n", "\n;").split(';')
         var line = 1
@@ -558,10 +583,10 @@ LIMIT 1
                 return
             } else if (versionCompare >= 0) {
                 // need to run all down migrations from current version for all up migrations that were run
-                val migrations = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, currentVersion)
-                        .values.toList()
-                        .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
-                        .reversed()
+                val migrations = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, dbProfile!!, currentVersion)
+                    .values.toList()
+                    .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
+                    .reversed()
 
                 val appliedMigrations = migration.getVersionBatchesNameMap()
 
@@ -586,15 +611,15 @@ LIMIT 1
                 if (versionCompare > 0) {
                     // need to run all migrations from earlier versions down up to but not including requested version
                     val versionList = getVersions()
-                            .filter { it.versionCompare(currentVersion) < 0 && it.versionCompare(migration.version) > 0 }
-                            .sortedWith(Comparator(String::versionCompare))
-                            .reversed()
+                        .filter { it.versionCompare(currentVersion) < 0 && it.versionCompare(migration.version) > 0 }
+                        .sortedWith(Comparator(String::versionCompare))
+                        .reversed()
 
                     versionList.forEach { version ->
-                        val versionMigrations = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, version)
-                                .values.toList()
-                                .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
-                                .reversed()
+                        val versionMigrations = entity.getEntityResourceScripts(resourceClass, dbEntityExtractor, dbProfile!!, version)
+                            .values.toList()
+                            .sortedWith(DbEntity.MIGRATIONS_COMPARATOR)
+                            .reversed()
 
                         val versionMigration = migration.withVersion(version)
 
@@ -662,10 +687,14 @@ LIMIT 1
 
     fun updateSchema(dbDir: File, dbVersion: String) {
         dbDir.ensureExistingDirectory("dbDir")
-        val versionDir = getVersionDirectory(dbDir, dbVersion, false)
+        val versionDir = getVersionDirectory(dbDir, dbProfile!!, dbVersion, false)
 
-        val schemaDir = dbDir + "schema"
-        schemaDir.ensureCreateDirectory("dbDir/schema")
+        val dbProfileDir = dbDir + dbProfile!!
+        dbProfileDir.ensureExistingDirectory("db/$dbProfile")
+
+        val schemaDir = dbProfileDir + "schema"
+        schemaDir.ensureCreateDirectory("db/$dbProfile/schema")
+
         val versionFile = schemaDir + "version.txt"
         versionFile.writeText("""# Version: ${dbVersion}""".trimIndent())
 
@@ -676,12 +705,12 @@ LIMIT 1
         val triggerDir = schemaDir + DbEntity.TRIGGER.dbEntityDirectory
         val viewsDir = schemaDir + DbEntity.VIEW.dbEntityDirectory
 
-        functionsDir.ensureCreateDirectory("db/schema/" + DbEntity.FUNCTION.dbEntityDirectory)
-        // migrationsDir.ensureCreateDirectory("db/schema/" + DbEntity.MIGRATION.dbEntityDirectory)
-        proceduresDir.ensureCreateDirectory("db/schema/" + DbEntity.PROCEDURE.dbEntityDirectory)
-        tablesDir.ensureCreateDirectory("db/schema/" + DbEntity.TABLE.dbEntityDirectory)
-        triggerDir.ensureCreateDirectory("db/schema/" + DbEntity.TRIGGER.dbEntityDirectory)
-        viewsDir.ensureCreateDirectory("db/schema/" + DbEntity.VIEW.dbEntityDirectory)
+        functionsDir.ensureCreateDirectory("db/$dbProfile/schema/" + DbEntity.FUNCTION.dbEntityDirectory)
+        // migrationsDir.ensureCreateDirectory("db/$dbProfile/schema/" + DbEntity.MIGRATION.dbEntityDirectory)
+        proceduresDir.ensureCreateDirectory("db/$dbProfile/schema/" + DbEntity.PROCEDURE.dbEntityDirectory)
+        tablesDir.ensureCreateDirectory("db/$dbProfile/schema/" + DbEntity.TABLE.dbEntityDirectory)
+        triggerDir.ensureCreateDirectory("db/$dbProfile/schema/" + DbEntity.TRIGGER.dbEntityDirectory)
+        viewsDir.ensureCreateDirectory("db/$dbProfile/schema/" + DbEntity.VIEW.dbEntityDirectory)
 
         // copy all entities from given version except migrations to snapshot dir
         copyEntities(DbEntity.FUNCTION, versionDir, schemaDir, true)
@@ -694,7 +723,7 @@ LIMIT 1
     }
 
     fun newVersion(dbDir: File, dbVersion: String) {
-        val versionDir = getVersionDirectory(dbDir, dbVersion, null)
+        val versionDir = getVersionDirectory(dbDir, dbProfile!!, dbVersion, null)
 
         if (versionDir.exists()) {
             throw IllegalArgumentException("Version directory '${versionDir.path}' must not exist")
@@ -711,23 +740,23 @@ LIMIT 1
         val triggerDir = versionDir + DbEntity.TRIGGER.dbEntityDirectory
         val viewsDir = versionDir + DbEntity.VIEW.dbEntityDirectory
 
-        functionsDir.ensureCreateDirectory("db/$dbVersion/" + DbEntity.FUNCTION.dbEntityDirectory)
-        migrationsDir.ensureCreateDirectory("db/$dbVersion/" + DbEntity.MIGRATION.dbEntityDirectory)
-        proceduresDir.ensureCreateDirectory("db/$dbVersion/" + DbEntity.PROCEDURE.dbEntityDirectory)
-        tablesDir.ensureCreateDirectory("db/$dbVersion/" + DbEntity.TABLE.dbEntityDirectory)
-        triggerDir.ensureCreateDirectory("db/$dbVersion/" + DbEntity.TRIGGER.dbEntityDirectory)
-        viewsDir.ensureCreateDirectory("db/$dbVersion/" + DbEntity.VIEW.dbEntityDirectory)
+        functionsDir.ensureCreateDirectory("db/$dbProfile/$dbVersion/" + DbEntity.FUNCTION.dbEntityDirectory)
+        migrationsDir.ensureCreateDirectory("db/$dbProfile/$dbVersion/" + DbEntity.MIGRATION.dbEntityDirectory)
+        proceduresDir.ensureCreateDirectory("db/$dbProfile/$dbVersion/" + DbEntity.PROCEDURE.dbEntityDirectory)
+        tablesDir.ensureCreateDirectory("db/$dbProfile/$dbVersion/" + DbEntity.TABLE.dbEntityDirectory)
+        triggerDir.ensureCreateDirectory("db/$dbProfile/$dbVersion/" + DbEntity.TRIGGER.dbEntityDirectory)
+        viewsDir.ensureCreateDirectory("db/$dbProfile/$dbVersion/" + DbEntity.VIEW.dbEntityDirectory)
 
         // copy all entities from previous version except migrations
         val previousVersion = getPreviousVersion(dbVersion)
         if (previousVersion != null) {
-            copyEntities(DbEntity.FUNCTION, getVersionDirectory(dbDir, previousVersion, true), versionDir, true)
-            //            copyEntities(DbEntity.MIGRATION, getVersionDirectory(dbDir, previousVersion, true), versionDir)
-            //            copyEntities(DbEntity.ROLLBACK, getVersionDirectory(dbDir, previousVersion, true), versionDir)
-            copyEntities(DbEntity.PROCEDURE, getVersionDirectory(dbDir, previousVersion, true), versionDir, true)
-            copyEntities(DbEntity.TABLE, getVersionDirectory(dbDir, previousVersion, true), versionDir, true) { it.toLowerCase() == MIGRATIONS_FILE_NAME }
-            copyEntities(DbEntity.TRIGGER, getVersionDirectory(dbDir, previousVersion, true), versionDir, true)
-            copyEntities(DbEntity.VIEW, getVersionDirectory(dbDir, previousVersion, true), versionDir, true)
+            copyEntities(DbEntity.FUNCTION, getVersionDirectory(dbDir, dbProfile!!, previousVersion, true), versionDir, true)
+            //            copyEntities(DbEntity.MIGRATION, getVersionDirectory(dbDir, dbProfile!!, previousVersion, true), versionDir)
+            //            copyEntities(DbEntity.ROLLBACK, getVersionDirectory(dbDir, dbProfile!!, previousVersion, true), versionDir)
+            copyEntities(DbEntity.PROCEDURE, getVersionDirectory(dbDir, dbProfile!!, previousVersion, true), versionDir, true)
+            copyEntities(DbEntity.TABLE, getVersionDirectory(dbDir, dbProfile!!, previousVersion, true), versionDir, true) { it.toLowerCase() == MIGRATIONS_FILE_NAME }
+            copyEntities(DbEntity.TRIGGER, getVersionDirectory(dbDir, dbProfile!!, previousVersion, true), versionDir, true)
+            copyEntities(DbEntity.VIEW, getVersionDirectory(dbDir, dbProfile!!, previousVersion, true), versionDir, true)
 
             // copy additional files from the templates directory
             copyExtraTemplateFiles(dbDir, dbVersion)
@@ -735,7 +764,7 @@ LIMIT 1
     }
 
     fun copyExtraTemplateFiles(dbDir: File, dbVersion: String) {
-        val versionDir = getVersionDirectory(dbDir, dbVersion, false)
+        val versionDir = getVersionDirectory(dbDir, dbProfile!!, dbVersion, false)
         val extraResourceFiles = getExtraSampleFiles(resourceClass)
 
         extraResourceFiles.forEach {
@@ -752,11 +781,11 @@ LIMIT 1
     }
 
     fun newEntityFile(entity: DbEntity, dbDir: File, dbVersion: String, entityName: String): Pair<File, File> {
-        val versionDir = getVersionDirectory(dbDir, dbVersion, false)
+        val versionDir = getVersionDirectory(dbDir, dbProfile!!, dbVersion, false)
 
         val entityDir = versionDir + entity.dbEntityDirectory
 
-        entityDir.ensureCreateDirectory("db/$dbVersion/${entity.dbEntityDirectory}")
+        entityDir.ensureCreateDirectory("db/$dbProfile/$dbVersion/${entity.dbEntityDirectory}")
 
         if (entity == DbEntity.MIGRATION || entity == DbEntity.ROLLBACK) {
             var lastMigration = 0
@@ -796,18 +825,21 @@ LIMIT 1
         }
     }
 
-    fun newEvolution(evolutionsDir: File, dbVersion: String) {
+    fun newEvolution(evolutionsDir: File, dbProfile: String, dbVersion: String) {
         evolutionsDir.ensureExistingDirectory("evolutions path")
 
-        LOG.info("Generated new play evolution in ${evolutionsDir.path}")
+        val evolutionsProfileDir = evolutionsDir + dbProfile
+        evolutionsDir.ensureExistingDirectory("evolutions path/dbProfile")
+
+        LOG.info("Generated new play evolution in ${evolutionsProfileDir.path}")
 
         val sb = StringBuilder()
 
-        val versionMigrations = DbEntity.MIGRATION.getEntityResourceScripts(resourceClass, dbEntityExtractor, dbVersion)
-                .values
+        val versionMigrations = DbEntity.MIGRATION.getEntityResourceScripts(resourceClass, dbEntityExtractor, dbProfile!!, dbVersion)
+            .values
 
-        val versionRollbacks = DbEntity.ROLLBACK.getEntityResourceScripts(resourceClass, dbEntityExtractor, dbVersion)
-                .values
+        val versionRollbacks = DbEntity.ROLLBACK.getEntityResourceScripts(resourceClass, dbEntityExtractor, dbProfile!!, dbVersion)
+            .values
 
         val migrationsMap = versionMigrations.map { it -> it.entityResourceName.replace("up.sql$".toRegex(), "") to it }.toMap()
         val rollbacksMap = versionRollbacks.map { it -> it.entityResourceName.replace("down.sql$".toRegex(), "") to it }.toMap()
@@ -817,7 +849,7 @@ LIMIT 1
         entityNames.addAll(rollbacksMap.keys)
 
         val entityNameList = entityNames.toList()
-                .sortedWith(DbEntity.MIGRATIONS_NAME_COMPARATOR)
+            .sortedWith(DbEntity.MIGRATIONS_NAME_COMPARATOR)
 
         entityNameList.forEach { entityName ->
             migrationsMap[entityName]?.let { it ->
@@ -831,7 +863,7 @@ LIMIT 1
         if (!sb.isEmpty()) {
             var lastMigration = 0
 
-            evolutionsDir.list { _, name ->
+            evolutionsProfileDir.list { _, name ->
                 val (num, ext) = name.extractLeadingDigits()
                 if (num != null && ext == ".sql" && num > lastMigration) {
                     lastMigration = num
@@ -841,7 +873,7 @@ LIMIT 1
 
             lastMigration++
 
-            val evolutionFile = evolutionsDir + "$lastMigration.sql"
+            val evolutionFile = evolutionsProfileDir + "$lastMigration.sql"
             evolutionFile.writeText(sb.toString())
             LOG.info("Generated new play evolution $lastMigration.sql in ${evolutionsDir.path}")
         } else {
@@ -868,7 +900,7 @@ LIMIT 1
             if (it.isFile && it.canRead()) {
                 val evolutionNumber = it.nameWithoutExtension.toIntOrNull()
                 if (evolutionNumber != null) {
-                    if (evolutionNumber in minEvolution..useMaxEvolution) {
+                    if (evolutionNumber in minEvolution .. useMaxEvolution) {
                         LOG.info("Adding evolution file $it")
                         files.add(it)
                     }
@@ -1032,255 +1064,380 @@ LIMIT 1
     fun dbCommand(args: Array<String>) {
         var dbVersion: String? = null
         var dbPath = File(System.getProperty("user.dir"))
+        dbProfile = null
 
-        var migration: MigrationSession? = null
+        var i = 0
+        while (i < args.size) {
+            val option = args[i++]
 
-        session.transaction { tx ->
-            try {
-                var i = 0
-                while (i < args.size) {
-                    val option = args[i++]
-                    when (option) {
-                        "-v" -> verbose = true
-                        "-d" -> detailed = true
-                        "-q" -> quiet = true
+            when (option) {
+                "-v" -> verbose = true
+                "-d" -> detailed = true
+                "-q" -> quiet = true
 
-                        "version" -> {
-                            if (args.size <= i) {
-                                throw IllegalArgumentException("version option requires a version argument")
-                            }
-                            if (dbVersion != null) {
-                                throw IllegalArgumentException("db version command must come before commands that require version")
-                            }
-                            val version = args[i++]
-                            //  val versions = getVersions()
-                            //  if (!versions.contains(version.toUpperCase())) {
-                            //      throw IllegalArgumentException("version $version does not exist in classpath '/db'")
-                            //  }
-                            dbVersion = version
-                        }
+                "profile" -> {
+                    if (args.size <= i) {
+                        throw IllegalArgumentException("profile option requires a profile argument")
+                    }
+                    if (dbProfile != null) {
+                        throw IllegalArgumentException("db profile command must come before commands that require profile")
+                    }
 
-                        "path" -> {
-                            if (args.size < i) {
-                                throw IllegalArgumentException("path option requires a path argument")
-                            }
-                            val path = args[i++]
-                            val pathDir = File(path).ensureExistingDirectory("path")
-                            dbPath = pathDir
-                        }
+                    val profile = args[i++]
+                    if (!sessions.containsKey(profile)) {
+                        throw IllegalArgumentException("profile $profile is not defined in sessions passed to Migrations.doCommand()")
+                    }
+                    //  val versions = getVersions()
+                    //  if (!versions.contains(version.toUpperCase())) {
+                    //      throw IllegalArgumentException("version $version does not exist in classpath '/db'")
+                    //  }
+                    dbProfile = profile
+                }
 
-                        "new-evolution" -> {
-                            if (args.size < i) {
-                                throw IllegalArgumentException("new-evolution option requires a path argument")
-                            }
-                            val path = args[i++]
-                            val pathDir = File(path).ensureExistingDirectory("evolutions path")
-                            if (dbVersion == null) dbVersion = getCurrentVersion()
+                "version" -> {
+                    if (args.size <= i) {
+                        throw IllegalArgumentException("version option requires a version argument")
+                    }
 
-                            if (dbVersion != null) {
-                                newEvolution(pathDir, dbVersion!!)
-                            } else {
-                                throw IllegalArgumentException("new-evolution option requires a database which has a current migration version")
-                            }
-                        }
+                    if (dbVersion != null) {
+                        throw IllegalArgumentException("db version command must come before commands that require version")
+                    }
+                    val version = args[i++]
+                    //  val versions = getVersions()
+                    //  if (!versions.contains(version.toUpperCase())) {
+                    //      throw IllegalArgumentException("version $version does not exist in classpath '/db'")
+                    //  }
+                    dbVersion = version
+                }
 
-                        "import-evolutions" -> {
-                            if (args.size < i) {
-                                throw IllegalArgumentException("import-evolution option requires a path argument")
-                            }
+                "path" -> {
+                    if (args.size < i) {
+                        throw IllegalArgumentException("path option requires a path argument")
+                    }
+                    val path = args[i++]
+                    val pathDir = File(path).ensureExistingDirectory("path")
+                    dbPath = pathDir
+                }
 
-                            val path = args[i++]
+                "new-evolution" -> {
+                    if (args.size < i) {
+                        throw IllegalArgumentException("new-evolution option requires a path argument")
+                    }
+                    val path = args[i++]
+                    val pathDir = File(path).ensureExistingDirectory("evolutions path")
 
-                            if (args.size < i) {
-                                throw IllegalArgumentException("import-evolution option requires a min evolution argument")
-                            }
+                    execute(dbVersion) {
+                        if (dbVersion == null) dbVersion = getCurrentVersion()
 
-                            val minEvoText = args[i++]
-                            val maxEvoText: String? =
-                                    if (args.size < i) {
-                                        null
-                                    } else {
-                                        args[i++]
-                                    }
-
-                            val pathDir = File(path).ensureExistingDirectory("evolutions path")
-
-                            if (dbVersion == null) dbVersion = getCurrentVersion()
-
-                            val minEvolution: Int = minEvoText.toIntOrNull()
-                                    ?: throw IllegalArgumentException("MinEvolution argument must be an integer")
-
-                            val maxEvolution: Int? = if (maxEvoText == null) null else {
-                                val maxEvo = maxEvoText.toIntOrNull()
-                                if (maxEvo == null) i--
-                                maxEvo
-                            }
-
-                            if (dbVersion != null) {
-                                importEvolutions(pathDir, dbVersion!!, minEvolution, maxEvolution, dbPath)
-                            } else {
-                                throw IllegalArgumentException("import-evolution option requires a database which has a current migration version")
-                            }
-                        }
-
-                        "dump-tables" -> {
-                            if (dbVersion == null) dbVersion = getCurrentVersion()
-                            dumpTables(dbPath, dbVersion!!)
-                        }
-
-                        "update-schema" -> {
-                            if (dbVersion == null) dbVersion = getCurrentVersion()
-                            updateSchema(dbPath, dbVersion!!)
-                        }
-
-                        "validate-tables", "validate" -> {
-                            if (dbVersion == null) dbVersion = getCurrentVersion()
-                            validateTableResourceFiles(dbVersion!!)
-                        }
-
-                        "init" -> {
-                            if (migration != null) {
-                                throw IllegalArgumentException("db init command must be first executed command")
-                            }
-                            migration = initMigrations(dbVersion)
-                        }
-
-                        "migrate" -> {
-                            // here need to apply up migrations from current version to given version or latest in version sorted order
-                            if (dbVersion == null) dbVersion = getLatestVersion()
-                            if (migration == null) migration = initMigrations(dbVersion)
-
-                            migrate(migration!!)
-                        }
-
-                        "rollback" -> {
-                            // here need to apply down migrations from current version to given version or if none given then rollback the last batch which was not rolled back
-                            if (migration == null) migration = initMigrations(dbVersion ?: getPreviousVersion(getCurrentVersion()
-                                    ?: "V0_0_0"))
-
-                            rollback(migration!!)
-                        }
-
-                        "create-tables", "create-tbls" -> {
-                            if (migration == null) migration = initMigrations(dbVersion)
-                            createTables(migration!!)
-                        }
-
-                        "update-all" -> {
-                            if (migration == null) migration = initMigrations(dbVersion)
-
-                            updateEntities(DbEntity.FUNCTION, migration!!)
-                            updateEntities(DbEntity.VIEW, migration!!)
-                            updateEntities(DbEntity.TRIGGER, migration!!)
-                            updateEntities(DbEntity.PROCEDURE, migration!!)
-                        }
-
-                        "update-procedures", "update-procs" -> {
-                            if (migration == null) migration = initMigrations(dbVersion)
-                            updateEntities(DbEntity.PROCEDURE, migration!!)
-                        }
-
-                        "update-functions", "update-funcs" -> {
-                            if (migration == null) migration = initMigrations(dbVersion)
-
-                            updateEntities(DbEntity.FUNCTION, migration!!)
-                        }
-
-                        "update-views" -> {
-                            if (migration == null) migration = initMigrations(dbVersion)
-
-                            updateEntities(DbEntity.VIEW, migration!!)
-                        }
-
-                        "update-triggers" -> {
-                            if (migration == null) migration = initMigrations(dbVersion)
-
-                            updateEntities(DbEntity.TRIGGER, migration!!)
-                        }
-
-                        "new-major" -> {
-                            if (migration == null) migration = initMigrations(dbVersion)
-                            val version = DbVersion.of(migration!!.version).nextMajor().toString()
-                            newVersion(dbPath, version)
-                        }
-
-                        "new-minor" -> {
-                            if (migration == null) migration = initMigrations(dbVersion)
-                            val version = DbVersion.of(migration!!.version).nextMinor().toString()
-                            newVersion(dbPath, version)
-                        }
-
-                        "new-patch" -> {
-                            if (migration == null) migration = initMigrations(dbVersion)
-                            val version = DbVersion.of(migration!!.version).nextPatch().toString()
-                            newVersion(dbPath, version)
-                        }
-
-                        "new-version" -> {
-                            val version = dbVersion ?: DbVersion.of((migration ?: initMigrations(dbVersion)).version).nextPatch().toString()
-                            newVersion(dbPath, version)
-                        }
-
-                        "new-migration" -> {
-                            if (args.size < i || args[i].isBlank()) {
-                                throw IllegalArgumentException("new-migration option requires a non-blank title argument")
-                            }
-                            val title = args[i++].trim()
-                            if (migration == null) migration = initMigrations(dbVersion)
-                            val version = dbVersion ?: migration!!.version
-                            newEntityFile(DbEntity.MIGRATION, dbPath, version, title)
-                        }
-
-                        "new-function" -> {
-                            if (args.size < i || args[i].isBlank()) {
-                                throw IllegalArgumentException("new-function option requires a non-blank name argument")
-                            }
-                            val title = args[i++].trim()
-                            if (migration == null) migration = initMigrations(dbVersion)
-                            val version = dbVersion ?: migration!!.version
-                            newEntityFile(DbEntity.FUNCTION, dbPath, version, title)
-                        }
-
-                        "new-procedure" -> {
-                            if (args.size < i || args[i].isBlank()) {
-                                throw IllegalArgumentException("new-procedure option requires a non-blank name argument")
-                            }
-                            val title = args[i++].trim()
-                            if (migration == null) migration = initMigrations(dbVersion)
-                            val version = dbVersion ?: migration!!.version
-                            newEntityFile(DbEntity.PROCEDURE, dbPath, version, title)
-                        }
-
-                        "new-trigger" -> {
-                            if (args.size < i || args[i].isBlank()) {
-                                throw IllegalArgumentException("new-trigger option requires a non-blank name argument")
-                            }
-                            val title = args[i++].trim()
-                            if (migration == null) migration = initMigrations(dbVersion)
-                            val version = dbVersion ?: migration!!.version
-                            newEntityFile(DbEntity.TRIGGER, dbPath, version, title)
-                        }
-
-                        "new-view" -> {
-                            if (args.size < i || args[i].isBlank()) {
-                                throw IllegalArgumentException("new-view option requires a non-blank name argument")
-                            }
-                            val title = args[i++].trim()
-                            if (migration == null) migration = initMigrations(dbVersion)
-                            val version = dbVersion ?: migration!!.version
-                            newEntityFile(DbEntity.VIEW, dbPath, version, title)
-                        }
-
-                        "exit" -> {
-                            tx.commit()
-                            System.exit(1)
-                        }
-
-                        else -> {
-                            throw IllegalArgumentException("db option $option is not recognized")
+                        if (dbVersion != null) {
+                            newEvolution(pathDir, dbProfile!!, dbVersion!!)
+                        } else {
+                            throw IllegalArgumentException("new-evolution option requires a database which has a current migration version")
                         }
                     }
                 }
+
+                "import-evolutions" -> {
+                    if (args.size < i) {
+                        throw IllegalArgumentException("import-evolution option requires a path argument")
+                    }
+
+                    val path = args[i++]
+
+                    if (args.size < i) {
+                        throw IllegalArgumentException("import-evolution option requires a min evolution argument")
+                    }
+
+                    val minEvoText = args[i++]
+                    val maxEvoText: String? =
+                        if (args.size < i) {
+                            null
+                        } else {
+                            args[i++]
+                        }
+
+                    val pathDir = File(path).ensureExistingDirectory("evolutions")
+
+                    if (dbProfile == null) dbProfile = DEFAULT_PROFILE
+                    if (dbVersion == null) dbVersion = getCurrentVersion() ?: "V0_0_0"
+
+                    val evolutionsProfileDir = (pathDir + dbProfile!!).ensureExistingDirectory("evolutions/dbProfile")
+
+                    val minEvolution: Int = minEvoText.toIntOrNull()
+                        ?: throw IllegalArgumentException("MinEvolution argument must be an integer")
+
+                    val maxEvolution: Int? = if (maxEvoText == null) null else {
+                        val maxEvo = maxEvoText.toIntOrNull()
+                        if (maxEvo == null) i--
+                        maxEvo
+                    }
+
+                    if (dbVersion != null) {
+                        importEvolutions(evolutionsProfileDir, dbVersion!!, minEvolution, maxEvolution, dbPath)
+                    } else {
+                        throw IllegalArgumentException("import-evolution option requires a database which has a current migration version for selected profile")
+                    }
+                }
+
+                "dump-tables" -> {
+                    execute(dbVersion) {
+                        val useDbVersion = dbVersion ?: getCurrentVersion()
+                        if (!it) dbVersion = useDbVersion
+                        dumpTables(dbPath, useDbVersion!!)
+                    }
+                }
+
+                "update-schema" -> {
+                    execute(dbVersion) {
+                        val useDbVersion = dbVersion ?: getCurrentVersion()
+                        if (!it) dbVersion = useDbVersion
+                        updateSchema(dbPath, useDbVersion!!)
+                    }
+                }
+
+                "validate-tables", "validate" -> {
+                    execute(dbVersion) {
+                        val useDbVersion = dbVersion ?: getCurrentVersion()
+                        if (!it) dbVersion = useDbVersion
+                        validateTableResourceFiles(useDbVersion!!)
+                    }
+                }
+
+                "init" -> {
+                    if (migration != null) {
+                        throw IllegalArgumentException("db init command must be first executed command")
+                    }
+
+                    execute(dbVersion) {
+                        val migrationInstance = initMigrations(dbVersion)
+                        if (!it) migration = migrationInstance
+                    }
+                }
+
+                "migrate" -> {
+                    // here need to apply up migrations from current version to given version or latest in version sorted order
+                    execute(dbVersion) {
+                        val useDbVersion = dbVersion ?: getLatestVersion()
+                        if (!it) dbVersion = useDbVersion
+
+                        val migrationInstance = migration ?: initMigrations(useDbVersion)
+                        if (!it) migration = migrationInstance
+                        migrate(migrationInstance)
+                    }
+                }
+
+                "rollback" -> {
+                    // here need to apply down migrations from current version to given version or if none given then rollback the last batch which was not rolled back
+                    executeProfile(option, dbVersion) {
+                        migration = migration ?: initMigrations(dbVersion ?: getPreviousVersion(getCurrentVersion() ?: "V0_0_0"))
+                        rollback(migration!!)
+                    }
+                }
+
+                "create-tables", "create-tbls" -> {
+                    execute(dbVersion) {
+                        val migrationInstance = migration ?: initMigrations(dbVersion)
+                        if (!it) migration = migrationInstance
+                        createTables(migrationInstance)
+                    }
+                }
+
+                "update-all" -> {
+                    execute(dbVersion) {
+                        val migrationInstance = migration ?: initMigrations(dbVersion)
+                        if (!it) migration = migrationInstance
+
+                        updateEntities(DbEntity.FUNCTION, migrationInstance)
+                        updateEntities(DbEntity.VIEW, migrationInstance)
+                        updateEntities(DbEntity.TRIGGER, migrationInstance)
+                        updateEntities(DbEntity.PROCEDURE, migrationInstance)
+                    }
+                }
+
+                "update-procedures", "update-procs" -> {
+                    execute(dbVersion) {
+                        val migrationInstance = migration ?: initMigrations(dbVersion)
+                        if (!it) migration = migrationInstance
+                        updateEntities(DbEntity.PROCEDURE, migrationInstance)
+                    }
+                }
+
+                "update-functions", "update-funcs" -> {
+                    execute(dbVersion) {
+                        val migrationInstance = migration ?: initMigrations(dbVersion)
+                        if (!it) migration = migrationInstance
+                        updateEntities(DbEntity.FUNCTION, migrationInstance)
+                    }
+                }
+
+                "update-views" -> {
+                    execute(dbVersion) {
+                        val migrationInstance = migration ?: initMigrations(dbVersion)
+                        if (!it) migration = migrationInstance
+                        updateEntities(DbEntity.VIEW, migrationInstance)
+                    }
+                }
+
+                "update-triggers" -> {
+                    execute(dbVersion) {
+                        val migrationInstance = migration ?: initMigrations(dbVersion)
+                        if (!it) migration = migrationInstance
+                        updateEntities(DbEntity.TRIGGER, migrationInstance)
+                    }
+                }
+
+                "new-major" -> {
+                    executeProfileDefault(option, dbVersion) {
+                        if (migration == null) migration = initMigrations(dbVersion)
+                        val version = DbVersion.of(migration!!.version).nextMajor().toString()
+                        newVersion(dbPath, version)
+                    }
+                }
+
+                "new-minor" -> {
+                    executeProfileDefault(option, dbVersion) {
+                        if (migration == null) migration = initMigrations(dbVersion)
+                        val version = DbVersion.of(migration!!.version).nextMinor().toString()
+                        newVersion(dbPath, version)
+                    }
+                }
+
+                "new-patch" -> {
+                    executeProfileDefault(option, dbVersion) {
+                        if (migration == null) migration = initMigrations(dbVersion)
+                        val version = DbVersion.of(migration!!.version).nextPatch().toString()
+                        newVersion(dbPath, version)
+                    }
+                }
+
+                "new-version" -> {
+                    executeProfileDefault(option, dbVersion) {
+                        val version = dbVersion ?: DbVersion.of((migration ?: initMigrations(dbVersion)).version).nextPatch().toString()
+                        newVersion(dbPath, version)
+                    }
+                }
+
+                "new-migration" -> {
+                    if (args.size < i || args[i].isBlank()) {
+                        throw IllegalArgumentException("new-migration option requires a non-blank title argument")
+                    }
+                    val title = args[i++].trim()
+
+                    executeProfileDefault(option, dbVersion) {
+                        if (migration == null) migration = initMigrations(dbVersion)
+                        val version = dbVersion ?: migration!!.version
+                        newEntityFile(DbEntity.MIGRATION, dbPath, version, title)
+                    }
+                }
+
+                "new-function" -> {
+                    if (args.size < i || args[i].isBlank()) {
+                        throw IllegalArgumentException("new-function option requires a non-blank name argument")
+                    }
+                    val title = args[i++].trim()
+                    executeProfileDefault(option, dbVersion) {
+                        if (migration == null) migration = initMigrations(dbVersion)
+                        val version = dbVersion ?: migration!!.version
+                        newEntityFile(DbEntity.FUNCTION, dbPath, version, title)
+                    }
+                }
+
+                "new-procedure" -> {
+                    if (args.size < i || args[i].isBlank()) {
+                        throw IllegalArgumentException("new-procedure option requires a non-blank name argument")
+                    }
+                    val title = args[i++].trim()
+                    executeProfileDefault(option, dbVersion) {
+                        if (migration == null) migration = initMigrations(dbVersion)
+                        val version = dbVersion ?: migration!!.version
+                        newEntityFile(DbEntity.PROCEDURE, dbPath, version, title)
+                    }
+                }
+
+                "new-trigger" -> {
+                    if (args.size < i || args[i].isBlank()) {
+                        throw IllegalArgumentException("new-trigger option requires a non-blank name argument")
+                    }
+                    val title = args[i++].trim()
+                    executeProfileDefault(option, dbVersion) {
+                        if (migration == null) migration = initMigrations(dbVersion)
+                        val version = dbVersion ?: migration!!.version
+                        newEntityFile(DbEntity.TRIGGER, dbPath, version, title)
+                    }
+                }
+
+                "new-view" -> {
+                    if (args.size < i || args[i].isBlank()) {
+                        throw IllegalArgumentException("new-view option requires a non-blank name argument")
+                    }
+                    val title = args[i++].trim()
+                    executeProfileDefault(option, dbVersion) {
+                        if (migration == null) migration = initMigrations(dbVersion)
+                        val version = dbVersion ?: migration!!.version
+                        newEntityFile(DbEntity.VIEW, dbPath, version, title)
+                    }
+                }
+
+                "exit" -> {
+                    exitProcess(1)
+                }
+
+                else -> {
+                    throw IllegalArgumentException("db option $option is not recognized")
+                }
+            }
+        }
+    }
+
+    fun execute(version: String?, command: (multi: Boolean) -> Unit) {
+        if (dbProfile == null) {
+            if (version != null) {
+                dbProfile = DEFAULT_PROFILE
+                transaction {
+                    command.invoke(false)
+                }
+            } else {
+                val dbProfiles = getDbProfiles()
+                dbProfiles.forEach { dbProfileName ->
+                    dbProfile = dbProfileName
+                    transaction {
+                        command.invoke(true)
+                    }
+                    migration = null
+                }
+            }
+            dbProfile = null
+        } else {
+            transaction {
+                command.invoke(false)
+            }
+        }
+    }
+
+    fun executeProfile(option: String, version: String?, command: () -> Unit) {
+        if (dbProfile == null) {
+            throw IllegalArgumentException("$option option requires a specific profile")
+        } else {
+            transaction {
+                command.invoke()
+            }
+        }
+    }
+
+    fun executeProfileDefault(option: String, version: String?, command: () -> Unit) {
+        if (dbProfile == null) {
+            dbProfile = DEFAULT_PROFILE
+        }
+
+        transaction {
+            command.invoke()
+        }
+    }
+
+    fun transaction(command: () -> Unit) {
+        session.transaction { tx ->
+            try {
+                command.invoke()
             } catch (e: Exception) {
                 val migrationSession = migration
                 if (migrationSession != null) {
@@ -1288,8 +1445,8 @@ LIMIT 1
 
                     tx.begin()
                     val migrationSql = migrationSession.getMigrationSql(
-                            migrationSession.lastScriptName ?: "",
-                            migrationSession.lastScriptSql ?: ""
+                        migrationSession.lastScriptName ?: "",
+                        migrationSession.lastScriptSql ?: ""
                     ).inParams("lastProblem" to e.message)
 
                     tx.execute(migrationSql)

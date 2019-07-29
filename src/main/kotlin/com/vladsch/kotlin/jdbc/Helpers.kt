@@ -327,17 +327,23 @@ fun String.versionCompare(other: String): Int {
     }
 }
 
-fun getVersionDirectory(dbDir: File, dbVersion: String, createDir: Boolean?): File {
+fun getVersionDirectory(dbDir: File, dbProfile:String, dbVersion: String, createDir: Boolean?): File {
     if (createDir != null) {
         dbDir.ensureExistingDirectory("dbDir")
     }
 
-    val dbVersionDir = dbDir + dbVersion
-
+    val dbProfileDir = dbDir + dbProfile
     if (createDir == true) {
-        dbVersionDir.ensureCreateDirectory("dbDir/dbVersion")
+        dbProfileDir.ensureCreateDirectory("dbDir/dbProfile")
     } else if (createDir == false) {
-        dbVersionDir.ensureExistingDirectory("dbDir/dbVersion")
+        dbProfileDir.ensureExistingDirectory("dbDir/dbProfile")
+    }
+    
+    val dbVersionDir = dbProfileDir + dbVersion
+    if (createDir == true) {
+        dbVersionDir.ensureCreateDirectory("dbDir/dbProfile/dbVersion")
+    } else if (createDir == false) {
+        dbVersionDir.ensureExistingDirectory("dbDir/dbProfile/dbVersion")
     }
     return dbVersionDir
 }

@@ -619,7 +619,6 @@ For example:
   * an empty name entry will match any file not explicitly matched by other entries and allows
     directing unmapped entries to a default location.
 
-
 :information_source: the easiest way to generate the file-map is first generate models with
 default mapping the file map. Move them to the desired sub-directories and then use the IDE
 `Copy Relative Path` context menu action and multi-caret editing or or a script to generate the
@@ -715,25 +714,27 @@ integer and meta is any string. Only the Vv portion is required. Minor, patch an
 optional. The underscore separating version parts belongs to the next element. i.e. the correct
 version is `V1` not `V1_`, `V1_2` and not `V1_2_`, etc.
 
-Each version has the following directory structure and database entity script naming
+Each profile/version has the following directory structure and database entity script naming
 conventions:
 
 ```
 db/
-└── V0_0_0
-    ├── functions
-    │   └── sample-function.udf.sql
-    ├── migrations
-    │   ├── 0.sample-migration.down.sql
-    │   └── 0.sample-migration.up.sql
-    ├── procedures
-    │   └── sample-stored-procedure.prc.sql
-    ├── tables
-    │   └── sample-table.tbl.sql
-    ├── triggers
-    │   └── sample-trigger.trg.sql
-    └── views
-        └── sample-view.view.sql
+└── profileName
+    └── schema
+    └── V0_0_0
+        ├── functions
+        │   └── sample-function.udf.sql
+        ├── migrations
+        │   ├── 0.sample-migration.down.sql
+        │   └── 0.sample-migration.up.sql
+        ├── procedures
+        │   └── sample-stored-procedure.prc.sql
+        ├── tables
+        │   └── sample-table.tbl.sql
+        ├── triggers
+        │   └── sample-trigger.trg.sql
+        └── views
+            └── sample-view.view.sql
 ```
 
 Database Entities:
@@ -800,9 +801,6 @@ run the `dump-tables` command.
 
 Commands:
 
-* init - initialize migrations table and migrate all to given version or latest version based on
-  database table match to table schemas contained in versions
-
 * path "resources/db" - set path to resources/db directory of the project where version
   information is stored.
 
@@ -815,14 +813,25 @@ Commands:
 
   The metadata if present will be compared using regular string comparison, ie. normal sort.
 
+* profile "profileName" - set specific db profile name to use for the commands
+
+* init - initialize migrations table and migrate all to given version or latest version based on
+  database table match to table schemas contained in versions
+
+  if profile is not given then will init all defined profiles
+
 * new-major - create a new version directory with major version incremented, from current or
   requested version.
+  
+  specific profile name is required
 
 * new-minor - create a new version directory with minor version incremented, from current or
   requested version.
 
 * new-patch - create a new version directory with patch version incremented, from current or
   requested version.
+
+  specific profile name is required
 
 * new-version - create a new version directory for the requested version. The directory cannot
   already exist. If the version is not provided then the current version with its patch version
@@ -833,12 +842,18 @@ Commands:
   If there is a previous version to the one requested then all its entity scripts will be copied
   to the new version directory.
 
+  specific profile name is required
+
 * import-evolutions "play/evolutions/directory" "min" "max". Import evolutions converting them
   to migrations in the current version. `min` is the minimum evolution to import. `max` is
   optional and if provided gives the maximum evolution number to import.
 
+  specific profile name is required
+
 * new-evolution "play/evolutions/directory" create a new play evolution file from current or
   requested version migrations and rollbacks in the requested directory.
+
+  specific profile name is required
 
 * new-migration "title" - create a new up/down migration script files in the requested (or
   current) version's migrations directory. The file name will be in the form: N.title.D.sql
@@ -846,17 +861,25 @@ Commands:
   Placeholders in the file: `__VERSION__` will be replaced with the version for which this file
   is generated and `__TITLE__` with the "title" passed to the command.
 
+  profile name defaults to `default` if one is not given
+
 * new-function "name" - create a new function file using resources/db/templates customized
   template or built-in if none Placeholders in the file: `__VERSION__` will be replaced with the
   version for which this file is generated and `__NAME__` with the "name" passed to the command.
+
+  profile name defaults to `default` if one is not given
 
 * new-procedure "name" - create a new procedure file using resources/db/templates customized
   template or built-in if none Placeholders in the file: `__VERSION__` will be replaced with the
   version for which this file is generated and `__NAME__` with the "name" passed to the command.
 
+  profile name defaults to `default` if one is not given
+
 * new-trigger "name" - create a new trigger file using resources/db/templates customized
   template or built-in if none Placeholders in the file: `__VERSION__` will be replaced with the
   version for which this file is generated and `__NAME__` with the "name" passed to the command.
+
+  profile name defaults to `default` if one is not given
 
 * new-view "name" - create a new view file using resources/db/templates customized template or
   built-in if none Placeholders in the file: `__VERSION__` will be replaced with the version for
@@ -864,30 +887,50 @@ Commands:
 
 * migrate - migrate to given version or to latest version
 
+  applies command to all defined profiles if profile name is not given
+
 * rollback - rollback to given version or to previous version
 
+  specific profile name is required
+
 * dump-tables - dump database tables
+
+  applies command to all defined profiles if profile name is not given
 
 * create-tables - create all tables which exist in the version tables directory and which do not
   exist in the database
 
+  applies command to all defined profiles if profile name is not given
+
 * validate-tables - validate that version table scripts and database agree
+
+  applies command to all defined profiles if profile name is not given
 
 * update-all - update all: functions, views, procedures, triggers. This runs the scripts
   corresponding to the database object for the requested version.
 
-* update-procedures
-  update-procs - update stored procedures
+  applies command to all defined profiles if profile name is not given
 
-* update-functions
-  update-funcs - update functions
+* update-procedures update-procs - update stored procedures
+
+  applies command to all defined profiles if profile name is not given
+
+* update-functions update-funcs - update functions
+
+  applies command to all defined profiles if profile name is not given
 
 * update-triggers - update triggers
+
+  applies command to all defined profiles if profile name is not given
 
 * update-schema - update `schema` directory with entities from selected version (or current if
   none given)
 
+  applies command to all defined profiles if profile name is not given
+
 * update-views - update views
+
+  applies command to all defined profiles if profile name is not given
 
 * exit - exit application
 
@@ -916,8 +959,7 @@ db/
 
 (The MIT License)
 
-Copyright (c) 2018 - Vladimir Schneider
-Copyright (c) 2015 - Kazuhiro Sera
+Copyright (c) 2018 - Vladimir Schneider Copyright (c) 2015 - Kazuhiro Sera
 
 [`enumerated-type`]: https://github.com/vsch/enumerated-type
 [`Generate Kotlin-Model.groovy`]: https://github.com/vsch/kotlin-jdbc/blob/master/extensions/com.intellij.database/schema/Generate%20Kotlin-Model.groovy

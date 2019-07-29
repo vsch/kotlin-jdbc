@@ -5,6 +5,7 @@
 - [TODO](#todo)
     - [High Priority](#high-priority)
 - [0.5.0 API Breaking Release](#050-api-breaking-release)
+- [0.5.0-beta-6](#050-beta-6)
 - [0.5.0-beta-5](#050-beta-5)
 - [0.5.0-beta-4](#050-beta-4)
 - [0.5.0-beta-3](#050-beta-3)
@@ -100,6 +101,19 @@ to the table name will only be used for column references.
 [`Generate Kotlin-Model.groovy`] has been updated to generate the new model format from tables
 in the database.
 
+## 0.5.0-beta-6
+
+* Break: Add profile name after `db/` to allow multi-database migrations.
+  * :warning: To migrate previous `db/` structure move all directories other than `templates` of
+    `db/` to `db/default`
+  * default profile is in `default` directory
+  * templates remain under `db/templates` and will apply to all profiles
+  * new `Migrations` constructor takes maps for session arguments indexed by profile string
+  * old `Migrations` constructor now uses `default` for profile name 
+  * `profile` command line option specifies which profile is to be used. Some commands like
+    `rollback` require an explicit profile name, others will use `default` when one is not
+    given, some like `init` and `migrate` will apply the command over all profiles
+
 ## 0.5.0-beta-5
 
 * Fix: Rollback used string compare instead of version compare, causing 0_7_2 to match 0_7_20
@@ -110,7 +124,6 @@ in the database.
 * Fix: [JavaScript-Enumerated-Value-Type.js] for latest version of [`enumerated-type`] with
       objects for values and `dropdownChoices` property of `{ value: xxx, label: "yyy", }`
       automatically generated from the enum id column and enum type column.
-
 
 ## 0.5.0-beta-3
 
