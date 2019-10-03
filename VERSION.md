@@ -5,6 +5,7 @@
 - [TODO](#todo)
     - [High Priority](#high-priority)
 - [0.5.0 API Breaking Release](#050-api-breaking-release)
+- [0.5.0-beta-7](#050-beta-7)
 - [0.5.0-beta-6](#050-beta-6)
 - [0.5.0-beta-5](#050-beta-5)
 - [0.5.0-beta-4](#050-beta-4)
@@ -101,6 +102,10 @@ to the table name will only be used for column references.
 [`Generate Kotlin-Model.groovy`] has been updated to generate the new model format from tables
 in the database.
 
+## 0.5.0-beta-7
+
+* Add: also accept `# -- !Ups` and `# -- !Downs` as valid Scala play evolution markers
+
 ## 0.5.0-beta-6
 
 * Break: Add profile name after `db/` to allow multi-database migrations.
@@ -109,7 +114,7 @@ in the database.
   * default profile is in `default` directory
   * templates remain under `db/templates` and will apply to all profiles
   * new `Migrations` constructor takes maps for session arguments indexed by profile string
-  * old `Migrations` constructor now uses `default` for profile name 
+  * old `Migrations` constructor now uses `default` for profile name
   * `profile` command line option specifies which profile is to be used. Some commands like
     `rollback` require an explicit profile name, others will use `default` when one is not
     given, some like `init` and `migrate` will apply the command over all profiles
@@ -121,13 +126,13 @@ in the database.
 
 ## 0.5.0-beta-4
 
-* Fix: [JavaScript-Enumerated-Value-Type.js] for latest version of [`enumerated-type`] with
+* Fix: [`JavaScript-Enumerated-Value-Type.js`] for latest version of [`enumerated-type`] with
       objects for values and `dropdownChoices` property of `{ value: xxx, label: "yyy", }`
       automatically generated from the enum id column and enum type column.
 
 ## 0.5.0-beta-3
 
-* Fix: [JavaScript-Enumerated-Value-Type.js] for latest version of [`enumerated-type`] with
+* Fix: [`JavaScript-Enumerated-Value-Type.js`] for latest version of [`enumerated-type`] with
   object value containing the id and type instead of constants.
 * Add: option to Scala model script to generate a separate Database model and an Api Model used
   for REST api data exchange.
@@ -412,8 +417,8 @@ To expand to `SELECT * FROM Table WHERE column in (?,?,?)` with parameters of `1
 
 * Initial release
 
-[`Generate Kotlin-Model.groovy`]: https://github.com/vsch/kotlin-jdbc/blob/master/extensions/com.intellij.database/schema/Generate%20Kotlin-Model.groovy
-[JavaScript-Enumerated-Value-Type.js]: extensions/com.intellij.database/data/extractors/JavaScript-Enumerated-Value-Type.js
+[`Generate Kotlin-Model.groovy`]: extensions/com.intellij.database/schema/Generate%20Kotlin-Model.groovy
+[`JavaScript-Enumerated-Value-Type.js`]: extensions/com.intellij.database/data/extractors/JavaScript-Enumerated-Value-Type.js
 [`enumerated-type`]: https://github.com/vsch/enumerated-type
 
 

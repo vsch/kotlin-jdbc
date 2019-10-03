@@ -923,11 +923,13 @@ LIMIT 1
             var part = 1
 
             lines.forEach { line ->
-                val UPS = "# --- !Ups"
-                val DOWNS = "# --- !Downs"
+                // SQL comment
+                // make the Ups/Down flexible to handle user input
+                val UPS = "# -{2,3} !Ups".toRegex()
+                val DOWNS = "# -{2,3} !Downs".toRegex()
                 val trimmed = line.trim()
                 when {
-                    trimmed == UPS -> {
+                    trimmed.matches(UPS) -> {
                         if (sawDowns || sawUps) {
                             // one part is done
                             generateMigration(dbPath, dbVersion, file, part, ups, downs, true)
@@ -946,7 +948,7 @@ LIMIT 1
                         ups.append(line).append("\n")
                     }
 
-                    trimmed == DOWNS -> {
+                    trimmed.matches(DOWNS) -> {
                         downs.append(commonPrefix)
                         commonPrefix.clear()
                         sawDowns = true

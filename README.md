@@ -967,7 +967,9 @@ db/
 
 (The MIT License)
 
-Copyright (c) 2018 - Vladimir Schneider Copyright (c) 2015 - Kazuhiro Sera
+Copyright (c) 2015 - Kazuhiro Sera
+
+Copyright (c) 2018-2019 - Vladimir Schneider
 
 [`enumerated-type`]: https://github.com/vsch/enumerated-type
 [`Generate Kotlin-Model.groovy`]: https://github.com/vsch/kotlin-jdbc/blob/master/extensions/com.intellij.database/schema/Generate%20Kotlin-Model.groovy
