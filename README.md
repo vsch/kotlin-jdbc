@@ -431,7 +431,7 @@ connection's `metaData.identifierQuoteString`.
 
 For IntelliJ Ultimate a Database extension script can be installed which will generate models
 from the context menu of any table in the database tools window. See
-[Installing IntelliJ Ultimate Database Tools Extension Script](#installing-database-tools-extension-scripts)
+[Installing Database Tools Extension Scripts](#installing-database-tools-extension-scripts)
 
 Result set row to model/json/data conversion:
 
@@ -652,11 +652,11 @@ changed model using the compare directory/file action of the IDE.
 
 ##### Generate Scala Slick Models from Tables
 
-Add [Generate Scala-Slick-Model.groovy] for generating a Scala/Slick database model.
+Add [`Generate Scala-Slick-Model.groovy`] for generating a Scala/Slick database model.
 
 ##### Result Set Conversion Scripts
 
-[Kotlin-Enum.kt.js] to convert result set data to Kotlin Enum definition. You need to add it to
+[`Kotlin-Enum.kt.js`] to convert result set data to Kotlin Enum definition. You need to add it to
 the `data/extractors` directory
 
 ![Scripted_Extensions_Generate-Kotlin-Model](assets/images/Scripted_Extensions_Data_Extractors.png)
@@ -697,9 +697,9 @@ enum class ChangeHistoryTypes(val id: Int, val type: String) {
 ```
 
 A script for generating a JavaScript enum based on [`enumerated-type`] npm package will generate
-an enum usable in JavaScript [JavaScript-Enumerated-Value-Type.js]
+an enum usable in JavaScript [`JavaScript-Enumerated-Value-Type.js`]
 
-A script for generating a markdown table for the table data [Markdown-Table.md.js]. The table
+A script for generating a markdown table for the table data [`Markdown-Table.md.js`]. The table
 above was generated with this script.
 
 ## Migrations
@@ -972,9 +972,10 @@ Copyright (c) 2015 - Kazuhiro Sera
 Copyright (c) 2018-2019 - Vladimir Schneider
 
 [`enumerated-type`]: https://github.com/vsch/enumerated-type
+[enumerated-type]: https://github.com/vsch/enumerated-type
 [`Generate Kotlin-Model.groovy`]: https://github.com/vsch/kotlin-jdbc/blob/master/extensions/com.intellij.database/schema/Generate%20Kotlin-Model.groovy
-[Generate Scala-Slick-Model.groovy]: extensions/com.intellij.database/schema/Generate%20Scala-Slick-Model.groovy
-[JavaScript-Enumerated-Value-Type.js]: extensions/com.intellij.database/data/extractors/JavaScript-Enumerated-Value-Type.js
-[Kotlin-Enum.kt.js]: extensions/com.intellij.database/data/extractors/Kotlin-Enum.js
-[Markdown-Table.md.js]: extensions/com.intellij.database/data/extractors/Markdown-Table.md.js
+[`Generate Scala-Slick-Model.groovy`]: extensions/com.intellij.database/schema/Generate%20Scala-Slick-Model.groovy
+[`JavaScript-Enumerated-Value-Type.js`]: extensions/com.intellij.database/data/extractors/JavaScript-Enumerated-Value-Type.js
+[`Kotlin-Enum.kt.js`]: extensions/com.intellij.database/data/extractors/Kotlin-Enum.js
+[`Markdown-Table.md.js`]: extensions/com.intellij.database/data/extractors/Markdown-Table.md.js
 
