@@ -105,6 +105,7 @@ in the database.
 ## 0.5.0-beta-7
 
 * Add: also accept `# -- !Ups` and `# -- !Downs` as valid Scala play evolution markers
+* Fix: merge fixes made by [Nick Johnson](https://github.com/Sylvyrfysh) in master
 
 ## 0.5.0-beta-6
 

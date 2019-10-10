@@ -283,8 +283,8 @@ void generateModel(PrintWriter dbg, PrintWriter out, String tableName, String cl
     fields.each() {
         out.print sep
         sep = ",\n";
-        if (it.annos != "") out.println "  ${it.annos}"
-        out.print "  val ${it.name}: ${it.type}"
+        if (it.annos != "") out.println "${sp}${it.annos}"
+        out.print "${sp}val ${it.name}: ${it.type}"
         if (it.nullable) out.print "?"
 //        if (it.attrs != null) out.print(" // attrs: '${it.attrs}'")
 //        if (it.default != null) out.print(" // default: '${it.default}'")
@@ -301,7 +301,7 @@ void generateModel(PrintWriter dbg, PrintWriter out, String tableName, String cl
 
     fields.each() {
         def line = ""
-        if (it.annos != "") line += "  ${it.annos}"
+        if (it.annos != "") line += "${sp}${it.annos}"
         line += "${sp}var ${it.name}: ${it.type}"
         if (it.nullable) line += "?"
         line += " by db"
