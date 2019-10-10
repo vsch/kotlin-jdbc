@@ -11,6 +11,7 @@ import com.intellij.database.util.DasUtil
  *   FILES       files helper
  */
 packageName = "com.sample"      // package used for generated class files
+indentType = "  " // can be anything, will be used as tab
 classFileNameSuffix = "Model"   // appended to class file name
 
 // KLUDGE: the DasTable and columns does not implement a way to get whether column is nullable, has default or is computed
@@ -89,8 +90,8 @@ def generate(out, tableName, className, fields) {
     fields.each() {
         out.print sep
         sep = ",\n";
-        if (it.annos != "") out.println "  ${it.annos}"
-        out.print "  val ${it.name}: ${it.type}"
+        if (it.annos != "") out.println "${indentType}${it.annos}"
+        out.print "${indentType}val ${it.name}: ${it.type}"
         if (it.nullable) out.print "?"
     }
     out.println "\n)"
@@ -103,8 +104,8 @@ def generate(out, tableName, className, fields) {
     def lines = []
     fields.each() {
         def line = ""
-        if (it.annos != "") line += "  ${it.annos}"
-        line += "  var ${it.name}: ${it.type}"
+        if (it.annos != "") line += "${indentType}${it.annos}"
+        line += "${indentType}var ${it.name}: ${it.type}"
         if (it.nullable) line += "?"
         line += " by db"
         if (it.auto && it.key) line += ".autoKey"
@@ -126,29 +127,29 @@ def generate(out, tableName, className, fields) {
 
     // data copy constructor
     out.println ""
-    out.println "  constructor(other: ${className}, quote: String? = null) : this(quote) {"
+    out.println "${indentType}constructor(other: ${className}, quote: String? = null) : this(quote) {"
     fields.each() {
-        out.println "    ${it.name} = other.${it.name}"
+        out.println "${indentType}${indentType}${it.name} = other.${it.name}"
     }
-    out.println "  }"
+    out.println "${indentType}}"
     out.println ""
 
     // data factory
-    out.println "  fun toData() = ${className}("
+    out.println "${indentType}fun toData() = ${className}("
     sep = "";
     fields.each() {
         out.print sep
         sep = ",\n";
-        out.print "    ${it.name}"
+        out.print "${indentType}${indentType}${it.name}"
     }
-    out.println "\n  )"
+    out.println "\n${indentType})"
     out.println ""
 
-    out.println "  companion object : ModelCompanion<${className}Model, ${className}>() {"
-    out.println "      override val tableName = \"${tableName}\""
-    out.println "      override fun createModel(quote:String?): ${className}Model = ${className}Model(quote)"
-    out.println "      override fun createData(model: ${className}Model): ${className} = model.toData()"
-    out.println "  }"
+    out.println "${indentType}companion object : ModelCompanion<${className}Model, ${className}>() {"
+    out.println "${indentType}${indentType}override val tableName = \"${tableName}\""
+    out.println "${indentType}${indentType}override fun createModel(quote:String?): ${className}Model = ${className}Model(quote)"
+    out.println "${indentType}${indentType}override fun createData(model: ${className}Model): ${className} = model.toData()"
+    out.println "${indentType}}"
     out.println "}"
 }
 
@@ -188,14 +189,24 @@ def calcFields(table) {
 
 def singularize(String str) {
     def s = com.intellij.psi.codeStyle.NameUtil.splitNameIntoWords(str).collect { it }
-    def singleLast = com.intellij.openapi.util.text.StringUtil.unpluralize(s[-1])
-    return str.substring(0, str.length() - s[-1].length()) + singleLast
+    def singleLast
+    if (s[s.length - 1].endsWith("s")) {
+        singleLast = s[s.length - 1].substring(0, s[s.length - 1].length() - 1)
+    } else {
+        singleLast = s[s.length - 1]
+    }
+    return str.substring(0, str.length() - s[s.length - 1].length()) + singleLast
 }
 
 def pluralize(String str) {
     def s = com.intellij.psi.codeStyle.NameUtil.splitNameIntoWords(str).collect { it }
-    def pluralLast = com.intellij.openapi.util.text.StringUtil.pluralize(s[-1])
-    return str.substring(0, str.length() - s[-1].length()) + pluralLast
+    def pluralLast
+    if (s[s.length - 1].endsWith("s")) {
+        pluralLast = s[s.length - 1]
+    } else {
+        pluralLast = s[s.length - 1].substring(0, s[s.length - 1].length() - 1)
+    }
+    return str.substring(0, str.length() - s[s.length - 1].length()) + pluralLast
 }
 
 def javaName(str, capitalize) {
