@@ -95,6 +95,14 @@ fun sqlQuery(statement: String, inputParams: Map<String, Any?>): SqlQuery {
     return SqlQuery(statement, inputParams = inputParams)
 }
 
+fun sqlQuery(statement: String, inputParams: Map<String, Any?>, params: List<Any?>): SqlQuery {
+    return SqlQuery(statement, params = params, inputParams = inputParams)
+}
+
+fun sqlQuery(statement: String, inputParams: Map<String, Any?>, vararg params: Any?): SqlQuery {
+    return SqlQuery(statement, params = params.toList(), inputParams = inputParams)
+}
+
 fun sqlCall(statement: String, vararg params: Any?): SqlCall {
     return SqlCall(statement, params = params.toList())
 }
