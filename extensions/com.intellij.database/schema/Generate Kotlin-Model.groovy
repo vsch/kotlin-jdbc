@@ -189,14 +189,24 @@ def calcFields(table) {
 
 def singularize(String str) {
     def s = com.intellij.psi.codeStyle.NameUtil.splitNameIntoWords(str).collect { it }
-    def singleLast = com.intellij.openapi.util.text.StringUtil.unpluralize(s[-1])
-    return str.substring(0, str.length() - s[-1].length()) + singleLast
+    def singleLast
+    if (s[s.length - 1].endsWith("s")) {
+        singleLast = s[s.length - 1].substring(0, s[s.length - 1].length() - 1)
+    } else {
+        singleLast = s[s.length - 1]
+    }
+    return str.substring(0, str.length() - s[s.length - 1].length()) + singleLast
 }
 
 def pluralize(String str) {
     def s = com.intellij.psi.codeStyle.NameUtil.splitNameIntoWords(str).collect { it }
-    def pluralLast = com.intellij.openapi.util.text.StringUtil.pluralize(s[-1])
-    return str.substring(0, str.length() - s[-1].length()) + pluralLast
+    def pluralLast
+    if (s[s.length - 1].endsWith("s")) {
+        pluralLast = s[s.length - 1]
+    } else {
+        pluralLast = s[s.length - 1].substring(0, s[s.length - 1].length() - 1)
+    }
+    return str.substring(0, str.length() - s[s.length - 1].length()) + pluralLast
 }
 
 def javaName(str, capitalize) {
