@@ -15,16 +15,16 @@ import groovy.json.JsonSlurper
  *   FILES       files helper
  */
 DEBUG = false                   // if true output debug trace to debug.log
+
+// can be overridden in model-config.json
 classFileNameSuffix = "Model"   // appended to class file name
+downsizeLongIdToInt = true      // if true changes id columns which would be declared Long to Int, change this to false to leave them as Long
+fileExtension = ".kt"           // file extension for generated models
+forceBooleanTinyInt = ""        // regex for column names marked as boolean when tinyint, only needed if using jdbc introspection which does not report actual declared type so all tinyint are tinyint(3)
 snakeCaseTables = false         // if true convert snake_case table names to Pascal case, else leave as is
-sp = "    "                     // spaces for each indent level
-fileExtension = ".kt"
+sp = "    "                     // string to use for each indent level
 
-// column names marked as boolean when tinyint, only needed if using jdbc introspection which does not report actual declared type so all tinyint are tinyint(3)
 //forceBooleanTinyInt = (~/^(?:deleted|checkedStatus|checked_status|optionState|option_state)$/)
-forceBooleanTinyInt = ""
-
-downsizeLongIdToInt = true // if true changes id columns which would be declared Long to Int, change this to false to leave them as Long
 
 typeMapping = [
         (~/(?i)tinyint\(1\)/)       : "Boolean",
@@ -117,6 +117,14 @@ FILES.chooseDirectoryAndSave("Choose directory", "Choose where to store generate
             packagePrefix = data["package-prefix"] ?: ""
             removePrefix = data["remove-prefix"] ?: ""
             skipUnmapped = data["skip-unmapped"] ?: false
+
+            // grab values from config
+            classFileNameSuffix = data["classFileNameSuffix"] ?: classFileNameSuffix
+            downsizeLongIdToInt = data["downsizeLongIdToInt"] ?: downsizeLongIdToInt
+            fileExtension = data["fileExtension"] ?: fileExtension
+            forceBooleanTinyInt = data["forceBooleanTinyInt"] ?: forceBooleanTinyInt
+            snakeCaseTables = data["snakeCaseTables"] ?: snakeCaseTables
+            sp = data["indent"] ?: sp
             tableMap = data["file-map"]
         }
 

@@ -48,8 +48,8 @@ file.
 Breaking change in resource `db/` adds profile name after `db/` to allow multi-database
 migrations, with `default` being the default profile name.
 
-To migrate previous `db/` structure move all directories other than `templates` under
-`db/` to `db/default`
+To migrate previous `db/` structure move all directories other than `templates` under `db/` to
+`db/default`
 
 ## Overview
 
@@ -626,6 +626,19 @@ For example:
 * `file-map`, map of model name to file path relative to `model-config.json` file location.
   * an empty name entry will match any file not explicitly matched by other entries and allows
     directing unmapped entries to a default location.
+  * if a model is mapped to an empty name then this model will not be generated.
+* script hardcoded parameters can also be changed in the config file to eliminate the need to
+  edit the script. If no value provided then script default will be used:
+  * `classFileNameSuffix`, default `"Model"`, appended to class file name
+  * `downsizeLongIdToInt`, default `true`, if `true` changes id columns which would be declared
+    `Long` to `Int`, change this to false to leave them as `Long`
+  * `fileExtension`, default `".kt"`, model extension
+  * `forceBooleanTinyInt`, default "", regex for column names marked as boolean when tinyint,
+    only needed if using jdbc introspection which does not report actual declared type so all
+    `tinyint` are `tinyint(3)`
+  * `snakeCaseTables`, default false, if true convert snake_case table names to Pascal case,
+    else leave as is
+  * `indent`, default 4 spaces, string to use for each indent level
 
 :information_source: the easiest way to generate the file-map is first generate models with
 default mapping the file map. Move them to the desired sub-directories and then use the IDE
@@ -654,10 +667,35 @@ changed model using the compare directory/file action of the IDE.
 
 Add [`Generate Scala-Slick-Model.groovy`] for generating a Scala/Slick database model.
 
+* In addition to the Kotlin model generator `model-config.json` configuration values Scala model
+  generator has additional configuration properties to control model generation:
+  * `classFileNameSuffix`, default `"Model"`, appended to class file name
+  * downsizeLongIdToInt, default `true`, if true changes id columns which would be declared
+    `Long` to `Int`, change this to `false` to leave them as `Long`
+  * `fileExtension`, default `".scala"`, model extension
+  * `forceBooleanTinyInt`, default "", regex for column names marked as boolean when tinyint,
+    only needed if using jdbc introspection which does not report actual declared type so all
+    `tinyint` are `tinyint(3)`
+  * `snakeCaseTables`, default `false`, if `true` convert snake_case table names to Pascal case,
+    else leave as is
+  * `indent`, default 2 spaces, string to use for each indent level
+  * `addToApi`, default `true`, create database Model class with `Date`/`Time`/`Timestamp` field
+    types and an Api class with `String` data types for these fields. Intended to be used for
+    converting to/from JSON when communicating with a JavaScript client. The Api class has
+    methods `toModel()` and `fromModel()` to easily convert between Api and database model
+    class.
+
+    :information_source:The Api class will only be created if there are date/time fields in the
+    model.
+
+  * `apiFileNameSuffix`, default `"Gen"`, appended to file name for the generated Api class.
+  * `convertTimeBasedToString`, default `false`, to convert all date, time and timestamp to
+    String in the model
+
 ##### Result Set Conversion Scripts
 
-[`Kotlin-Enum.kt.js`] to convert result set data to Kotlin Enum definition. You need to add it to
-the `data/extractors` directory
+[`Kotlin-Enum.kt.js`] to convert result set data to Kotlin Enum definition. You need to add it
+to the `data/extractors` directory
 
 ![Scripted_Extensions_Generate-Kotlin-Model](assets/images/Scripted_Extensions_Data_Extractors.png)
 
@@ -972,10 +1010,10 @@ Copyright (c) 2015 - Kazuhiro Sera
 Copyright (c) 2018-2019 - Vladimir Schneider
 
 [`enumerated-type`]: https://github.com/vsch/enumerated-type
-[enumerated-type]: https://github.com/vsch/enumerated-type
 [`Generate Kotlin-Model.groovy`]: https://github.com/vsch/kotlin-jdbc/blob/master/extensions/com.intellij.database/schema/Generate%20Kotlin-Model.groovy
 [`Generate Scala-Slick-Model.groovy`]: extensions/com.intellij.database/schema/Generate%20Scala-Slick-Model.groovy
 [`JavaScript-Enumerated-Value-Type.js`]: extensions/com.intellij.database/data/extractors/JavaScript-Enumerated-Value-Type.js
 [`Kotlin-Enum.kt.js`]: extensions/com.intellij.database/data/extractors/Kotlin-Enum.js
 [`Markdown-Table.md.js`]: extensions/com.intellij.database/data/extractors/Markdown-Table.md.js
+[enumerated-type]: https://github.com/vsch/enumerated-type
 

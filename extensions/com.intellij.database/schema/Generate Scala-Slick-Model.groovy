@@ -15,18 +15,19 @@ import groovy.json.JsonSlurper
  *   FILES       files helper
  */
 DEBUG = false                       // if true output debug trace to debug.log
-classFileNameSuffix = "Model"       // appended to class file name
-apiFileNameSuffix = "Gen"           // appended to class file name
-snakeCaseTables = false             // if true convert snake_case table names to Pascal case, else leave as is
-sp = "  "                           // spaces for each indent level
-fileExtension = ".scala"
-downsizeLongIdToInt = true          // if true changes id columns which would be declared Long to Int, change this to false to leave them as Long
-convertTimeBasedToString = false    // to convert all date, time and timestamp to String in the model
-addToApi = true                     // create database Model class with Date/Timestamp and Api class with String if model has Date/Time/Timestamp fields
 
-// column names marked as boolean when tinyint, only needed if using jdbc introspection which does not report actual declared type so all tinyint are tinyint(3)
+// can be overridden in model-config.json
+classFileNameSuffix = "Model"       // appended to class file name
+downsizeLongIdToInt = true          // if true changes id columns which would be declared Long to Int, change this to false to leave them as Long
+fileExtension = ".scala"            // file extension for generated models
+forceBooleanTinyInt = ""            // regex for column names marked as boolean when tinyint, only needed if using jdbc introspection which does not report actual declared type so all tinyint are tinyint(3)
+snakeCaseTables = false             // if true convert snake_case table names to Pascal case, else leave as is
+sp = "  "                           // string to use for each indent level
+addToApi = true                     // create database Model class with Date/Timestamp and Api class with String if model has Date/Time/Timestamp fields
+apiFileNameSuffix = "Gen"           // appended to class file name
+convertTimeBasedToString = false    // to convert all date, time and timestamp to String in the model
+
 //forceBooleanTinyInt = (~/^(?:deleted|checkedStatus|checked_status|optionState|option_state)$/)
-forceBooleanTinyInt = ""
 
 typeMappingTimeBasedToString = [
         (~/(?i)tinyint\(1\)/)       : "Boolean",
@@ -53,8 +54,6 @@ typeMappingTimeBased = [
         (~/(?i)time/)               : "Time",
         (~/(?i)/)                   : "String"
 ]
-
-typeMapping = convertTimeBasedToString ? typeMappingTimeBasedToString : typeMappingTimeBased
 
 FILES.chooseDirectoryAndSave("Choose directory", "Choose where to store generated files") { File dir ->
     // read in possible map of tables to subdirectories
@@ -134,6 +133,15 @@ FILES.chooseDirectoryAndSave("Choose directory", "Choose where to store generate
             packagePrefix = data["package-prefix"] ?: ""
             removePrefix = data["remove-prefix"] ?: ""
             skipUnmapped = data["skip-unmapped"] ?: false
+            classFileNameSuffix = data["classFileNameSuffix"] ?: classFileNameSuffix
+            downsizeLongIdToInt = data["downsizeLongIdToInt"] ?: downsizeLongIdToInt
+            fileExtension = data["fileExtension"] ?: fileExtension
+            forceBooleanTinyInt = data["forceBooleanTinyInt"] ?: forceBooleanTinyInt
+            snakeCaseTables = data["snakeCaseTables"] ?: snakeCaseTables
+            sp = data["indent"] ?: sp
+            addToApi = data["addToApi"] ?: addToApi
+            apiFileNameSuffix = data["apiFileNameSuffix"] ?: apiFileNameSuffix
+            convertTimeBasedToString = data["convertTimeBasedToString"] ?: convertTimeBasedToString
             tableMap = data["file-map"]
         }
 
@@ -142,6 +150,8 @@ FILES.chooseDirectoryAndSave("Choose directory", "Choose where to store generate
         }
     }
 }
+
+typeMapping = convertTimeBasedToString ? typeMappingTimeBasedToString : typeMappingTimeBased
 
 void generate(PrintWriter dbg, DasTable table, File dir, tableMap, String packageName, String packagePrefix, String removePrefix, boolean skipUnmapped) {
     String className = snakeCaseTables ? toJavaName(toSingular(table.getName()), true) : toSingular(table.getName())
