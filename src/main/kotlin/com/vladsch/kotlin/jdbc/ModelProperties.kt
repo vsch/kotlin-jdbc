@@ -615,8 +615,18 @@ class ModelProperties<M>(val session: Session, val tableName: String, val dbCase
 
     fun listQuery(whereClause: String, params: Map<String, Any?>, alias: String? = null): SqlQuery {
         val sb = StringBuilder()
-        appendSelectSql(sb, alias)
-        appendSelectSql(sb).append(whereClause, alias)
+        val aliasedWhereClause = if(!alias.isNullOrEmpty()) {
+            whereClause.split(" ").joinToString(" ") {
+                if (properties.containsKey(it) || propertyDefaults.containsKey(it)) {
+                    "$alias.$it"
+                } else {
+                    it
+                }
+            }
+        } else {
+            whereClause
+        }
+        appendSelectSql(sb, alias).append(" WHERE ", aliasedWhereClause)
         return sqlQuery(sb.toString(), params)
     }
 }
