@@ -42,6 +42,10 @@ abstract class Model<M : Model<M, D>, D>(session: Session?, sqlTable: String, db
         return _db.appendSelectSql(this)
     }
 
+    fun bulkInsert(items: List<M>) = _db.bulkInsert(items)
+    fun batchInsert(items: List<M>) = _db.batchInsert(items)
+    fun bulkInsertIgnoreKeys(items: List<M>) = _db.bulkInsertIgnoreKeys(items)
+    fun batchInsertIgnoreKeys(items: List<M>) = _db.batchInsertIgnoreKeys(items)
     fun insert() = _db.insert()
     fun insertIgnoreKeys() = _db.insertIgnoreKeys()
     fun select() = _db.select()

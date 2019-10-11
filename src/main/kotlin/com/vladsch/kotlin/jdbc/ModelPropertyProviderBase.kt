@@ -2,7 +2,7 @@ package com.vladsch.kotlin.jdbc
 
 import kotlin.reflect.KProperty
 
-open class ModelPropertyProviderBase<T>(val provider: ModelProperties<T>, val propType: PropertyType, override val columnName: String?, override val defaultValue:Any? = Unit) : InternalModelPropertyProvider<T> {
+open class ModelPropertyProviderBase<T: Model<*, *>>(val provider: ModelProperties<T>, val propType: PropertyType, override val columnName: String?, override val defaultValue:Any? = Unit) : InternalModelPropertyProvider<T> {
     final override fun provideDelegate(thisRef: T, prop: KProperty<*>): ModelProperties<T> {
         return provider.registerProp(prop, propType, columnName, defaultValue)
     }
@@ -44,7 +44,7 @@ open class ModelPropertyProviderBase<T>(val provider: ModelProperties<T>, val pr
     }
 }
 
-class ModelPropertyProviderAutoKey<T>(provider: ModelProperties<T>, columnName: String?) : ModelPropertyProviderBase<T>(provider, PropertyType.AUTO_KEY, columnName) {
+class ModelPropertyProviderAutoKey<T: Model<*, *>>(provider: ModelProperties<T>, columnName: String?) : ModelPropertyProviderBase<T>(provider, PropertyType.AUTO_KEY, columnName) {
     override val key: ModelPropertyProvider<T>
         get() = this
 
@@ -72,7 +72,7 @@ class ModelPropertyProviderAutoKey<T>(provider: ModelProperties<T>, columnName: 
     }
 }
 
-class ModelPropertyProviderKey<T>(provider: ModelProperties<T>, columnName: String?) : ModelPropertyProviderBase<T>(provider, PropertyType.KEY, columnName) {
+class ModelPropertyProviderKey<T: Model<*, *>>(provider: ModelProperties<T>, columnName: String?) : ModelPropertyProviderBase<T>(provider, PropertyType.KEY, columnName) {
     override val key: ModelPropertyProvider<T>
         get() = this
 
@@ -100,7 +100,7 @@ class ModelPropertyProviderKey<T>(provider: ModelProperties<T>, columnName: Stri
     }
 }
 
-class ModelPropertyProviderAuto<T>(provider: ModelProperties<T>, columnName: String?) : ModelPropertyProviderBase<T>(provider, PropertyType.AUTO, columnName) {
+class ModelPropertyProviderAuto<T: Model<*, *>>(provider: ModelProperties<T>, columnName: String?) : ModelPropertyProviderBase<T>(provider, PropertyType.AUTO, columnName) {
     override val key: ModelPropertyProvider<T>
         get() = provider.autoKey
 
@@ -128,7 +128,7 @@ class ModelPropertyProviderAuto<T>(provider: ModelProperties<T>, columnName: Str
     }
 }
 
-class ModelPropertyProviderDefault<T>(provider: ModelProperties<T>, columnName: String?, value: Any?) : ModelPropertyProviderBase<T>(provider, PropertyType.DEFAULT, columnName, value) {
+class ModelPropertyProviderDefault<T: Model<*, *>>(provider: ModelProperties<T>, columnName: String?, value: Any?) : ModelPropertyProviderBase<T>(provider, PropertyType.DEFAULT, columnName, value) {
     override val key: ModelPropertyProvider<T>
         get() = provider.autoKey
 
