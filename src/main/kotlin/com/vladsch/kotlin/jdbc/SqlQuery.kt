@@ -73,7 +73,7 @@ open class SqlQuery(
 
     fun populateParams(stmt: PreparedStatement) {
         if (replacementMap.isNotEmpty()) {
-            replacementMap.forEach { paramName, occurrences ->
+            replacementMap.forEach { (paramName, occurrences) ->
                 populateNamedParam(stmt, paramName, occurrences)
             }
         } else {

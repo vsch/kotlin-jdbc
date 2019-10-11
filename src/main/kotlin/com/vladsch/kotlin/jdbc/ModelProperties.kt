@@ -89,7 +89,7 @@ class ModelProperties<M>(val session: Session, val tableName: String, val dbCase
         out.append("SELECT * FROM ")
         appendQuoted(out, tableName) //.append(" ")
         if (!alias.isNullOrBlank() && alias != tableName) {
-            out.append(alias)
+            out.append(' ').append(alias)
         }
         return out
     }
@@ -479,17 +479,23 @@ class ModelProperties<M>(val session: Session, val tableName: String, val dbCase
     }
 
     fun forEachKey(consumer: (prop: KProperty<*>, propType: PropertyType, value: Any?) -> Unit) {
-        for (prop in keyProperties) {
-            if (properties.containsKey(prop.name)) {
-                consumer.invoke(prop, propertyTypes[prop.name]!!, properties[prop.name])
-            } else {
-                consumer.invoke(prop, propertyTypes[prop.name]!!, Unit)
-            }
-        }
+        forEachPropTypeValue(keyProperties, consumer)
     }
 
     fun forEachProp(consumer: (prop: KProperty<*>, propType: PropertyType, value: Any?) -> Unit) {
-        for (prop in kProperties) {
+        forEachPropTypeValue(kProperties, consumer)
+    }
+
+    fun forEachKey(consumer: (prop: KProperty<*>, propType: PropertyType, columnName: String, value: Any?) -> Unit) {
+        forEachPropTypeColumnNameValue(keyProperties, consumer)
+    }
+
+    fun forEachProp(consumer: (prop: KProperty<*>, propType: PropertyType, columnName: String, value: Any?) -> Unit) {
+        forEachPropTypeColumnNameValue(kProperties, consumer)
+    }
+
+    private fun forEachPropTypeValue(useProperties: ArrayList<KProperty<*>>, consumer: (prop: KProperty<*>, propType: PropertyType, value: Any?) -> Unit) {
+        for (prop in useProperties) {
             if (properties.containsKey(prop.name)) {
                 consumer.invoke(prop, propertyTypes[prop.name]!!, properties[prop.name])
             } else {
@@ -498,22 +504,11 @@ class ModelProperties<M>(val session: Session, val tableName: String, val dbCase
         }
     }
 
-    fun forEachKey(consumer: (prop: KProperty<*>, propType: PropertyType, columnName: String, value: Any?) -> Unit) {
-        for (prop in keyProperties) {
+    private fun forEachPropTypeColumnNameValue(useProperties: ArrayList<KProperty<*>>, consumer: (prop: KProperty<*>, propType: PropertyType, columnName: String, value: Any?) -> Unit) {
+        for (prop in useProperties) {
             val columnName = columnNames[prop.name] ?: prop.name
-            if (properties.containsKey(prop.name)) {
-                consumer.invoke(prop, propertyTypes[prop.name]!!, columnName, properties[prop.name])
-            } else {
-                consumer.invoke(prop, propertyTypes[prop.name]!!, columnName, Unit)
-            }
-        }
-    }
-
-    fun forEachProp(consumer: (prop: KProperty<*>, propType: PropertyType, columnName: String, value: Any?) -> Unit) {
-        for (prop in kProperties) {
-            val columnName = columnNames[prop.name] ?: prop.name
-            if (properties.containsKey(prop.name)) {
-                consumer.invoke(prop, propertyTypes[prop.name]!!, columnName, properties[prop.name])
+            if (this.properties.containsKey(prop.name)) {
+                consumer.invoke(prop, propertyTypes[prop.name]!!, columnName, this.properties[prop.name])
             } else {
                 consumer.invoke(prop, propertyTypes[prop.name]!!, columnName, Unit)
             }
@@ -615,8 +610,7 @@ class ModelProperties<M>(val session: Session, val tableName: String, val dbCase
 
     fun listQuery(whereClause: String, params: Map<String, Any?>, alias: String? = null): SqlQuery {
         val sb = StringBuilder()
-        appendSelectSql(sb, alias)
-        appendSelectSql(sb).append(whereClause, alias)
+        appendSelectSql(sb, alias).append(' ').append(whereClause)
         return sqlQuery(sb.toString(), params)
     }
 }

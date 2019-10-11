@@ -24,8 +24,10 @@ interface Session : AutoCloseable {
     fun <A> first(query: SqlQuery, extractor: (Row) -> A): A?
     fun <K, A> hashMap(query: SqlQuery, keyExtractor: (Row) -> K, extractor: (Row) -> A): Map<K, A>
     fun jsonObject(query: SqlQuery, keyExtractor: (Row) -> String, extractor: (Row) -> JsonObject): JsonObject
-    fun forEach(query: SqlQuery, operator: (Row) -> Unit): Unit
-    fun forEach(query: SqlCall, stmtProc: (CallableStatement) -> Unit, operator: (rs: ResultSet, index: Int) -> Unit): Unit
+    fun forEach(query: SqlQuery, operator: (Row) -> Unit)
+    @Deprecated(message = "Use executeCall(query: SqlCall, stmtProc: (results: SqlCallResults) -> Unit) instead", replaceWith = ReplaceWith("executeCall"))
+    fun forEach(query: SqlCall, stmtProc: (stmt: CallableStatement) -> Unit, operator: (rs: ResultSet, index: Int) -> Unit)
+    fun executeCall(query: SqlCall, stmtProc: (results: SqlCallResults) -> Unit)
     fun execute(query: SqlQuery): Boolean
     fun update(query: SqlQuery): Int
     fun updateGetLongId(query: SqlQuery): Long?

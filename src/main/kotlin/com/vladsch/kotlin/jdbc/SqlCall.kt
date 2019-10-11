@@ -16,9 +16,27 @@ class SqlCall(
         super.populateNamedParam(stmt, paramName, occurrences)
 
         if (outputParams.containsKey(paramName)) {
-            // setup out or inout param
-            (stmt as CallableStatement).registerOutParameter(paramName, outputParams[paramName].param().sqlType())
+            // setup out or inout param, make these independent of name so we use occurrence index
+            require(occurrences.size == 1) { "Output parameter $paramName should have exactly 1 occurrence, got ${occurrences.size}" }
+            (stmt as CallableStatement).registerOutParameter(occurrences.first() + 1, outputParams[paramName].param().sqlType())
         }
+    }
+
+    fun outputParamIndices(stmt: CallableStatement): Map<String, Int> {
+        val params = HashMap<String, Int>()
+        replacementMap
+            .filter { outputParams.containsKey(it.key) }
+            .forEach { (paramName, occurrences) ->
+                require(occurrences.size == 1) { "Output parameter $paramName should have exactly 1 occurrence, got ${occurrences.size}" }
+                params[paramName] = occurrences.first() + 1
+            }
+        return params
+    }
+
+    fun outParamIndex(paramName: String): Int {
+        require(outputParams.containsKey(paramName)) { "Parameter $paramName is not an outParam" }
+        require(replacementMap[paramName]?.size == 1) { "Output parameter $paramName should have exactly 1 occurrence, got ${replacementMap[paramName]?.size}" }
+        return replacementMap[paramName]?.first()!! + 1
     }
 
     override fun params(vararg params: Any?): SqlCall {

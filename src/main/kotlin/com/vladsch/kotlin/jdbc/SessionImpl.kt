@@ -185,13 +185,22 @@ open class SessionImpl(
                 var rsIndex = 0
                 while (results) {
                     val rs = stmt.resultSet
-                    try {
-                        operator.invoke(rs, rsIndex++)
-                    } finally {
-                        rs.close()
-                    }
+                    operator.invoke(rs, rsIndex++)
                     results = stmt.moreResults
                 }
+            } finally {
+                stmt.close()
+            }
+        }
+    }
+
+    override fun executeCall(query: SqlCall, stmtProc: (results: SqlCallResults) -> Unit) {
+        execute(query) { stmt ->
+            try {
+                val results = stmt.execute();
+                val outputParams = query.outputParamIndices(stmt as CallableStatement)
+                val callableOutParams = SqlCallResults(stmt, results, outputParams)
+                stmtProc.invoke(callableOutParams)
             } finally {
                 stmt.close()
             }

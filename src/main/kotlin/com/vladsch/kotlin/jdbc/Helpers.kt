@@ -15,7 +15,7 @@ import javax.json.JsonObject
 import javax.json.JsonValue
 import javax.sql.DataSource
 
-inline fun <reified T> PreparedStatement.setTypedParam(idx: Int, param: Parameter<T>) {
+inline fun <reified T : Any> PreparedStatement.setTypedParam(idx: Int, param: Parameter<T>) {
     if (param.value == null) {
         this.setNull(idx, param.sqlType())
     } else {
@@ -61,9 +61,11 @@ fun PreparedStatement.setParam(idx: Int, v: Any?) {
     }
 }
 
-open class Parameter<out T>(val value: T?, val type: Class<out T>)
+open class Parameter<T : Any>(val value: T?, val type: Class<T>) {
+    constructor(value: T) : this(value, value.javaClass)
+}
 
-fun <T> Parameter<T>.sqlType() = when (type) {
+fun <T : Any> Parameter<T>.sqlType() = when (type) {
     String::class.java, URL::class.java -> Types.VARCHAR
     Int::class.java, Long::class.java, Short::class.java,
     Byte::class.java, BigInteger::class.java -> Types.NUMERIC
@@ -78,9 +80,46 @@ fun <T> Parameter<T>.sqlType() = when (type) {
 }
 
 @Suppress("UNCHECKED_CAST")
-inline fun <reified T> T?.param(): Parameter<T> = when (this) {
-    is Parameter<*> -> Parameter(this.value as T?, this.type as Class<T>)
-    else -> Parameter(this, T::class.java)
+fun <T : Any> CallableStatement.getParam(idx: Int, type: Class<T>): T? {
+    return when (type) {
+        String::class.java -> this.getString(idx) as T?
+        Byte::class.java -> this.getByte(idx) as T?
+        Boolean::class.java -> this.getBoolean(idx) as T?
+        Int::class.java -> this.getInt(idx) as T?
+        Long::class.java -> this.getLong(idx) as T?
+        Short::class.java -> this.getShort(idx) as T?
+        Double::class.java -> this.getDouble(idx) as T?
+        Float::class.java -> this.getFloat(idx) as T?
+        ZonedDateTime::class.java -> this.getTimestamp(idx) as T?
+        OffsetDateTime::class.java -> this.getTimestamp(idx) as T?
+        Instant::class.java -> this.getTimestamp(idx) as T?
+        java.time.LocalDateTime::class.java -> this.getTimestamp(idx) as T?
+        LocalDate::class.java -> this.getDate(idx) as T?
+        LocalTime::class.java -> this.getTime(idx) as T?
+        org.joda.time.DateTime::class.java -> this.getTimestamp(idx) as T?
+        org.joda.time.LocalDateTime::class.java -> this.getTimestamp(idx) as T?
+        org.joda.time.LocalDate::class.java -> this.getDate(idx) as T?
+        org.joda.time.LocalTime::class.java -> this.getTime(idx) as T?
+        java.util.Date::class.java -> this.getTimestamp(idx) as T?
+        java.sql.Timestamp::class.java -> this.getTimestamp(idx) as T?
+        java.sql.Time::class.java -> this.getTime(idx) as T?
+        java.sql.Date::class.java -> this.getTimestamp(idx) as T?
+        java.sql.SQLXML::class.java -> this.getSQLXML(idx) as T?
+        ByteArray::class.java -> this.getBytes(idx) as T?
+        BigDecimal::class.java -> this.getBigDecimal(idx) as T?
+        java.sql.Array::class.java -> this.getArray(idx) as T?
+        URL::class.java -> this.getURL(idx) as T?
+        else -> this.getObject(idx) as T?
+    }
+}
+
+@Suppress("UNCHECKED_CAST")
+inline fun <reified T : Any> T?.param(): Parameter<T> = when (this) {
+    is Parameter<*> -> this as Parameter<T>
+    else ->
+        // when T is not known due to caller handling <*> type need to use actual value's javaClass otherwise
+        if (this != null) Parameter(this)
+        else Parameter(this as T?, T::class.java)
 }
 
 fun sqlQuery(statement: String, vararg params: Any?): SqlQuery {
@@ -222,7 +261,7 @@ val toJsonObject: (Row) -> JsonObject = {
     val metaData = it.rs.metaData
     val jsonObject = MutableJsObject(metaData.columnCount)
 
-    for (column in 1..metaData.columnCount) {
+    for (column in 1 .. metaData.columnCount) {
         addJsonValue(jsonObject, column, it.rs)
     }
 
@@ -335,7 +374,7 @@ fun String.versionCompare(other: String): Int {
     }
 }
 
-fun getVersionDirectory(dbDir: File, dbProfile:String, dbVersion: String, createDir: Boolean?): File {
+fun getVersionDirectory(dbDir: File, dbProfile: String, dbVersion: String, createDir: Boolean?): File {
     if (createDir != null) {
         dbDir.ensureExistingDirectory("dbDir")
     }

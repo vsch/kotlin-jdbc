@@ -5,6 +5,7 @@
 - [TODO](#todo)
     - [High Priority](#high-priority)
 - [0.5.0 API Breaking Release](#050-api-breaking-release)
+- [0.5.0-beta-8](#050-beta-8)
 - [0.5.0-beta-7](#050-beta-7)
 - [0.5.0-beta-6](#050-beta-6)
 - [0.5.0-beta-5](#050-beta-5)
@@ -102,6 +103,58 @@ to the table name will only be used for column references.
 [`Generate Kotlin-Model.groovy`] has been updated to generate the new model format from tables
 in the database.
 
+## 0.5.0-beta-8
+
+* Fix: sql call out params are now passed by index instead of name to make them independent of
+  actual sql procedure param names.
+* Fix: `param()` to work for non-null values when calling context's capture type is `*`,
+  previous implementation would always result in `Any` type, fixed implementation uses the
+  value's class for type's class.
+* Fix: SQL generation for model `listQuery` with where clause and/or alias
+* Fix: deprecate `Session.forEach(SqlCall, (stmt: CallableStatement) -> Unit, (rs: ResultSet,
+  index: Int) -> Unit)`
+* Add: `Session.executeCall(SqlCall, (results: SqlCallResults) -> Unit)` to replace
+  `Session.forEach(SqlCall, (stmt: CallableStatement) -> Unit, (rs: ResultSet, index: Int) ->
+  Unit)`. Use `SqlCallResults.forEach` to process result sets returned by the procedure call. To
+  get values of out params use `SqlCallResults.get{Type}(paramName)` to get non-null values or
+  `SqlCallResults.get{Type}OrNull(paramName)` to get nullable values.
+
+  For example, when using old `forEach` the code was:
+
+  ```kotlin
+  val sqlQuery = sqlCall("""CALL processInstances(:clientId, :types)""")
+    .inParams("clientId" to 35)
+    .inOutParams("types" to "")
+
+  val jsonResult = MutableJsObject()
+  var types: List<String> = listOf()
+
+  session.forEach(sqlQuery, { stmt ->
+      types = stmt.getString("types").split(',')
+  }) { rs, index ->
+      val key = types[index]
+      jsonResult[key] = MutableJsArray(Rows(rs).map(toJsonObject).toList()) as JsonValue
+  }
+  ```
+
+  Using the new `executeCall`, the code changes to:
+
+  ```kotlin
+  val sqlQuery = sqlCall("""CALL processInstances(:clientId, :types)""")
+    .inParams("clientId" to 35)
+    .inOutParams("types" to "")
+
+  val jsonResult = MutableJsObject()
+
+  session.executeCall(sqlQuery) { results:SqlCallResults ->
+      val types = results.getString("types").split(',')
+      results.forEach { rs, index ->
+          val key = types[index]
+          jsonResult[key] = MutableJsArray(Rows(rs).map(toJsonObject).toList()) as JsonValue
+      }
+  }
+  ```
+
 ## 0.5.0-beta-7
 
 * Add: import evolutions to also accept `# -- !Ups` and `# -- !Downs` as valid Scala play
@@ -129,8 +182,8 @@ in the database.
 ## 0.5.0-beta-4
 
 * Fix: [`JavaScript-Enumerated-Value-Type.js`] for latest version of [`enumerated-type`] with
-      objects for values and `dropdownChoices` property of `{ value: xxx, label: "yyy", }`
-      automatically generated from the enum id column and enum type column.
+  objects for values and `dropdownChoices` property of `{ value: xxx, label: "yyy", }`
+  automatically generated from the enum id column and enum type column.
 
 ## 0.5.0-beta-3
 
@@ -140,8 +193,8 @@ in the database.
   for REST api data exchange.
 * Fix: `Generate Kotlin-Model.groovy` now will look for the model map file starting from the
   directory selected for generation and go up, until encountering directory with sub-directory
-  `.idea`, hitting the root directory or finding `model-config.json` file. Mappings in
-  this file are now relative to the directory of the `model-config.json` file.
+  `.idea`, hitting the root directory or finding `model-config.json` file. Mappings in this file
+  are now relative to the directory of the `model-config.json` file.
 
   if `.idea` sub-directory was seen then will assume that this is the project root and if no
   `model-config.json` file is provided then will use the destination directory, without the
@@ -419,8 +472,7 @@ To expand to `SELECT * FROM Table WHERE column in (?,?,?)` with parameters of `1
 
 * Initial release
 
+[`enumerated-type`]: https://github.com/vsch/enumerated-type
 [`Generate Kotlin-Model.groovy`]: extensions/com.intellij.database/schema/Generate%20Kotlin-Model.groovy
 [`JavaScript-Enumerated-Value-Type.js`]: extensions/com.intellij.database/data/extractors/JavaScript-Enumerated-Value-Type.js
-[`enumerated-type`]: https://github.com/vsch/enumerated-type
-
 
