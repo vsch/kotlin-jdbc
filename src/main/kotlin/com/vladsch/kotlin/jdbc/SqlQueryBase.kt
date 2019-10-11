@@ -3,16 +3,17 @@ package com.vladsch.kotlin.jdbc
 import org.jetbrains.annotations.TestOnly
 import java.sql.PreparedStatement
 
-open class SqlQuery(
+open class SqlQueryBase<T : SqlQueryBase<T>>(
     val statement: String,
     params: List<Any?> = listOf(),
-    inputParams: Map<String, Any?> = mapOf()
+    namedParams: Map<String, Any?> = mapOf()
 ) {
-    protected val params = ArrayList(params)
-    protected val inputParams = HashMap(inputParams)
+
+    protected val params = ArrayList(params.asParamList())
+    protected val namedParams: HashMap<String, Parameter<*>> = HashMap(namedParams.asParamMap())
     private var _queryDetails: Details? = null
 
-    val queryDetails: Details get() = finalizeQuery()
+    private val queryDetails: Details get() = finalizedQuery()
     val replacementMap get() = queryDetails.replacementMap
     val cleanStatement get() = queryDetails.cleanStatement
 
@@ -27,7 +28,7 @@ open class SqlQuery(
         _queryDetails = null
     }
 
-    private fun finalizeQuery(): Details {
+    private fun finalizedQuery(): Details {
         if (_queryDetails == null) {
             // called when parameters are defined and have request for clean statement or populate params
             val listParamsMap: HashMap<String, String> = HashMap()
@@ -44,7 +45,7 @@ open class SqlQuery(
                 }
             }.map { group ->
                 val paramName = group.value.substring(1);
-                val paramValue = inputParams[paramName]
+                val paramValue = namedParams[paramName]
                 val pair = Pair(paramName, idxOffset)
 
                 if (paramValue is Collection<*>) {
@@ -73,9 +74,7 @@ open class SqlQuery(
 
     fun populateParams(stmt: PreparedStatement) {
         if (replacementMap.isNotEmpty()) {
-            replacementMap.forEach { (paramName, occurrences) ->
-                populateNamedParam(stmt, paramName, occurrences)
-            }
+            populateNamedParam(stmt)
         } else {
             params.forEachIndexed { index, value ->
                 stmt.setTypedParam(index + 1, value.param())
@@ -83,15 +82,27 @@ open class SqlQuery(
         }
     }
 
-    protected open fun populateNamedParam(stmt: PreparedStatement, paramName: String, occurrences: List<Int>) {
-        occurrences.forEach {
-            val param = inputParams[paramName]
-            if (param is Collection<*>) {
-                param.forEachIndexed { idx, paramItem ->
-                    stmt.setTypedParam(it + idx + 1, paramItem.param())
+    protected fun forEachNamedParam(action: (paramName: String, param: Parameter<*>, occurrences: List<Int>) -> Unit) {
+        replacementMap.forEach { (paramName, occurrences) ->
+            val param = namedParams[paramName]!!
+            action.invoke(paramName, param, occurrences)
+        }
+    }
+
+    protected open fun populateNamedParam(stmt: PreparedStatement) {
+        forEachNamedParam { _, param, occurrences ->
+            if (param.inOut.isIn) {
+                if (param.value is Collection<*>) {
+                    param.value.forEachIndexed { idx, paramItem ->
+                        occurrences.forEach {
+                            stmt.setTypedParam(it + idx + 1, paramItem, param)
+                        }
+                    }
+                } else {
+                    occurrences.forEach {
+                        stmt.setTypedParam(it + 1, param)
+                    }
                 }
-            } else {
-                stmt.setTypedParam(it + 1, param.param())
             }
         }
     }
@@ -101,66 +112,84 @@ open class SqlQuery(
         return if (replacementMap.isNotEmpty()) {
             val sqlParams = ArrayList<Any?>(queryDetails.paramCount)
 
-            for (i in 0 until  queryDetails.paramCount) {
+            for (i in 0 until queryDetails.paramCount) {
                 sqlParams.add(null)
             }
 
-            replacementMap.forEach { paramName, occurrences ->
+            forEachNamedParam { _, param, occurrences ->
                 occurrences.forEach {
-                    val param = inputParams[paramName]
                     if (param is Collection<*>) {
                         param.forEachIndexed { idx, paramItem ->
-                            sqlParams[it + idx] =  paramItem
+                            sqlParams[it + idx] = paramItem
                         }
                     } else {
-                        sqlParams[it] =  param
+                        sqlParams[it] = param
                     }
                 }
             }
+
             sqlParams
         } else {
             params
         }
     }
 
-    open fun params(vararg params: Any?): SqlQuery {
-        this.params.addAll(params)
+    fun params(vararg params: Any?): T {
+        this.params.addAll(params.asParamList())
         this._queryDetails = null
-        return this
+        @Suppress("UNCHECKED_CAST")
+        return this as T
     }
 
-    open fun paramsArray(params: Array<out Any?>): SqlQuery {
-        this.params.addAll(params)
+    fun paramsArray(params: Array<out Any?>): T {
+        this.params.addAll(params.asParamList())
         this._queryDetails = null
-        return this
+        @Suppress("UNCHECKED_CAST")
+        return this as T
     }
 
-    open fun paramsList(params: Collection<Any?>): SqlQuery {
-        this.params.addAll(params)
+    fun paramsList(params: Collection<Any?>): T {
+        this.params.addAll(params.asParamList())
         this._queryDetails = null
-        return this
+        @Suppress("UNCHECKED_CAST")
+        return this as T
     }
 
-    open fun inParams(params: Map<String, Any?>): SqlQuery {
-        inputParams.putAll(params)
+    open fun params(params: Map<String, Any?>): T {
+        namedParams.putAll(params.asParamMap())
         this._queryDetails = null
-        return this
+        @Suppress("UNCHECKED_CAST")
+        return this as T
     }
 
-    open fun inParams(vararg params: Pair<String, Any?>): SqlQuery {
-        inputParams.putAll(params)
+    open fun params(vararg params: Pair<String, Any?>): T {
+        namedParams.putAll(params.asParamMap())
         this._queryDetails = null
-        return this
+        @Suppress("UNCHECKED_CAST")
+        return this as T
     }
 
-    open fun inParamsArray(params: Array<out Pair<String, Any?>>): SqlQuery {
-        inputParams.putAll(params)
+    open fun paramsArray(params: Array<out Pair<String, Any?>>): T {
+        namedParams.putAll(params.asParamMap())
         this._queryDetails = null
-        return this
+        @Suppress("UNCHECKED_CAST")
+        return this as T
+    }
+
+    fun inParams(params: Map<String, Any?>): T {
+        return params(params.asParamMap(InOut.IN))
+    }
+
+    fun inParams(vararg params: Pair<String, Any?>): T {
+        return params(params.asParamMap(InOut.IN))
+    }
+
+    fun inParamsArray(params: Array<out Pair<String, Any?>>): T {
+        return inParams(params.asParamMap(InOut.IN))
     }
 
     override fun toString(): String {
-        return "SqlQuery(statement='$statement', params=$params, inputParams=$inputParams, replacementMap=$replacementMap, cleanStatement='$cleanStatement')"
+        return "SqlQueryBase(statement='$statement', params=$params, namedParams=$namedParams, replacementMap=$replacementMap, cleanStatement='$cleanStatement')"
     }
 
     companion object {
