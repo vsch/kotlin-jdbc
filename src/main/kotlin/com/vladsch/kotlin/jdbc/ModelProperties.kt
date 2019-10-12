@@ -538,6 +538,8 @@ class ModelProperties<M : Model<*, *>>(val session: Session, val tableName: Stri
             }
             stmt.addBatch()
         }
+
+        stmt.executeBatch()
     }
 
     internal fun generateInsertString(): ArrayList<Any?> {
