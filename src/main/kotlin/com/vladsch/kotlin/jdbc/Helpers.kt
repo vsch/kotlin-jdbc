@@ -15,8 +15,16 @@ import javax.json.JsonObject
 import javax.json.JsonValue
 import javax.sql.DataSource
 
-inline fun <reified T : Any> PreparedStatement.setTypedParam(idx: Int, param: Parameter<T>) {
+fun PreparedStatement.setTypedParam(idx: Int, param: Parameter<*>) {
     if (param.value == null) {
+        this.setNull(idx, param.sqlType())
+    } else {
+        setParam(idx, param.value)
+    }
+}
+
+fun PreparedStatement.setTypedParam(idx: Int, value:Any?, param:Parameter<*>) {
+    if (value == null) {
         this.setNull(idx, param.sqlType())
     } else {
         setParam(idx, param.value)
@@ -61,11 +69,29 @@ fun PreparedStatement.setParam(idx: Int, v: Any?) {
     }
 }
 
-open class Parameter<T : Any>(val value: T?, val type: Class<T>) {
+enum class InOut(val flags: Int) {
+    IN(1),
+    OUT(2),
+    IN_OUT(3),
+    ;
+
+    val isIn:Boolean get() = (flags and 1) != 0
+    val isOut:Boolean get() = (flags and 2) != 0
+    fun isOf(inOut: InOut):Boolean = (flags and inOut.flags) != 0
+}
+
+open class Parameter<T : Any>(val value: Any?, val type: Class<T>, val inOut: InOut = InOut.IN) {
     constructor(value: T) : this(value, value.javaClass)
+    constructor(value: Collection<T>, type: Class<T>) : this(value as Any?, type)
+
+    fun asIn(): Parameter<T> = if (inOut == InOut.IN) this else Parameter(value, type, InOut.IN)
+    fun asInOut(): Parameter<T> = if (inOut == InOut.IN_OUT) this else Parameter(value, type, InOut.IN_OUT)
+    fun asInOut(inOut: InOut): Parameter<T> = if (this.inOut == inOut) this else Parameter(value, type, inOut)
+    fun asOut(): Parameter<T> = if (inOut == InOut.OUT) this else Parameter(value, type, InOut.OUT)
 }
 
 fun <T : Any> Parameter<T>.sqlType() = when (type) {
+    // TODO: add other types which can be used and mapped see: java.sql.Types
     String::class.java, URL::class.java -> Types.VARCHAR
     Int::class.java, Long::class.java, Short::class.java,
     Byte::class.java, BigInteger::class.java -> Types.NUMERIC
@@ -76,6 +102,9 @@ fun <T : Any> Parameter<T>.sqlType() = when (type) {
     java.sql.Timestamp::class.java -> Types.TIMESTAMP
     java.sql.Time::class.java, LocalTime::class.java -> Types.TIME
     LocalDate::class.java -> Types.DATE
+    java.sql.SQLXML::class.java -> Types.SQLXML
+    java.sql.Array::class.java -> Types.ARRAY
+    URL::class.java -> Types.DATALINK
     else -> Types.OTHER
 }
 
@@ -122,6 +151,20 @@ inline fun <reified T : Any> T?.param(): Parameter<T> = when (this) {
         else Parameter(this as T?, T::class.java)
 }
 
+fun Map<String, Any?>.asParamMap(): Map<String, Parameter<*>> = map { it.key to it.value.param() }.toMap()
+fun Map<String, Any?>.asParamMap(inOut: InOut): Map<String, Parameter<*>> = map { it.key to it.value.param().asInOut(inOut) }.toMap()
+fun Array<out Pair<String,Any?>>.asParamMap(): Map<String, Parameter<*>> = map { it.first to it.second.param() }.toMap()
+fun Array<out Pair<String,Any?>>.asParamMap(inOut: InOut): Map<String, Parameter<*>> = map { it.first to it.second.param().asInOut(inOut) }.toMap()
+fun Iterable<Any?>.asParamList(): List<Parameter<*>> = map { it.param() }
+fun Array<out Any?>.asParamList(): List<Parameter<*>> = map { it.param() }
+
+inline infix fun <reified B : Any> String.inAs(that: B): Pair<String, Parameter<B>> = Pair(this, Parameter(that, B::class.java))
+inline infix fun <reified B : Any> String.outAs(that: B): Pair<String, Parameter<B>> = Pair(this, Parameter(that, B::class.java, InOut.OUT))
+inline infix fun <reified B : Any> String.inOutAs(that: B): Pair<String, Parameter<B>> = Pair(this, Parameter(that, B::class.java, InOut.IN_OUT))
+inline infix fun <reified B : Collection<B>> String.inAs(that: B): Pair<String, Parameter<B>> = Pair(this, Parameter(that, B::class.java))
+inline infix fun <reified B : Collection<B>> String.outAs(that: B): Pair<String, Parameter<B>> = Pair(this, Parameter(that, B::class.java, InOut.OUT))
+inline infix fun <reified B : Collection<B>> String.inOutAs(that: B): Pair<String, Parameter<B>> = Pair(this, Parameter(that, B::class.java, InOut.IN_OUT))
+
 fun sqlQuery(statement: String, vararg params: Any?): SqlQuery {
     return SqlQuery(statement, params = params.toList())
 }
@@ -131,23 +174,28 @@ fun sqlQuery(statement: String, params: List<Any?>): SqlQuery {
 }
 
 fun sqlQuery(statement: String, inputParams: Map<String, Any?>): SqlQuery {
-    return SqlQuery(statement, inputParams = inputParams)
+    return SqlQuery(statement, namedParams = inputParams)
 }
 
 fun sqlQuery(statement: String, inputParams: Map<String, Any?>, params: List<Any?>): SqlQuery {
-    return SqlQuery(statement, params = params, inputParams = inputParams)
+    return SqlQuery(statement, params = params, namedParams = inputParams)
 }
 
 fun sqlQuery(statement: String, inputParams: Map<String, Any?>, vararg params: Any?): SqlQuery {
-    return SqlQuery(statement, params = params.toList(), inputParams = inputParams)
+    return SqlQuery(statement, params = params.toList(), namedParams = inputParams)
 }
 
 fun sqlCall(statement: String, vararg params: Any?): SqlCall {
     return SqlCall(statement, params = params.toList())
 }
 
+@Deprecated(message = "Use sqlCall with named params and directional parameter construction with to/inAs, outAs, inOutAs infix functions", replaceWith = ReplaceWith("sqlCall"))
 fun sqlCall(statement: String, inputParams: Map<String, Any?>, outputParams: Map<String, Any>): SqlCall {
     return SqlCall(statement, inputParams = inputParams, outputParams = outputParams)
+}
+
+fun sqlCall(statement: String, namedParams: Map<String, Any?>): SqlCall {
+    return SqlCall(statement, namedParams = namedParams)
 }
 
 fun session(url: String, user: String, password: String): Session {

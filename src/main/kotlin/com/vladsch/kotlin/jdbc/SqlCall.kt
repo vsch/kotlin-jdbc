@@ -6,30 +6,36 @@ import java.sql.PreparedStatement
 class SqlCall(
     statement: String,
     params: List<Any?> = listOf(),
-    inputParams: Map<String, Any?> = mapOf(),
-    outputParams: Map<String, Any> = mapOf()
-) : SqlQuery(statement, params, inputParams) {
+    namedParams: Map<String, Any?> = mapOf()
+) : SqlQueryBase<SqlCall>(statement, params, namedParams) {
 
-    protected val outputParams = HashMap(outputParams)
+    @Deprecated(message = "Use directional parameter construction with to/inAs, outAs, inOutAs infix functions")
+    constructor(
+        statement: String,
+        params: List<Any?> = listOf(),
+        inputParams: Map<String, Any?> = mapOf(),
+        outputParams: Map<String, Any> = mapOf()
+    ) : this(statement, params, inputParams.asParamMap(InOut.IN)) {
+        params(outputParams.asParamMap(InOut.OUT))
+    }
 
-    override fun populateNamedParam(stmt: PreparedStatement, paramName: String, occurrences: List<Int>) {
-        super.populateNamedParam(stmt, paramName, occurrences)
+    override fun populateNamedParams(stmt: PreparedStatement) {
+        super.populateNamedParams(stmt)
 
-        if (outputParams.containsKey(paramName)) {
-            // setup out or inout param, make these independent of name so we use occurrence index
+        stmt as CallableStatement? ?: return
+
+        forEachNamedParam(InOut.OUT) { paramName, param, occurrences ->
             require(occurrences.size == 1) { "Output parameter $paramName should have exactly 1 occurrence, got ${occurrences.size}" }
-            (stmt as CallableStatement).registerOutParameter(occurrences.first() + 1, outputParams[paramName].param().sqlType())
+            stmt.registerOutParameter(occurrences.first() + 1, param.sqlType())
         }
     }
 
     fun outputParamIndices(stmt: CallableStatement): Map<String, Int> {
         val params = HashMap<String, Int>()
-        replacementMap
-            .filter { outputParams.containsKey(it.key) }
-            .forEach { (paramName, occurrences) ->
-                require(occurrences.size == 1) { "Output parameter $paramName should have exactly 1 occurrence, got ${occurrences.size}" }
-                params[paramName] = occurrences.first() + 1
-            }
+        forEachNamedParam(InOut.OUT) { paramName, _, occurrences ->
+            require(occurrences.size == 1) { "Output parameter $paramName should have exactly 1 occurrence, got ${occurrences.size}" }
+            params[paramName] = occurrences.first() + 1
+        }
         return params
     }
 
@@ -39,55 +45,23 @@ class SqlCall(
         return replacementMap[paramName]?.first()!! + 1
     }
 
-    override fun params(vararg params: Any?): SqlCall {
-        return super.params(*params) as SqlCall
-    }
-
-    override fun paramsArray(params: Array<out Any?>): SqlCall {
-        return super.paramsArray(params) as SqlCall
-    }
-
-    override fun paramsList(params: Collection<Any?>): SqlCall {
-        return super.paramsList(params) as SqlCall
-    }
-
-    override fun inParams(params: Map<String, Any?>): SqlCall {
-        return super.inParams(params) as SqlCall
-    }
-
-    override fun inParams(vararg params: Pair<String, Any?>): SqlCall {
-        return super.inParams(*params) as SqlCall
-    }
-
-    override fun inParamsArray(params: Array<out Pair<String, Any?>>): SqlCall {
-        return super.inParamsArray(params) as SqlCall
-    }
-
     fun inOutParams(params: Map<String, Any?>): SqlCall {
-        outputParams.putAll(params)
-        inParams(params)
-        return this
+        return params(params.asParamMap(InOut.IN_OUT))
     }
 
     fun inOutParams(vararg params: Pair<String, Any?>): SqlCall {
-        outputParams.putAll(params)
-        inParamsArray(params)
-        return this
+        return params(params.asParamMap(InOut.IN_OUT))
     }
 
     fun outParams(params: Map<String, Any?>): SqlCall {
-        outputParams.putAll(params)
-        resetDetails()
-        return this
+        return params(params.asParamMap(InOut.OUT))
     }
 
     fun outParams(vararg params: Pair<String, Any?>): SqlCall {
-        outputParams.putAll(params)
-        resetDetails()
-        return this
+        return params(params.asParamMap(InOut.OUT))
     }
 
     override fun toString(): String {
-        return "SqlCall(outputParams=$outputParams) ${super.toString()}"
+        return "SqlCall(statement='$statement', params=${params.map { it.value }}, namedParams=${namedParams.map { it.key to it.value.value }}, replacementMap=$replacementMap, cleanStatement='$cleanStatement')"
     }
 }

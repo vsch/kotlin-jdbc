@@ -3,7 +3,7 @@ package com.vladsch.kotlin.jdbc
 import org.jetbrains.annotations.TestOnly
 import java.sql.PreparedStatement
 
-open class SqlQueryBase<T : SqlQueryBase<T>>(
+abstract class SqlQueryBase<T : SqlQueryBase<T>>(
     val statement: String,
     params: List<Any?> = listOf(),
     namedParams: Map<String, Any?> = mapOf()
@@ -11,11 +11,15 @@ open class SqlQueryBase<T : SqlQueryBase<T>>(
 
     protected val params = ArrayList(params.asParamList())
     protected val namedParams: HashMap<String, Parameter<*>> = HashMap(namedParams.asParamMap())
-    private var _queryDetails: Details? = null
 
+    private var _queryDetails: Details? = null
     private val queryDetails: Details get() = finalizedQuery()
+
     val replacementMap get() = queryDetails.replacementMap
     val cleanStatement get() = queryDetails.cleanStatement
+
+    val inputParams: Map<String, Parameter<*>> get() = this.namedParams.filter { it.value.inOut.isIn }
+    val outputParams: Map<String, Parameter<*>> get() = this.namedParams.filter { it.value.inOut.isOut }
 
     data class Details(
         val listParamsMap: Map<String, String>,
@@ -39,6 +43,7 @@ open class SqlQueryBase<T : SqlQueryBase<T>>(
                     // not a parameter
                     false
                 } else {
+                    // filter out commented lines
                     val pos = statement.lastIndexOf('\n', group.range.first)
                     val lineStart = if (pos == -1) 0 else pos + 1;
                     !regexSqlComment.containsMatchIn(statement.subSequence(lineStart, statement.length))
@@ -48,8 +53,8 @@ open class SqlQueryBase<T : SqlQueryBase<T>>(
                 val paramValue = namedParams[paramName]
                 val pair = Pair(paramName, idxOffset)
 
-                if (paramValue is Collection<*>) {
-                    val size = paramValue.size
+                if (paramValue?.value is Collection<*>) {
+                    val size = paramValue.value.size
                     listParamsMap[paramName] = "?,".repeat(size).substring(0, size * 2 - 1)
                     idxOffset += size - 1
                 }
@@ -73,8 +78,9 @@ open class SqlQueryBase<T : SqlQueryBase<T>>(
     }
 
     fun populateParams(stmt: PreparedStatement) {
+        // TODO: handle mix of ? and named params, by computing indices for ? params and populating based on index
         if (replacementMap.isNotEmpty()) {
-            populateNamedParam(stmt)
+            populateNamedParams(stmt)
         } else {
             params.forEachIndexed { index, value ->
                 stmt.setTypedParam(index + 1, value.param())
@@ -82,26 +88,24 @@ open class SqlQueryBase<T : SqlQueryBase<T>>(
         }
     }
 
-    protected fun forEachNamedParam(action: (paramName: String, param: Parameter<*>, occurrences: List<Int>) -> Unit) {
+    protected fun forEachNamedParam(inOut: InOut, action: (paramName: String, param: Parameter<*>, occurrences: List<Int>) -> Unit) {
         replacementMap.forEach { (paramName, occurrences) ->
-            val param = namedParams[paramName]!!
-            action.invoke(paramName, param, occurrences)
+            val param = namedParams[paramName] ?: NULL_PARAMETER
+            if (param.inOut.isOf(inOut)) action.invoke(paramName, param, occurrences)
         }
     }
 
-    protected open fun populateNamedParam(stmt: PreparedStatement) {
-        forEachNamedParam { _, param, occurrences ->
-            if (param.inOut.isIn) {
-                if (param.value is Collection<*>) {
-                    param.value.forEachIndexed { idx, paramItem ->
-                        occurrences.forEach {
-                            stmt.setTypedParam(it + idx + 1, paramItem, param)
-                        }
-                    }
-                } else {
+    protected open fun populateNamedParams(stmt: PreparedStatement) {
+        forEachNamedParam(InOut.IN) { _, param, occurrences ->
+            if (param.value is Collection<*>) {
+                param.value.forEachIndexed { idx, paramItem ->
                     occurrences.forEach {
-                        stmt.setTypedParam(it + 1, param)
+                        stmt.setTypedParam(it + idx + 1, paramItem, param)
                     }
+                }
+            } else {
+                occurrences.forEach {
+                    stmt.setTypedParam(it + 1, param)
                 }
             }
         }
@@ -116,14 +120,14 @@ open class SqlQueryBase<T : SqlQueryBase<T>>(
                 sqlParams.add(null)
             }
 
-            forEachNamedParam { _, param, occurrences ->
+            forEachNamedParam(InOut.IN) { _, param, occurrences ->
                 occurrences.forEach {
-                    if (param is Collection<*>) {
-                        param.forEachIndexed { idx, paramItem ->
+                    if (param.value is Collection<*>) {
+                        param.value.forEachIndexed { idx, paramItem ->
                             sqlParams[it + idx] = paramItem
                         }
                     } else {
-                        sqlParams[it] = param
+                        sqlParams[it] = param.value
                     }
                 }
             }
@@ -155,21 +159,21 @@ open class SqlQueryBase<T : SqlQueryBase<T>>(
         return this as T
     }
 
-    open fun params(params: Map<String, Any?>): T {
+    fun params(params: Map<String, Any?>): T {
         namedParams.putAll(params.asParamMap())
         this._queryDetails = null
         @Suppress("UNCHECKED_CAST")
         return this as T
     }
 
-    open fun params(vararg params: Pair<String, Any?>): T {
+    fun params(vararg params: Pair<String, Any?>): T {
         namedParams.putAll(params.asParamMap())
         this._queryDetails = null
         @Suppress("UNCHECKED_CAST")
         return this as T
     }
 
-    open fun paramsArray(params: Array<out Pair<String, Any?>>): T {
+    fun paramsArray(params: Array<out Pair<String, Any?>>): T {
         namedParams.putAll(params.asParamMap())
         this._queryDetails = null
         @Suppress("UNCHECKED_CAST")
@@ -194,6 +198,7 @@ open class SqlQueryBase<T : SqlQueryBase<T>>(
 
     companion object {
         // must begin with
+        private val NULL_PARAMETER = Parameter(null, Any::class.java, InOut.IN)
         private val regex = Regex(":\\w+|'(?:[^']|'')*'|`(?:[^`])*`|\"(?:[^\"])*\"")
         private val regexSqlComment = Regex("""^\s*(?:--\s|#)""")
     }
