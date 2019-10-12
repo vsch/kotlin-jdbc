@@ -124,8 +124,9 @@ in the database.
 
   These also have `Collection<T>` versions which create a Parameter() with a collection value
   but type is `T::class.java`. When generating parameters for prepared stmt this type is used to
-  create a `Parameter` instance for the element with `T:class.java` instead of generic `Any`.
-* Fix: extract `SqlQueryBast<T>` for `SqlQuery` and `SqlCall` to eliminate the need to override
+  determine sql type for the element of the collection instead of generic `Any` as was before,
+  again because of `*` captured type from a collection.
+* Fix: extract `SqlQueryBase<T>` for `SqlQuery` and `SqlCall` to eliminate the need to override
   function just to cast them to the right class. `SqlCall` no longer extends `SqlQuery`.
 * Fix: `SqlQueryBase` now stores each parameter in `Parameter()` data class format. Eliminates
   creating a new instance with param() since if it is already parameter it just returns the
@@ -157,7 +158,7 @@ in the database.
       types = stmt.getString("types").split(',')
   }) { rs, index ->
       val key = types[index]
-      jsonResult[key] = MutableJsArray(Rows(rs).map(toJsonObject).toList()) as JsonValue
+      jsonResult[key] = MutableJsArray(Rows(rs).map(toJsonObject).toList())
   }
   ```
 
@@ -173,7 +174,7 @@ in the database.
       val types = results.getString("types").split(',')
       results.forEach { rs, index ->
           val key = types[index]
-          jsonResult[key] = MutableJsArray(Rows(rs).map(toJsonObject).toList()) as JsonValue
+          jsonResult[key] = MutableJsArray(Rows(rs).map(toJsonObject).toList())
       }
   }
   ```
