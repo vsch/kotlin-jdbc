@@ -115,7 +115,7 @@ class NamedParamTest {
                 """SELECT * FROM table t WHERE t.a IN
                 (:param)"""
             ) { query ->
-                query.inParams("param" to listOf(0, 1, 2))
+                query.params("param" inTo listOf(0, 1, 2))
 
                 val cleanStatement = query.cleanStatement
 

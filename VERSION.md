@@ -105,12 +105,36 @@ in the database.
 
 ## 0.5.0-beta-8
 
-* Fix: sql call out params are now passed by index instead of name to make them independent of
-  actual sql procedure param names.
+* Fix: `SqlCall` out params are now passed by index instead of name to make them independent of
+  actual sql procedure parameter names.
 * Fix: `param()` to work for non-null values when calling context's capture type is `*`,
   previous implementation would always result in `Any` type, fixed implementation uses the
   value's class for type's class.
+* Fix: `param()` to not construct a new instance if passed value is already `Parameter<*>`
 * Fix: SQL generation for model `listQuery` with where clause and/or alias
+* Add: `InOut` type to `Parameter()`, defaults to `InOut.IN` so parameter carries direction of
+  parameter and type.
+* Add: `inTo`, `outTo` and `inOutTo` infix functions to use instead of `to` for param creation.
+  These create parameters with in/inOut/out type eliminating the need for multiple `params()`
+  functions for directional information. Default direction is `in` if not provided.
+
+  They also create an instance of `Parameter` when the captured type is known. Functions using
+  `param()` from a collection iteration have `*` for type capture and loose actual type,
+  resorting to `Any` (ie. `Object`).
+
+  These also have `Collection<T>` versions which create a Parameter() with a collection value
+  but type is `T::class.java`. When generating parameters for prepared stmt this type is used to
+  create a `Parameter` instance for the element with `T:class.java` instead of generic `Any`.
+* Fix: extract `SqlQueryBast<T>` for `SqlQuery` and `SqlCall` to eliminate the need to override
+  function just to cast them to the right class. `SqlCall` no longer extends `SqlQuery`.
+* Fix: `SqlQueryBase` now stores each parameter in `Parameter()` data class format. Eliminates
+  creating a new instance with param() since if it is already parameter it just returns the
+  instance.
+* Fix: deprecate old methods in favor of directional parameter declaration.
+* Fix: change `Session` methods to use `SqlQueryBase<*>` when either `SqlQuery` or `SqlCall` can
+  be used. For some, like updates with get keys, `SqlCall` never returns any keys even when
+  stored procedure executes DML that does, so these are now `SqlQuery` only. Similarly, those
+  only applicable to `SqlCall` are now `SqlCall` typed and will not take `SqlQuery`
 * Fix: deprecate `Session.forEach(SqlCall, (stmt: CallableStatement) -> Unit, (rs: ResultSet,
   index: Int) -> Unit)`
 * Add: `Session.executeCall(SqlCall, (results: SqlCallResults) -> Unit)` to replace
@@ -137,12 +161,11 @@ in the database.
   }
   ```
 
-  Using the new `executeCall`, the code changes to:
+  Using the new `executeCall` and directional param declarations, the code changes to:
 
   ```kotlin
-  val sqlQuery = sqlCall("""CALL processInstances(:clientId, :types)""")
-    .inParams("clientId" to 35)
-    .inOutParams("types" to "")
+  val sqlQuery = sqlCall("""CALL processInstances(:clientId, :types)""",
+            mapOf("clientId" inTo 35, "types" inOutTo ""))
 
   val jsonResult = MutableJsObject()
 

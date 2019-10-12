@@ -14,9 +14,9 @@ class SqlCallResults(private val stmt: CallableStatement, val withResults: Boole
     }
 
     fun forEach(operator: (rs: ResultSet, index: Int) -> Unit) {
-        val rs = stmt.resultSet ?: return
         var rsIndex = 0
         while (true) {
+            val rs = stmt.resultSet ?: return
             operator.invoke(rs, rsIndex++)
             if (!stmt.moreResults) break
         }

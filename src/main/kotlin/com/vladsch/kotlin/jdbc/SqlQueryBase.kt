@@ -8,7 +8,6 @@ abstract class SqlQueryBase<T : SqlQueryBase<T>>(
     params: List<Any?> = listOf(),
     namedParams: Map<String, Any?> = mapOf()
 ) {
-
     protected val params = ArrayList(params.asParamList())
     protected val namedParams: HashMap<String, Parameter<*>> = HashMap(namedParams.asParamMap())
 
@@ -180,16 +179,19 @@ abstract class SqlQueryBase<T : SqlQueryBase<T>>(
         return this as T
     }
 
+    @Deprecated(message = "Use directional parameter construction with to/inTo, outTo, inOutTo infix functions", replaceWith = ReplaceWith("params"))
     fun inParams(params: Map<String, Any?>): T {
         return params(params.asParamMap(InOut.IN))
     }
 
+    @Deprecated(message = "Use directional parameter construction with to/inTo, outTo, inOutTo infix functions", replaceWith = ReplaceWith("params"))
     fun inParams(vararg params: Pair<String, Any?>): T {
         return params(params.asParamMap(InOut.IN))
     }
 
+    @Deprecated(message = "Use directional parameter construction with to/inTo, outTo, inOutTo infix functions", replaceWith = ReplaceWith("paramsArray"))
     fun inParamsArray(params: Array<out Pair<String, Any?>>): T {
-        return inParams(params.asParamMap(InOut.IN))
+        return paramsArray(params)
     }
 
     override fun toString(): String {

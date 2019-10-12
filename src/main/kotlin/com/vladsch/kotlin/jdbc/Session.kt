@@ -24,10 +24,10 @@ interface Session : AutoCloseable {
 
     fun <A> executeWithKeys(query: SqlQuery, consumer: (PreparedStatement) -> A): A?
     fun <A> updateWithKeys(query: SqlQuery, consumer: (PreparedStatement) -> A): A?
-    fun <A> update(query: SqlQuery, consumer: (PreparedStatement) -> A): A?
+    fun <A> update(query: SqlQueryBase<*>, consumer: (PreparedStatement) -> A): A?
     fun <A> list(query: SqlQueryBase<*>, extractor: (Row) -> A): List<A>
-    fun jsonArray(query: SqlQuery, extractor: (Row) -> JsonObject): JsonArray
-    fun count(query: SqlQuery): Int
+    fun jsonArray(query: SqlQueryBase<*>, extractor: (Row) -> JsonObject): JsonArray
+    fun count(query: SqlQueryBase<*>): Int
     fun <A> first(query: SqlQueryBase<*>, extractor: (Row) -> A): A?
     fun <K, A> hashMap(query: SqlQueryBase<*>, keyExtractor: (Row) -> K, extractor: (Row) -> A): Map<K, A>
     fun jsonObject(query: SqlQueryBase<*>, keyExtractor: (Row) -> String, extractor: (Row) -> JsonObject): JsonObject
@@ -38,7 +38,7 @@ interface Session : AutoCloseable {
     fun executeCall(query: SqlCall, stmtProc: (results: SqlCallResults) -> Unit)
 
     fun execute(query: SqlQueryBase<*>): Boolean
-    fun update(query: SqlQuery): Int
+    fun update(query: SqlQueryBase<*>): Int
     fun updateGetLongId(query: SqlQuery): Long?
     fun updateGetId(query: SqlQuery): Int?
     fun <A> updateGetKey(query: SqlQuery, extractor: (Row) -> A): A?

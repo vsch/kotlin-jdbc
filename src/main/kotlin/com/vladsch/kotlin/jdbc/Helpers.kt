@@ -158,12 +158,12 @@ fun Array<out Pair<String,Any?>>.asParamMap(inOut: InOut): Map<String, Parameter
 fun Iterable<Any?>.asParamList(): List<Parameter<*>> = map { it.param() }
 fun Array<out Any?>.asParamList(): List<Parameter<*>> = map { it.param() }
 
-inline infix fun <reified B : Any> String.inAs(that: B): Pair<String, Parameter<B>> = Pair(this, Parameter(that, B::class.java))
-inline infix fun <reified B : Any> String.outAs(that: B): Pair<String, Parameter<B>> = Pair(this, Parameter(that, B::class.java, InOut.OUT))
-inline infix fun <reified B : Any> String.inOutAs(that: B): Pair<String, Parameter<B>> = Pair(this, Parameter(that, B::class.java, InOut.IN_OUT))
-inline infix fun <reified B : Collection<B>> String.inAs(that: B): Pair<String, Parameter<B>> = Pair(this, Parameter(that, B::class.java))
-inline infix fun <reified B : Collection<B>> String.outAs(that: B): Pair<String, Parameter<B>> = Pair(this, Parameter(that, B::class.java, InOut.OUT))
-inline infix fun <reified B : Collection<B>> String.inOutAs(that: B): Pair<String, Parameter<B>> = Pair(this, Parameter(that, B::class.java, InOut.IN_OUT))
+inline infix fun <reified B : Any> String.inTo(that: B): Pair<String, Parameter<B>> = Pair(this, Parameter(that, B::class.java))
+inline infix fun <reified B : Any> String.outTo(that: B): Pair<String, Parameter<B>> = Pair(this, Parameter(that, B::class.java, InOut.OUT))
+inline infix fun <reified B : Any> String.inOutTo(that: B): Pair<String, Parameter<B>> = Pair(this, Parameter(that, B::class.java, InOut.IN_OUT))
+inline infix fun <reified B : Collection<B>> String.inTo(that: B): Pair<String, Parameter<B>> = Pair(this, Parameter(that, B::class.java))
+inline infix fun <reified B : Collection<B>> String.outTo(that: B): Pair<String, Parameter<B>> = Pair(this, Parameter(that, B::class.java, InOut.OUT))
+inline infix fun <reified B : Collection<B>> String.inOutTo(that: B): Pair<String, Parameter<B>> = Pair(this, Parameter(that, B::class.java, InOut.IN_OUT))
 
 fun sqlQuery(statement: String, vararg params: Any?): SqlQuery {
     return SqlQuery(statement, params = params.toList())
@@ -189,7 +189,7 @@ fun sqlCall(statement: String, vararg params: Any?): SqlCall {
     return SqlCall(statement, params = params.toList())
 }
 
-@Deprecated(message = "Use sqlCall with named params and directional parameter construction with to/inAs, outAs, inOutAs infix functions", replaceWith = ReplaceWith("sqlCall"))
+@Deprecated(message = "Use sqlCall with named params and directional parameter construction with to/inTo, outTo, inOutTo infix functions", replaceWith = ReplaceWith("sqlCall"))
 fun sqlCall(statement: String, inputParams: Map<String, Any?>, outputParams: Map<String, Any>): SqlCall {
     return SqlCall(statement, inputParams = inputParams, outputParams = outputParams)
 }
