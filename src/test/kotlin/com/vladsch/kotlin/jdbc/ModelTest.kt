@@ -1,9 +1,9 @@
 package com.vladsch.kotlin.jdbc
 
-import org.junit.Before
+//import kotlin.test.assertEquals
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
-import org.junit.Assert.assertEquals
 import org.junit.rules.ExpectedException
 import java.sql.DriverManager
 
@@ -27,11 +27,11 @@ class ModelTest {
 
     class InvalidModelPublicAutoKey(session: Session? = session(), quote: String? = null) : Model<InvalidModelPublicAutoKey, InvalidModelPublicAutoKey.Data>(session, "tests", true, false, quote = quote) {
         data class Data(
-                val processId: Long?,
-                val title: String,
-                val version: String,
-                val unknown: String?,
-                val createdAt: String?
+            val processId: Long?,
+            val title: String,
+            val version: String,
+            val unknown: String?,
+            val createdAt: String?
         )
 
         var processId: Long? by db.autoKey
@@ -51,11 +51,11 @@ class ModelTest {
 
     class InvalidModelPublicAuto(session: Session? = session(), quote: String? = null) : Model<InvalidModelPublicAuto, InvalidModelPublicAuto.Data>(session, "tests", true, false, quote = quote) {
         data class Data(
-                val processId: Long?,
-                val title: String,
-                val version: String,
-                val unknown: String?,
-                val createdAt: String?
+            val processId: Long?,
+            val title: String,
+            val version: String,
+            val unknown: String?,
+            val createdAt: String?
         )
 
         var processId: Long? by db.autoKey; private set
@@ -75,11 +75,11 @@ class ModelTest {
 
     class ValidModelPublicAuto(session: Session? = session(), quote: String? = null) : Model<ValidModelPublicAuto, ValidModelPublicAuto.Data>(session, sqlTable = "tests", dbCase = true, quote = quote) {
         data class Data(
-                val processId: Long?,
-                val title: String,
-                val version: String,
-                val unknown: String?,
-                val createdAt: String?
+            val processId: Long?,
+            val title: String,
+            val version: String,
+            val unknown: String?,
+            val createdAt: String?
         )
 
         var processId: Long? by db.autoKey
@@ -134,15 +134,15 @@ class ModelTest {
 
     class DatabaseModel(session: Session? = session(), quote: String? = null) : Model<DatabaseModel, DatabaseModel.Data>(session, "tests", false, true, quote) {
         data class Data(
-                val processId: Long?,
-                val modelName: String?,
-                val title: String,
-                val version: String,
-                val ownName: String,
-                val CappedName: Int,
-                val ALLCAPS: Int,
-                val withDigits2: Int,
-                val createdAt: String?
+            val processId: Long?,
+            val modelName: String?,
+            val title: String,
+            val version: String,
+            val ownName: String,
+            val CappedName: Int,
+            val ALLCAPS: Int,
+            val withDigits2: Int,
+            val createdAt: String?
         )
 
         var processId: Long? by db.key.auto
@@ -166,22 +166,22 @@ class ModelTest {
 
     class TestModel(session: Session? = session(), quote: String? = null) : Model<TestModel, TestModel.Data>(session, "tests", true, false, quote) {
         data class Data(
-                val processId: Long?,
-                val title: String,
-                val version: String,
-                val batch: Int?,
-                val createdAt: String?
+            val processId: Long?,
+            val title: String,
+            val version: String,
+            val batch: Int?,
+            val createdAt: String?
         )
 
         constructor(
-                processId: Long? = null,
-                title: String,
-                version: String,
-                batch: Int? = null,
-                createdAt: String? = null,
-                session: Session? = session(),
-                quote:String? = null
-        ) : this(session,quote) {
+            processId: Long? = null,
+            title: String,
+            version: String,
+            batch: Int? = null,
+            createdAt: String? = null,
+            session: Session? = session(),
+            quote: String? = null
+        ) : this(session, quote) {
             if (processId != null) this.processId = processId
             this.title = title
             this.version = version
@@ -209,21 +209,21 @@ class ModelTest {
 
     class TestModelDefaultValue(session: Session? = session(), quote: String? = null) : Model<TestModelDefaultValue, TestModelDefaultValue.Data>(session, "tests", true, false, quote = quote) {
         data class Data(
-                var processId: Long?,
-                var title: String,
-                var version: String,
-                var batch: Int?,
-                var createdAt: String?
+            var processId: Long?,
+            var title: String,
+            var version: String,
+            var batch: Int?,
+            var createdAt: String?
         )
 
         constructor(
-                processId: Long? = null,
-                title: String,
-                version: String,
-                batch: Int? = null,
-                createdAt: String? = null,
-                session: Session? = session(),
-                quote:String? = null
+            processId: Long? = null,
+            title: String,
+            version: String,
+            batch: Int? = null,
+            createdAt: String? = null,
+            session: Session? = session(),
+            quote: String? = null
         ) : this(session, quote) {
             if (processId != null) this.processId = processId
             this.title = title
@@ -256,22 +256,22 @@ class ModelTest {
 
     class TestNoNonDefaultModel(session: Session? = session(), quote: String? = null) : Model<TestNoNonDefaultModel, TestNoNonDefaultModel.Data>(session, "tests", true, false, quote = quote) {
         data class Data(
-                var processId: Long?,
-                var title: String?,
-                var version: String?,
-                var batch: Int?,
-                var createdAt: String?
+            var processId: Long?,
+            var title: String?,
+            var version: String?,
+            var batch: Int?,
+            var createdAt: String?
         )
 
         constructor(
-                processId: Long? = null,
-                title: String? = null,
-                version: String? = null,
-                batch: Int? = null,
-                createdAt: String? = null,
-                session: Session? = session(),
-                quote: String? = null
-        ) : this(session,quote) {
+            processId: Long? = null,
+            title: String? = null,
+            version: String? = null,
+            batch: Int? = null,
+            createdAt: String? = null,
+            session: Session? = session(),
+            quote: String? = null
+        ) : this(session, quote) {
             if (processId != null) this.processId = processId
             this.title = title
             this.version = version
@@ -327,14 +327,14 @@ class ModelTest {
     fun insert_1() {
         val model = TestModel(title = "title text", version = "V1.0")
         val sql = model.insertQuery
-        assertEquals("message", sqlQuery("INSERT INTO tests (title, version) VALUES (?, ?)", listOf("title text", "V1.0")).toString(), sql.toString());
+        assertEquals(sqlQuery("INSERT INTO tests (title, version) VALUES (?, ?)", listOf("title text", "V1.0")).toString(), sql.toString());
     }
 
     @Test
     fun insert_1_quoted() {
         val model = TestModel(title = "title text", version = "V1.0", quote = "`")
         val sql = model.insertQuery
-        assertEquals("message", sqlQuery("INSERT INTO `tests` (`title`, `version`) VALUES (?, ?)", listOf("title text", "V1.0")).toString(), sql.toString());
+        assertEquals(sqlQuery("INSERT INTO `tests` (`title`, `version`) VALUES (?, ?)", listOf("title text", "V1.0")).toString(), sql.toString());
     }
 
     @Test
@@ -344,7 +344,7 @@ class ModelTest {
         model.batch = 4
         thrown.expect(IllegalStateException::class.java)
         val sql = model.insertQuery
-        assertEquals("message", sqlQuery("INSERT INTO tests (title, version) VALUES (?, ?)", listOf("title text", "V1.0")).toString(), sql.toString());
+        assertEquals(sqlQuery("INSERT INTO tests (title, version) VALUES (?, ?)", listOf("title text", "V1.0")).toString(), sql.toString());
     }
 
     @Test
@@ -354,42 +354,42 @@ class ModelTest {
         model.version = "V1.0"
         model.batch = 4
         val sql = model.insertQuery
-        assertEquals("message", sqlQuery("INSERT INTO tests (title, version, batch) VALUES (?, ?, ?)", listOf("title text", "V1.0", 4)).toString(), sql.toString());
+        assertEquals(sqlQuery("INSERT INTO tests (title, version, batch) VALUES (?, ?, ?)", listOf("title text", "V1.0", 4)).toString(), sql.toString());
     }
 
     @Test
     fun insert_Default() {
         val model = TestModel(title = "title text", version = "V1.0", batch = 4)
         val sql = model.insertQuery
-        assertEquals("message", sqlQuery("INSERT INTO tests (title, version, batch) VALUES (?, ?, ?)", listOf("title text", "V1.0", 4)).toString(), sql.toString());
+        assertEquals(sqlQuery("INSERT INTO tests (title, version, batch) VALUES (?, ?, ?)", listOf("title text", "V1.0", 4)).toString(), sql.toString());
     }
 
     @Test
     fun insert_DefaultSkipNull() {
         val model = TestModel(title = "title text", version = "V1.0", batch = null)
         val sql = model.insertQuery
-        assertEquals("message", sqlQuery("INSERT INTO tests (title, version) VALUES (?, ?)", listOf("title text", "V1.0")).toString(), sql.toString());
+        assertEquals(sqlQuery("INSERT INTO tests (title, version) VALUES (?, ?)", listOf("title text", "V1.0")).toString(), sql.toString());
     }
 
     @Test
     fun insert_NoAutoColumns() {
         val model = TestModel(title = "title text", version = "V1.0", createdAt = "createdAt")
         val sql = model.insertQuery
-        assertEquals("message", sqlQuery("INSERT INTO tests (title, version) VALUES (?, ?)", listOf("title text", "V1.0")).toString(), sql.toString());
+        assertEquals(sqlQuery("INSERT INTO tests (title, version) VALUES (?, ?)", listOf("title text", "V1.0")).toString(), sql.toString());
     }
 
     @Test
     fun insert_DefaultSkipNullDefaultValue() {
         val model = TestModelDefaultValue(title = "title text", version = "V1.0", batch = null)
         val sql = model.insertQuery
-        assertEquals("message", sqlQuery("INSERT INTO tests (title, version, batch) VALUES (?, ?, ?)", listOf("title text", "V1.0", 1)).toString(), sql.toString());
+        assertEquals(sqlQuery("INSERT INTO tests (title, version, batch) VALUES (?, ?, ?)", listOf("title text", "V1.0", 1)).toString(), sql.toString());
     }
 
     @Test
     fun insert_NoAutoColumnsDefaultValue() {
         val model = TestModelDefaultValue(title = "title text", version = "V1.0", createdAt = "createdAt")
         val sql = model.insertQuery
-        assertEquals("message", sqlQuery("INSERT INTO tests (title, version, batch) VALUES (?, ?, ?)", listOf("title text", "V1.0", 1)).toString(), sql.toString());
+        assertEquals(sqlQuery("INSERT INTO tests (title, version, batch) VALUES (?, ?, ?)", listOf("title text", "V1.0", 1)).toString(), sql.toString());
     }
 
     @Test
@@ -410,14 +410,14 @@ class ModelTest {
     fun delete_1() {
         val model = TestModel(5)
         val sql = model.deleteQuery
-        assertEquals("message", sqlQuery("DELETE FROM tests WHERE processId = ?", listOf(5)).toString(), sql.toString());
+        assertEquals(sqlQuery("DELETE FROM tests WHERE processId = ?", listOf(5)).toString(), sql.toString());
     }
 
     @Test
     fun delete_1_quoted() {
         val model = TestModel(5, quote = "`")
         val sql = model.deleteQuery
-        assertEquals("message", sqlQuery("DELETE FROM `tests` WHERE `processId` = ?", listOf(5)).toString(), sql.toString());
+        assertEquals(sqlQuery("DELETE FROM `tests` WHERE `processId` = ?", listOf(5)).toString(), sql.toString());
     }
 
     @Test
@@ -425,7 +425,7 @@ class ModelTest {
         thrown.expect(IllegalStateException::class.java)
         val model = TestModel(processId = 5, title = "title", version = "V1.0")
 
-        assertEquals("message", false, model.isDirty())
+        assertEquals(false, model.isDirty())
 
         val sql = model.updateQuery
     }
@@ -435,12 +435,12 @@ class ModelTest {
         val model = TestModel(processId = 5, title = "title", version = "V1.0")
         model.title = "title text"
 
-        assertEquals("message", true, model.isDirty())
-        assertEquals("message", true, model.isDirty(TestModel::title))
-        assertEquals("message", false, model.isDirty(TestModel::version))
+        assertEquals(true, model.isDirty())
+        assertEquals(true, model.isDirty(TestModel::title))
+        assertEquals(false, model.isDirty(TestModel::version))
 
         val sql = model.updateQuery
-        assertEquals("message", sqlQuery("UPDATE tests SET title = ? WHERE processId = ?", listOf("title text", 5)).toString(), sql.toString());
+        assertEquals(sqlQuery("UPDATE tests SET title = ? WHERE processId = ?", listOf("title text", 5)).toString(), sql.toString());
     }
 
     @Test
@@ -448,12 +448,12 @@ class ModelTest {
         val model = TestModel(processId = 5, title = "title", version = "V1.0", quote = "`")
         model.title = "title text"
 
-        assertEquals("message", true, model.isDirty())
-        assertEquals("message", true, model.isDirty(TestModel::title))
-        assertEquals("message", false, model.isDirty(TestModel::version))
+        assertEquals(true, model.isDirty())
+        assertEquals(true, model.isDirty(TestModel::title))
+        assertEquals(false, model.isDirty(TestModel::version))
 
         val sql = model.updateQuery
-        assertEquals("message", sqlQuery("UPDATE `tests` SET `title` = ? WHERE `processId` = ?", listOf("title text", 5)).toString(), sql.toString());
+        assertEquals(sqlQuery("UPDATE `tests` SET `title` = ? WHERE `processId` = ?", listOf("title text", 5)).toString(), sql.toString());
     }
 
     @Test
@@ -462,12 +462,12 @@ class ModelTest {
         model.title = "title text"
         model.version = "V2.0"
 
-        assertEquals("message", true, model.isDirty())
-        assertEquals("message", true, model.isDirty(TestModel::title))
-        assertEquals("message", true, model.isDirty(TestModel::version))
+        assertEquals(true, model.isDirty())
+        assertEquals(true, model.isDirty(TestModel::title))
+        assertEquals(true, model.isDirty(TestModel::version))
 
         val sql = model.updateQuery
-        assertEquals("message", sqlQuery("UPDATE tests SET title = ?, version = ? WHERE processId = ?", listOf("title text", "V2.0", 5)).toString(), sql.toString());
+        assertEquals(sqlQuery("UPDATE tests SET title = ?, version = ? WHERE processId = ?", listOf("title text", "V2.0", 5)).toString(), sql.toString());
     }
 
     @Test
@@ -477,13 +477,13 @@ class ModelTest {
         model.version = "V2.0"
         model.batch = 4
 
-        assertEquals("message", true, model.isDirty())
-        assertEquals("message", true, model.isDirty(TestModel::title))
-        assertEquals("message", true, model.isDirty(TestModel::version))
-        assertEquals("message", true, model.isDirty(TestModel::batch))
+        assertEquals(true, model.isDirty())
+        assertEquals(true, model.isDirty(TestModel::title))
+        assertEquals(true, model.isDirty(TestModel::version))
+        assertEquals(true, model.isDirty(TestModel::batch))
 
         val sql = model.updateQuery
-        assertEquals("message", sqlQuery("UPDATE tests SET title = ?, version = ?, batch = ? WHERE processId = ?", listOf("title text", "V2.0", 4, 5)).toString(), sql.toString());
+        assertEquals(sqlQuery("UPDATE tests SET title = ?, version = ?, batch = ? WHERE processId = ?", listOf("title text", "V2.0", 4, 5)).toString(), sql.toString());
     }
 
     @Test
@@ -493,13 +493,13 @@ class ModelTest {
         model.version = "V2.0"
         model.batch = null
 
-        assertEquals("message", true, model.isDirty())
-        assertEquals("message", true, model.isDirty(TestModel::title))
-        assertEquals("message", true, model.isDirty(TestModel::version))
-        assertEquals("message", true, model.isDirty(TestModel::batch))
+        assertEquals(true, model.isDirty())
+        assertEquals(true, model.isDirty(TestModel::title))
+        assertEquals(true, model.isDirty(TestModel::version))
+        assertEquals(true, model.isDirty(TestModel::batch))
 
         val sql = model.updateQuery
-        assertEquals("message", sqlQuery("UPDATE tests SET title = ?, version = ? WHERE processId = ?", listOf("title text", "V2.0", 5)).toString(), sql.toString());
+        assertEquals(sqlQuery("UPDATE tests SET title = ?, version = ? WHERE processId = ?", listOf("title text", "V2.0", 5)).toString(), sql.toString());
     }
 
     @Test
@@ -507,13 +507,13 @@ class ModelTest {
         val model = TestModel(processId = 5, title = "title", version = "V1.0", batch = 4)
         model.batch = null
 
-        assertEquals("message", true, model.isDirty())
-        assertEquals("message", false, model.isDirty(TestModel::title))
-        assertEquals("message", false, model.isDirty(TestModel::version))
-        assertEquals("message", true, model.isDirty(TestModel::batch))
+        assertEquals(true, model.isDirty())
+        assertEquals(false, model.isDirty(TestModel::title))
+        assertEquals(false, model.isDirty(TestModel::version))
+        assertEquals(true, model.isDirty(TestModel::batch))
 
         val sql = model.updateQuery
-        assertEquals("message", sqlQuery("UPDATE tests SET processId = processId WHERE processId = ?", listOf(5)).toString(), sql.toString());
+        assertEquals(sqlQuery("UPDATE tests SET processId = processId WHERE processId = ?", listOf(5)).toString(), sql.toString());
     }
 
     @Test
@@ -523,13 +523,13 @@ class ModelTest {
         model.version = "V2.0"
         model.batch = null
 
-        assertEquals("message", true, model.isDirty())
-        assertEquals("message", true, model.isDirty(TestModel::title))
-        assertEquals("message", true, model.isDirty(TestModel::version))
-        assertEquals("message", true, model.isDirty(TestModel::batch))
+        assertEquals(true, model.isDirty())
+        assertEquals(true, model.isDirty(TestModel::title))
+        assertEquals(true, model.isDirty(TestModel::version))
+        assertEquals(true, model.isDirty(TestModel::batch))
 
         val sql = model.updateQuery
-        assertEquals("message", sqlQuery("UPDATE tests SET title = ?, version = ? WHERE processId = ?", listOf("title text", "V2.0", 5)).toString(), sql.toString());
+        assertEquals(sqlQuery("UPDATE tests SET title = ?, version = ? WHERE processId = ?", listOf("title text", "V2.0", 5)).toString(), sql.toString());
     }
 
     @Test
@@ -537,13 +537,13 @@ class ModelTest {
         val model = TestModelDefaultValue(processId = 5, title = "title", version = "V1.0", batch = 4)
         model.batch = null
 
-        assertEquals("message", true, model.isDirty())
-        assertEquals("message", false, model.isDirty(TestModel::title))
-        assertEquals("message", false, model.isDirty(TestModel::version))
-        assertEquals("message", true, model.isDirty(TestModel::batch))
+        assertEquals(true, model.isDirty())
+        assertEquals(false, model.isDirty(TestModel::title))
+        assertEquals(false, model.isDirty(TestModel::version))
+        assertEquals(true, model.isDirty(TestModel::batch))
 
         val sql = model.updateQuery
-        assertEquals("message", sqlQuery("UPDATE tests SET processId = processId WHERE processId = ?", listOf(5)).toString(), sql.toString());
+        assertEquals(sqlQuery("UPDATE tests SET processId = processId WHERE processId = ?", listOf(5)).toString(), sql.toString());
     }
 
     // no longer applicable, can always use a key column to set to itself
@@ -552,14 +552,14 @@ class ModelTest {
     //        val model = TestNoNonDefaultModel(processId = 5, title = null, version = null, batch = 4)
     //        model.batch = null
     //
-    //        assertEquals("message", true, model.isDirty())
-    //        assertEquals("message", false, model.isDirty(TestModel::title))
-    //        assertEquals("message", false, model.isDirty(TestModel::version))
-    //        assertEquals("message", true, model.isDirty(TestModel::batch))
+    //        assertEquals(true, model.isDirty())
+    //        assertEquals(false, model.isDirty(TestModel::title))
+    //        assertEquals(false, model.isDirty(TestModel::version))
+    //        assertEquals(true, model.isDirty(TestModel::batch))
     //
     //        thrown.expect(IllegalStateException::class.java)
     //        val sql = model.updateQuery
-    //        assertEquals("message", sqlQuery("UPDATE tests SET title = ? WHERE processId = ?", listOf("title", 5)).toString(), sql.toString());
+    //        assertEquals(sqlQuery("UPDATE tests SET title = ? WHERE processId = ?", listOf("title", 5)).toString(), sql.toString());
     //    }
 
     @Test
@@ -568,7 +568,7 @@ class ModelTest {
         val columns = ArrayList<String>()
         model.forEachProp { prop, propType, columnName, value -> columns += columnName }
 
-        assertEquals("message", arrayListOf("process_id", "model_name", "title", "version", "hasOwnName", "capped_name", "allcaps", "with_digits2", "created_at"), columns)
+        assertEquals(arrayListOf("process_id", "model_name", "title", "version", "hasOwnName", "capped_name", "allcaps", "with_digits2", "created_at"), columns)
     }
 
     @Test
@@ -577,7 +577,7 @@ class ModelTest {
         val columns = ArrayList<String>()
         model.forEachKey { prop, propType, columnName, value -> columns += columnName }
 
-        assertEquals("message", arrayListOf("process_id", "model_name"), columns)
+        assertEquals(arrayListOf("process_id", "model_name"), columns)
     }
 
     @Test
@@ -595,7 +595,7 @@ class ModelTest {
         model.createdAt = "createdAt"
 
         val sql = model.insertQuery
-        assertEquals("message", sqlQuery("INSERT INTO tests (title, version, hasOwnName, capped_name, allcaps, with_digits2) VALUES (?, ?, ?, ?, ?, ?)", listOf("title", "version", "ownName", 5, 4, 3)).toString(), sql.toString());
+        assertEquals(sqlQuery("INSERT INTO tests (title, version, hasOwnName, capped_name, allcaps, with_digits2) VALUES (?, ?, ?, ?, ?, ?)", listOf("title", "version", "ownName", 5, 4, 3)).toString(), sql.toString());
     }
 
     @Test
@@ -613,7 +613,7 @@ class ModelTest {
         model.createdAt = "createdAt"
 
         val sql = model.deleteQuery
-        assertEquals("message", sqlQuery("DELETE FROM tests WHERE process_id = ? AND model_name = ?", listOf(5, "name")).toString(), sql.toString());
+        assertEquals(sqlQuery("DELETE FROM tests WHERE process_id = ? AND model_name = ?", listOf(5, "name")).toString(), sql.toString());
     }
 
     @Test
@@ -631,7 +631,7 @@ class ModelTest {
         model.createdAt = "createdAt"
 
         val sql = model.updateQuery
-        assertEquals("message", sqlQuery("UPDATE tests SET title = ?, version = ?, hasOwnName = ?, capped_name = ?, allcaps = ?, with_digits2 = ? WHERE process_id = ? AND model_name = ?", listOf("title", "version", "ownName", 5, 4, 3, 5, "name")).toString(), sql.toString());
+        assertEquals(sqlQuery("UPDATE tests SET title = ?, version = ?, hasOwnName = ?, capped_name = ?, allcaps = ?, with_digits2 = ? WHERE process_id = ? AND model_name = ?", listOf("title", "version", "ownName", 5, 4, 3, 5, "name")).toString(), sql.toString());
     }
 
     @Test
@@ -640,7 +640,7 @@ class ModelTest {
 
         val sqlQuery = sqlQuery("SELECT * FROM tests WHERE single = :single AND list IN (:list)", mapOf("single" to 10, "list" to listOf(1, 2, 3, 4)))
 
-        assertEquals("message", sqlQuery.toString(), sql.toString());
+        assertEquals(sqlQuery.toString(), sql.toString());
     }
 
     @Test
@@ -649,6 +649,6 @@ class ModelTest {
 
         val sqlQuery = sqlQuery("SELECT * FROM `tests` WHERE `single` = :single AND `list` IN (:list)", mapOf("single" to 10, "list" to listOf(1, 2, 3, 4)))
 
-        assertEquals("message", sqlQuery.toString(), sql.toString());
+        assertEquals(sqlQuery.toString(), sql.toString());
     }
 }

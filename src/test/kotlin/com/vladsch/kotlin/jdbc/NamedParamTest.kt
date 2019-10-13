@@ -1,6 +1,7 @@
 package com.vladsch.kotlin.jdbc
 
 import org.junit.Test
+//import kotlin.test.assertEquals
 import org.junit.Assert.assertEquals
 
 class NamedParamTest {
@@ -14,8 +15,8 @@ class NamedParamTest {
             withQueries(
                 "SELECT * FROM table t WHERE t.a = :param"
             ) { query ->
-                assertEquals("message", """SELECT * FROM table t WHERE t.a = ?""".normalizeSpaces(), query.cleanStatement.normalizeSpaces())
-                assertEquals("message", mapOf("param" to listOf(0)), query.replacementMap)
+                assertEquals("""SELECT * FROM table t WHERE t.a = ?""".normalizeSpaces(), query.cleanStatement.normalizeSpaces())
+                assertEquals(mapOf("param" to listOf(0)), query.replacementMap)
             }
         }
 
@@ -23,8 +24,8 @@ class NamedParamTest {
             withQueries(
                 "INSERT INTO table VALUES (':param')"
             ) { query ->
-                assertEquals("message", """INSERT INTO table VALUES (':param')""".normalizeSpaces(), query.cleanStatement.normalizeSpaces())
-                assertEquals("message", EMPTY_REPLACEMENTS, query.replacementMap)
+                assertEquals("""INSERT INTO table VALUES (':param')""".normalizeSpaces(), query.cleanStatement.normalizeSpaces())
+                assertEquals(EMPTY_REPLACEMENTS, query.replacementMap)
             }
         }
 
@@ -32,8 +33,8 @@ class NamedParamTest {
             withQueries(
                 "INSERT INTO `:table` VALUES (':param')"
             ) { query ->
-                assertEquals("message", """INSERT INTO `:table` VALUES (':param')""".normalizeSpaces(), query.cleanStatement.normalizeSpaces())
-                assertEquals("message", EMPTY_REPLACEMENTS, query.replacementMap)
+                assertEquals("""INSERT INTO `:table` VALUES (':param')""".normalizeSpaces(), query.cleanStatement.normalizeSpaces())
+                assertEquals(EMPTY_REPLACEMENTS, query.replacementMap)
             }
         }
 
@@ -41,8 +42,8 @@ class NamedParamTest {
             withQueries(
                 "INSERT INTO \":table\" VALUES (':param')"
             ) { query ->
-                assertEquals("message", """INSERT INTO ":table" VALUES (':param')""".normalizeSpaces(), query.cleanStatement.normalizeSpaces())
-                assertEquals("message", EMPTY_REPLACEMENTS, query.replacementMap)
+                assertEquals("""INSERT INTO ":table" VALUES (':param')""".normalizeSpaces(), query.cleanStatement.normalizeSpaces())
+                assertEquals(EMPTY_REPLACEMENTS, query.replacementMap)
             }
         }
 
@@ -51,9 +52,9 @@ class NamedParamTest {
                 """SELECT * FROM table t WHERE t.a =
                 :param"""
             ) { query ->
-                assertEquals("message", """SELECT * FROM table t WHERE t.a =
+                assertEquals("""SELECT * FROM table t WHERE t.a =
                     ?""".normalizeSpaces(), query.cleanStatement.normalizeSpaces())
-                assertEquals("message", mapOf("param" to listOf(0)), query.replacementMap)
+                assertEquals(mapOf("param" to listOf(0)), query.replacementMap)
             }
         }
 
@@ -61,8 +62,8 @@ class NamedParamTest {
             withQueries(
                 "SELECT * FROM table t WHERE t.a = :param1 AND t.b = :param2"
             ) { query ->
-                assertEquals("message", "SELECT * FROM table t WHERE t.a = ? AND t.b = ?", query.cleanStatement)
-                assertEquals("message", mapOf(
+                assertEquals("SELECT * FROM table t WHERE t.a = ? AND t.b = ?", query.cleanStatement)
+                assertEquals(mapOf(
                     "param1" to listOf(0),
                     "param2" to listOf(1)
                 ), query.replacementMap)
@@ -80,7 +81,7 @@ class NamedParamTest {
  AND (? IS NULL OR t.b = ?)
  AND (? IS NULL OR t.c = ?)""".normalizeSpaces(), query.cleanStatement.normalizeSpaces()
                 )
-                assertEquals("message", mapOf(
+                assertEquals(mapOf(
                     "param1" to listOf(0, 5),
                     "param2" to listOf(1, 2),
                     "param3" to listOf(3, 4)
@@ -99,7 +100,7 @@ class NamedParamTest {
  --AND (? IS NULL OR t.b = ?)
  AND (? IS NULL OR t.c = ?)""".normalizeSpaces(), query.cleanStatement.normalizeSpaces()
                 )
-                assertEquals("message", mapOf(
+                assertEquals(mapOf(
                     "param1" to listOf(0, 5),
                     "param2" to listOf(1, 2),
                     "param3" to listOf(3, 4)
@@ -119,9 +120,9 @@ class NamedParamTest {
 
                 val cleanStatement = query.cleanStatement
 
-                assertEquals("message", """SELECT * FROM table t WHERE t.a IN
+                assertEquals("""SELECT * FROM table t WHERE t.a IN
                     (?,?,?)""".normalizeSpaces(), cleanStatement.normalizeSpaces())
-                assertEquals("message", mapOf("param" to listOf(0)), query.replacementMap)
+                assertEquals(mapOf("param" to listOf(0)), query.replacementMap)
             }
         }
 
@@ -132,10 +133,10 @@ class NamedParamTest {
 
                 val cleanStatement = query.cleanStatement
 
-                assertEquals("message", """SELECT * FROM table t WHERE t.b = ? AND t.a IN (?,?,?)""", cleanStatement.normalizeSpaces())
-                assertEquals("message", mapOf("param" to listOf(1), "paramB" to listOf(0)), query.replacementMap)
+                assertEquals("""SELECT * FROM table t WHERE t.b = ? AND t.a IN (?,?,?)""", cleanStatement.normalizeSpaces())
+                assertEquals(mapOf("param" to listOf(1), "paramB" to listOf(0)), query.replacementMap)
                 val actual = query.getParams()
-                assertEquals("message", listOf<Any?>(10, 0, 1, 2), actual)
+                assertEquals(listOf<Any?>(10, 0, 1, 2), actual)
             }
         }
 
@@ -146,9 +147,9 @@ class NamedParamTest {
 
                 val cleanStatement = query.cleanStatement
 
-                assertEquals("message", """SELECT * FROM table t WHERE t.a IN (?,?,?) AND t.b = ?""", cleanStatement.normalizeSpaces())
-                assertEquals("message", mapOf("param" to listOf(0), "paramB" to listOf(3)), query.replacementMap)
-                assertEquals("message", listOf<Any?>(0, 1, 2, 10), query.getParams())
+                assertEquals("""SELECT * FROM table t WHERE t.a IN (?,?,?) AND t.b = ?""", cleanStatement.normalizeSpaces())
+                assertEquals(mapOf("param" to listOf(0), "paramB" to listOf(3)), query.replacementMap)
+                assertEquals(listOf<Any?>(0, 1, 2, 10), query.getParams())
             }
         }
 
@@ -159,9 +160,9 @@ class NamedParamTest {
 
                 val cleanStatement = query.cleanStatement
 
-                assertEquals("message", """SELECT * FROM table t WHERE t.a IN (?,?,?) OR t.b IN (?,?,?)""", cleanStatement.normalizeSpaces())
-                assertEquals("message", mapOf("param" to listOf(0, 3)), query.replacementMap)
-                assertEquals("message", listOf<Any?>(0, 1, 2, 0, 1, 2), query.getParams())
+                assertEquals("""SELECT * FROM table t WHERE t.a IN (?,?,?) OR t.b IN (?,?,?)""", cleanStatement.normalizeSpaces())
+                assertEquals(mapOf("param" to listOf(0, 3)), query.replacementMap)
+                assertEquals(listOf<Any?>(0, 1, 2, 0, 1, 2), query.getParams())
             }
         }
     }
@@ -179,7 +180,7 @@ class NamedParamTest {
  -- AND (? IS NULL OR t.b = ?)
  AND (? IS NULL OR t.c = ?)""".normalizeSpaces(), query.cleanStatement.normalizeSpaces()
             )
-            assertEquals("message", mapOf(
+            assertEquals(mapOf(
                 "param1" to listOf(0, 3),
                 "param2" to listOf(1),
                 "param3" to listOf(2)
@@ -199,7 +200,7 @@ class NamedParamTest {
  -- AND (? IS NULL OR t.b = ?)
  AND (? IS NULL OR t.c = ?)""".normalizeSpaces(), query.cleanStatement.normalizeSpaces()
             )
-            assertEquals("message", mapOf(
+            assertEquals(mapOf(
                 "param1" to listOf(0, 3),
                 "param2" to listOf(1),
                 "param3" to listOf(2)
@@ -217,7 +218,7 @@ class NamedParamTest {
 -- AND (? IS NULL OR t.b = ?)
  AND (? IS NULL OR t.c = ?)""".normalizeSpaces(), query.cleanStatement.normalizeSpaces()
             )
-            assertEquals("message", mapOf(
+            assertEquals(mapOf(
                 "param1" to listOf(0, 3),
                 "param2" to listOf(1),
                 "param3" to listOf(2)
@@ -235,7 +236,7 @@ class NamedParamTest {
 #AND (? IS NULL OR t.b = ?)
  AND (? IS NULL OR t.c = ?)""".normalizeSpaces(), query.cleanStatement.normalizeSpaces()
                 )
-                assertEquals("message", mapOf(
+                assertEquals(mapOf(
                     "param1" to listOf(0, 3),
                     "param2" to listOf(1),
                     "param3" to listOf(2)
@@ -254,7 +255,7 @@ class NamedParamTest {
  #AND (? IS NULL OR t.b = ?)
  AND (? IS NULL OR t.c = ?)""".normalizeSpaces(), query.cleanStatement.normalizeSpaces()
                 )
-                assertEquals("message", mapOf(
+                assertEquals(mapOf(
                     "param1" to listOf(0, 3),
                     "param2" to listOf(1),
                     "param3" to listOf(2)
