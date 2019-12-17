@@ -5,6 +5,7 @@
 - [TODO](#todo)
     - [High Priority](#high-priority)
 - [0.5.0 API Breaking Release](#050-api-breaking-release)
+- [0.5.0](#050)
 - [0.5.0-beta-8](#050-beta-8)
 - [0.5.0-beta-7](#050-beta-7)
 - [0.5.0-beta-6](#050-beta-6)
@@ -102,6 +103,12 @@ to the table name will only be used for column references.
 
 [`Generate Kotlin-Model.groovy`] has been updated to generate the new model format from tables
 in the database.
+
+## 0.5.0
+
+* Fix: merge branch `dev-0.5.0` into `master`
+* Fix: merge #15, PR: Allow for custom hikari data sources
+* Fix: travis to use precise env to allow jdk8
 
 ## 0.5.0-beta-8
 
