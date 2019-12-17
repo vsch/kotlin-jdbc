@@ -3,7 +3,7 @@
 [![Build Status](https://travis-ci.org/vsch/kotlin-jdbc.svg)](https://travis-ci.org/vsch/kotlin-jdbc)
 [![Maven Central status](https://img.shields.io/maven-central/v/com.vladsch.kotlin-jdbc/kotlin-jdbc.svg)](https://search.maven.org/search?q=g:com.vladsch.kotlin-jdbc)<!-- @IGNORE PREVIOUS: link -->
 
-## Version 0.5 API Breaking Release
+## Version 0.5.0 API Breaking Release
 
 :information_source: This branch is a rework with breaking changes to refactor models and
 related classes to eliminate having to specify identifier quoting in the model by creating the
@@ -43,13 +43,16 @@ to the table name will only be used for column references.
 in the database and optionally use a `model-config.json` to provide table to generated model
 file.
 
-### :warning: 0.5.0-beta-6 Adds *profileName* after `db/`
+### :warning: 0.5.0-beta-6 Added *profileName* after `db/`
 
 Breaking change in resource `db/` adds profile name after `db/` to allow multi-database
 migrations, with `default` being the default profile name.
 
 To migrate previous `db/` structure move all directories other than `templates` under `db/` to
 `db/default`
+
+### :information_source: master branch is now Version 0.5.0
+### :information_source: Version 0.4.0 moved to branch 0.4.0
 
 ## Overview
 
@@ -110,14 +113,14 @@ functions, procedures, tables, triggers and views. See [Migrations](#migrations)
 <dependency>
     <groupId>com.vladsch.kotlin-jdbc</groupId>
     <artifactId>kotlin-jdbc</artifactId>
-    <version>0.5.0-beta-8</version>
+    <version>0.5.0</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```gradle
-compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.5.0-beta-8"
+compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.5.0"
 ```
 
 ### Example
