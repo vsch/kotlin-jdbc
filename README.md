@@ -51,8 +51,8 @@ migrations, with `default` being the default profile name.
 To migrate previous `db/` structure move all directories other than `templates` under `db/` to
 `db/default`
 
-### :information_source: master branch is now Version 0.5.0
-### :information_source: Version 0.4.0 moved to branch 0.4.0
+### :information_source: master branch is now Version 0.5
+### :information_source: Version 0.4.x moved to branch 0.4
 
 ## Overview
 
