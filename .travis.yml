@@ -1,6 +1,10 @@
-sudo: false
+dist: precise
 language: kotlin
-jdk: oraclejdk8
+sudo: required
+install: true
+
+jdk:
+  - oraclejdk8
 
 env:
   - TEST=kotlin
