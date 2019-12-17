@@ -1,84 +1,72 @@
 package com.vladsch.kotlin.jdbc
 
+import javax.json.JsonArray
 import javax.json.JsonObject
 import kotlin.reflect.KProperty
 
-@Suppress("MemberVisibilityCanBePrivate")
-abstract class Model<T : Model<T>>(val sqlTable: String, dbCase: Boolean, allowSetAuto: Boolean = true, quote: String? = null) {
-    protected val db: ModelPropertyProvider<T> get() = _model
+@Suppress("MemberVisibilityCanBePrivate", "UNCHECKED_CAST", "PropertyName")
+abstract class Model<M : Model<M, D>, D>(session: Session?, sqlTable: String, dbCase: Boolean, allowSetAuto: Boolean = true, quote: String? = null) {
+    internal val _db = ModelProperties<Model<M, D>>(session ?: session(), sqlTable, dbCase, allowSetAuto, quote)
+    protected val db: ModelPropertyProvider<Model<M, D>> get() = _db
 
-    internal val _model = ModelProperties<T>(this::class.simpleName ?: "<unknown>", dbCase, allowSetAuto, quote ?: ModelProperties.databaseQuoting)
-
-    fun load(rs: Row): T {
-        _model.load(rs)
-        @Suppress("UNCHECKED_CAST")
-        return this as T
+    fun load(rs: Row): M {
+        _db.load(rs)
+        return this as M
     }
 
-    fun load(json: JsonObject): T {
-        _model.load(json)
-        @Suppress("UNCHECKED_CAST")
-        return this as T
+    fun load(json: JsonObject): M {
+        _db.load(json)
+        return this as M
     }
 
-    fun load(other: Model<*>): T {
-        _model.load(other)
-        @Suppress("UNCHECKED_CAST")
-        return this as T
+    fun load(other: Model<*, *>): M {
+        _db.load(other)
+        return this as M
     }
 
-    fun toJson() = _model.toJsonObject()
+    val _session: Session get() = _db.session
+    val _quote: String get() = _db.quote
 
-    val insertQuery: SqlQuery get() = _model.sqlInsertQuery(sqlTable)
-    val deleteQuery: SqlQuery get() = _model.sqlDeleteQuery(sqlTable)
-    val updateQuery: SqlQuery get() = _model.sqlUpdateQuery(sqlTable)
-    val selectQuery: SqlQuery get() = _model.sqlSelectQuery(sqlTable)
-    val selectSql: String get() = _model.sqlSelectTable(sqlTable)
+    fun toJson() = _db.toJsonObject()
 
-    fun insert(session: Session) {
-        session.updateGetKeys(insertQuery) {
-            _model.loadKeys(it)
-        }
+    val insertQuery: SqlQuery get() = _db.sqlInsertQuery()
+    val deleteQuery: SqlQuery get() = _db.sqlDeleteQuery()
+    val updateQuery: SqlQuery get() = _db.sqlUpdateQuery()
+    val selectQuery: SqlQuery get() = _db.sqlSelectQuery()
+    val selectSql: String get() = _db.sqlSelectTable()
+
+    fun Appendable.appendQuoted(id: kotlin.String): Appendable {
+        return _db.appendQuoted(this, id)
     }
 
-    fun insertIgnoreKeys(session: Session) {
-        session.update(insertQuery)
+    fun Appendable.appendSqlSelectTable(): Appendable {
+        return _db.appendSelectSql(this)
     }
 
-    fun select(session: Session) {
-        session.first(selectQuery) {
-            _model.load(it)
-        }
-    }
+    fun insert() = _db.insert()
+    fun insertIgnoreKeys() = _db.insertIgnoreKeys()
+    fun select() = _db.select()
+    fun insertReload() = _db.insertReload()
+    fun clearAutoKeys() = _db.clearAutoKeys()
+    fun delete() = _db.delete()
+    fun update() = _db.update()
+    fun updateReload() = _db.updateReload()
+    fun deleteKeepAutoKeys() = _db.deleteKeepAutoKeys()
+    fun snapshot() = _db.snapshot()
+    fun isDirty(): Boolean = _db.isModified()
+    fun isDirty(property: KProperty<*>): Boolean = _db.isModified(property)
+    fun appendKeys(appendable: Appendable, params: ArrayList<Any?>, delimiter: String = " AND ", sep: String = ""): String =
+            _db.appendKeys(appendable, params, delimiter, sep, null)
 
-    fun insertReload(session: Session) {
-        insert(session)
-        select(session)
-    }
+    fun forEachKey(consumer: (prop: KProperty<*>, propType: PropertyType, value: Any?) -> Unit) = _db.forEachKey(consumer)
 
-    fun clearAutoKeys() {
-        _model.clearAutoKeys()
-    }
+    fun forEachProp(consumer: (prop: KProperty<*>, propType: PropertyType, value: Any?) -> Unit) = _db.forEachProp(consumer)
 
-    fun delete(session: Session) {
-        session.execute(deleteQuery)
-        clearAutoKeys()
-    }
+    fun forEachKey(consumer: (prop: KProperty<*>, propType: PropertyType, columnName: String, value: Any?) -> Unit) =
+            _db.forEachKey(consumer)
 
-    fun update(session: Session) {
-        if (session.execute(updateQuery)) {
-            snapshot()
-        }
-    }
-
-    fun updateReload(session: Session) {
-        update(session)
-        select(session)
-    }
-
-    fun deleteKeepAutoKeys(session: Session) {
-        delete(session)
-    }
+    fun forEachProp(consumer: (prop: KProperty<*>, propType: PropertyType, columnName: String, value: Any?) -> Unit) =
+            _db.forEachProp(consumer)
 
     /**
      * set property value directly in the _model property map, by passing _model properties
@@ -87,45 +75,74 @@ abstract class Model<T : Model<T>>(val sqlTable: String, dbCase: Boolean, allowS
      */
     protected fun <V> setProperty(prop: KProperty<*>, value: V) {
         @Suppress("UNCHECKED_CAST")
-        _model.setProperty(this as T, prop, value)
+        _db.setProperty(this, prop, value)
     }
 
-    fun snapshot() {
-        _model.snapshot()
+    fun quoteIdentifier(id: String): String = _db.appendQuoted(StringBuilder(), id).toString()
+
+    fun appendSelectSql(out: Appendable, alias: String? = null): Appendable = _db.appendSelectSql(out, alias)
+
+    fun appendListQuery(out: Appendable, params: Array<out Pair<String, Any?>>, alias: String? = null): Appendable = _db.appendListQuery(out, params, alias)
+
+    fun appendListQuery(out: Appendable, params: Map<String, Any?>, alias: String? = null): Appendable = _db.appendListQuery(out, params, alias)
+
+    fun listQuery(params: Map<String, Any?>, alias: String? = null): SqlQuery = _db.listQuery(params, alias)
+
+    fun listQuery(vararg params: Pair<String, Any?>, alias: String? = null): SqlQuery = _db.listQuery(params, alias)
+
+    fun listQuery(whereClause: String, params: Map<String, Any?>, alias: String? = null): SqlQuery = _db.listQuery(whereClause, params, alias)
+
+    fun listData(): List<D> = _db.listData(toData)
+
+    fun listData(whereClause: String): List<D> = _db.listData(whereClause, toData)
+
+    fun listData(sqlQuery: SqlQuery): List<D> = _db.session.list(sqlQuery, toData)
+
+    fun listData(params: Map<String, Any?>, alias: String? = null): List<D> = _db.session.list(listQuery(params, alias), toData)
+
+    fun listData(whereClause: String, params: Map<String, Any?>, alias: String? = null): List<D> = _db.session.list(listQuery(whereClause, params, alias), toData)
+
+    fun jsonArray(): JsonArray = _db.session.jsonArray(listQuery(), toJsonObject)
+
+    fun jsonArray(whereClause: String): JsonArray = _db.session.jsonArray(listQuery(whereClause, mapOf()), toJsonObject)
+
+    fun jsonArray(sqlQuery: SqlQuery): JsonArray = _db.session.jsonArray(sqlQuery, toJsonObject)
+
+    fun jsonArray(params: Map<String, Any?>, alias: String? = null): JsonArray = _db.session.jsonArray(listQuery(params, alias), toJsonObject)
+
+    fun jsonArray(whereClause: String, params: Map<String, Any?>, alias: String? = null): JsonArray = _db.session.jsonArray(listQuery(whereClause, params, alias), toJsonObject)
+
+    fun listModel(): List<M> = _db.listModel(toModel) as List<M>
+
+    fun listModel(whereClause: String): List<M> = _db.listModel(whereClause, toModel) as List<M>
+
+    fun listModel(sqlQuery: SqlQuery): List<M> = _db.session.list(sqlQuery, toModel)
+
+    fun listModel(params: Map<String, Any?>, alias: String? = null): List<M> = _db.session.list(listQuery(params, alias), toModel)
+
+    fun listModel(whereClause: String, params: Map<String, Any?>, alias: String? = null): List<M> = _db.session.list(listQuery(whereClause, params, alias), toModel)
+
+    // create a new copy, same params
+    abstract operator fun invoke(): M
+
+    // create a data of this
+    abstract fun toData(): D
+
+    // instance in this model used to load lists
+    private val loader: M by lazy { invoke() }
+
+    val toData: (Row) -> D = {
+        loader.load(it).toData()
     }
 
-    fun isDirty(): Boolean {
-        return _model.isModified()
-    }
-
-    fun isDirty(property: KProperty<*>): Boolean {
-        return _model.isModified(property)
-    }
-
-    fun appendKeys(appendable: Appendable, params: ArrayList<Any?>, delimiter: String = " AND ", sep: String = ""): String {
-        return _model.appendKeys(appendable, params, delimiter, sep)
-    }
-
-    fun forEachKey(consumer: (prop: KProperty<*>, propType: PropertyType, value: Any?) -> Unit) {
-        _model.forEachKey(consumer)
-    }
-
-    fun forEachProp(consumer: (prop: KProperty<*>, propType: PropertyType, value: Any?) -> Unit) {
-        _model.forEachProp(consumer)
-    }
-
-    fun forEachKey(consumer: (prop: KProperty<*>, propType: PropertyType, columnName: String, value: Any?) -> Unit) {
-        _model.forEachKey(consumer)
-    }
-
-    fun forEachProp(consumer: (prop: KProperty<*>, propType: PropertyType, columnName: String, value: Any?) -> Unit) {
-        _model.forEachProp(consumer)
+    val toModel: (Row) -> M = {
+        loader.load(it)
     }
 
     override fun toString(): String {
         val sb = StringBuilder()
         var sep = ""
-        sb.append(_model.name).append("(")
+        sb.append(_db.tableName).append("(")
         forEachProp { prop, propType, value ->
             if (value !== Unit) {
                 sb.append(sep)
@@ -136,43 +153,5 @@ abstract class Model<T : Model<T>>(val sqlTable: String, dbCase: Boolean, allowS
         }
         sb.append(")")
         return sb.toString()
-    }
-
-    companion object {
-        var databaseQuoting: String
-            get() = ModelProperties.databaseQuoting
-            set(value) {
-                ModelProperties.databaseQuoting = value
-            }
-
-        fun quoteIdentifier(name: String): String = ModelProperties.quoteIdentifier(name)
-
-        fun listQuery(tableName: String, params: Array<out Pair<String, Any?>>, quote: String = ModelProperties.databaseQuoting): SqlQuery {
-            val conditions = HashMap<String, Any?>()
-            conditions.putAll(params)
-            return listQuery(tableName, conditions, quote)
-        }
-
-        fun listQuery(tableName: String, whereClause: String, params: Array<out Pair<String, Any?>>, quote: String = ModelProperties.databaseQuoting): SqlQuery {
-            val paramsMap = HashMap<String, Any?>()
-            paramsMap.putAll(params)
-            return listQuery(tableName, whereClause, paramsMap, quote)
-        }
-
-        fun appendWhereClause(query: String, params: Map<String, Any?>, quote: String = ModelProperties.databaseQuoting): SqlQuery {
-            return if (!params.isEmpty()) {
-                sqlQuery("$query WHERE " + params.keys.joinToString(" AND ") { key -> if (params[key] is Collection<*>) "$quote$key$quote IN (:$key)" else "$quote$key$quote = :$key" }, params)
-            } else {
-                sqlQuery(query)
-            }
-        }
-
-        fun listQuery(tableName: String, conditions: Map<String, Any?>, quote: String = ModelProperties.databaseQuoting): SqlQuery {
-            return appendWhereClause("SELECT * FROM $quote$tableName$quote", conditions, quote)
-        }
-
-        fun listQuery(tableName: String, whereClause: String, params: Map<String, Any?>, quote: String = ModelProperties.databaseQuoting): SqlQuery {
-            return sqlQuery("SELECT * FROM $quote$tableName$quote $whereClause", params, quote)
-        }
     }
 }

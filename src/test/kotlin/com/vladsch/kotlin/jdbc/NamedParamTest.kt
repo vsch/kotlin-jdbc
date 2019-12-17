@@ -1,9 +1,13 @@
 package com.vladsch.kotlin.jdbc
 
 import org.junit.Test
-import kotlin.test.assertEquals
+//import kotlin.test.assertEquals
+import org.junit.Assert.assertEquals
 
 class NamedParamTest {
+    companion object {
+        private val EMPTY_REPLACEMENTS = mapOf<String, List<Int>>()
+    }
 
     @Test
     fun paramExtraction() {
@@ -21,7 +25,7 @@ class NamedParamTest {
                 "INSERT INTO table VALUES (':param')"
             ) { query ->
                 assertEquals("""INSERT INTO table VALUES (':param')""".normalizeSpaces(), query.cleanStatement.normalizeSpaces())
-                assertEquals(mapOf(), query.replacementMap)
+                assertEquals(EMPTY_REPLACEMENTS, query.replacementMap)
             }
         }
 
@@ -30,7 +34,7 @@ class NamedParamTest {
                 "INSERT INTO `:table` VALUES (':param')"
             ) { query ->
                 assertEquals("""INSERT INTO `:table` VALUES (':param')""".normalizeSpaces(), query.cleanStatement.normalizeSpaces())
-                assertEquals(mapOf(), query.replacementMap)
+                assertEquals(EMPTY_REPLACEMENTS, query.replacementMap)
             }
         }
 
@@ -39,7 +43,7 @@ class NamedParamTest {
                 "INSERT INTO \":table\" VALUES (':param')"
             ) { query ->
                 assertEquals("""INSERT INTO ":table" VALUES (':param')""".normalizeSpaces(), query.cleanStatement.normalizeSpaces())
-                assertEquals(mapOf(), query.replacementMap)
+                assertEquals(EMPTY_REPLACEMENTS, query.replacementMap)
             }
         }
 
@@ -72,7 +76,7 @@ class NamedParamTest {
                  AND (:param2 IS NULL OR t.b = :param3)
                  AND (:param3 IS NULL OR t.c = :param1)"""
             ) { query ->
-                assertEquals(
+                assertEquals("message",
                     """SELECT * FROM table t WHERE (? IS NULL OR t.a = ?)
  AND (? IS NULL OR t.b = ?)
  AND (? IS NULL OR t.c = ?)""".normalizeSpaces(), query.cleanStatement.normalizeSpaces()
@@ -91,7 +95,7 @@ class NamedParamTest {
                  --AND (:param2 IS NULL OR t.b = :param3)
                  AND (:param3 IS NULL OR t.c = :param1)"""
             ) { query ->
-                assertEquals(
+                assertEquals("message",
                     """SELECT * FROM table t WHERE (? IS NULL OR t.a = ?)
  --AND (? IS NULL OR t.b = ?)
  AND (? IS NULL OR t.c = ?)""".normalizeSpaces(), query.cleanStatement.normalizeSpaces()
@@ -112,7 +116,7 @@ class NamedParamTest {
                 """SELECT * FROM table t WHERE t.a IN
                 (:param)"""
             ) { query ->
-                query.inParams("param" to listOf(0, 1, 2))
+                query.params("param" inTo listOf(0, 1, 2))
 
                 val cleanStatement = query.cleanStatement
 
@@ -171,7 +175,7 @@ class NamedParamTest {
                  -- AND (:param2 IS NULL OR t.b = :param3)
                  AND (:param3 IS NULL OR t.c = :param1)"""
             )
-            assertEquals(
+            assertEquals("message",
                 """SELECT * FROM table t WHERE (? IS NULL OR t.a = ?)
  -- AND (? IS NULL OR t.b = ?)
  AND (? IS NULL OR t.c = ?)""".normalizeSpaces(), query.cleanStatement.normalizeSpaces()
@@ -190,7 +194,7 @@ class NamedParamTest {
                  -- AND (:param2 IS NULL OR t.b = :param3)
                  AND (:param3 IS NULL OR t.c = :param1)"""
             )
-            assertEquals(
+            assertEquals("message",
                 """-- leading comment
  SELECT * FROM table t WHERE (? IS NULL OR t.a = ?)
  -- AND (? IS NULL OR t.b = ?)
@@ -209,7 +213,7 @@ class NamedParamTest {
 -- AND (:param2 IS NULL OR t.b = :param3)
                  AND (:param3 IS NULL OR t.c = :param1)"""
             )
-            assertEquals(
+            assertEquals("message",
                 """SELECT * FROM table t WHERE (? IS NULL OR t.a = ?)
 -- AND (? IS NULL OR t.b = ?)
  AND (? IS NULL OR t.c = ?)""".normalizeSpaces(), query.cleanStatement.normalizeSpaces()
@@ -227,7 +231,7 @@ class NamedParamTest {
 #AND (:param2 IS NULL OR t.b = :param3)
                  AND (:param3 IS NULL OR t.c = :param1)"""
             ) { query ->
-                assertEquals(
+                assertEquals("message",
                     """SELECT * FROM table t WHERE (? IS NULL OR t.a = ?)
 #AND (? IS NULL OR t.b = ?)
  AND (? IS NULL OR t.c = ?)""".normalizeSpaces(), query.cleanStatement.normalizeSpaces()
@@ -246,7 +250,7 @@ class NamedParamTest {
     #AND (:param2 IS NULL OR t.b = :param3)
                  AND (:param3 IS NULL OR t.c = :param1)"""
             ) { query ->
-                assertEquals(
+                assertEquals("message",
                     """SELECT * FROM table t WHERE (? IS NULL OR t.a = ?)
  #AND (? IS NULL OR t.b = ?)
  AND (? IS NULL OR t.c = ?)""".normalizeSpaces(), query.cleanStatement.normalizeSpaces()

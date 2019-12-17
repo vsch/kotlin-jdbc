@@ -3,6 +3,16 @@
 [TOC]: # " "
 
 - [TODO](#todo)
+    - [High Priority](#high-priority)
+- [0.5.0 API Breaking Release](#050-api-breaking-release)
+- [0.5.0-beta-8](#050-beta-8)
+- [0.5.0-beta-7](#050-beta-7)
+- [0.5.0-beta-6](#050-beta-6)
+- [0.5.0-beta-5](#050-beta-5)
+- [0.5.0-beta-4](#050-beta-4)
+- [0.5.0-beta-3](#050-beta-3)
+- [0.5.0-beta-2](#050-beta-2)
+- [0.5.0-beta-1](#050-beta-1)
 - [0.4.10](#0410)
 - [0.4.8](#048)
 - [0.4.6](#046)
@@ -43,6 +53,213 @@
   * [ ] Tables
   * [ ] Others?
 
+### High Priority
+
+* [ ] Test: query generating functions
+  * [ ] validate quote parameter is used for table and column names
+  * [ ] alias parameter
+    * [ ] `""`
+    * [ ] same as table name
+    * [ ] other string `"a"`
+* [ ] Test: list generation functions
+* [ ] Fix: Readme docs, consider creating a wiki
+
+## 0.5.0 API Breaking Release
+
+:information_source: This branch is a rework with breaking changes to refactor models and
+related classes to eliminate having to specify identifier quoting in the model by creating the
+model for a database session. Which makes sense for a database model class.
+
+Biggest change is that the model now takes two template arguments: main model class and its
+associated data class with an optional session instance and identifier quoting string.
+
+If `session` is not given or `null` then default session will be used.
+
+If `quote` if not given or `null` then the connection `metaData.identifierQuoteString` will be
+used, anything else will use whatever string is passed in. Unless your jdbc driver does not
+provide identifier quoting, there is no need to use anything but the default.
+
+Companion object now only has the table name constant string.
+
+All other functions implemented in the `Model` with two abstract members: `toData()` returning
+the data class for the model and `operator invoke` for the factory function for the model. To
+get another instance of a model `myModel` invoke the model instance as a function `myModel()`.
+
+For models that do not need a data class `ModelNoData` is also available which only takes a
+single template argument, as was the case for the `Model` class in previous releases.
+
+Having the session instance information in the model simplifies using models because session no
+longer has to be specified for every method performing database access.
+
+Additionally, list results are simplified because neither the session nor the extractor needs to
+be passed, with `myModel.listData()` variations can be used or `myModel.listModel()` variations.
+
+Additionally there is now an `alias:String? = null` argument available for sql generating
+functions which will add a table alias to the table name and use the alias for disambiguating
+column names. If generating queries with multiple tables, set the `alias` to empty string `""`
+or the table name to have it added to the column references. An empty table alias or one equal
+to the table name will only be used for column references.
+
+[`Generate Kotlin-Model.groovy`] has been updated to generate the new model format from tables
+in the database.
+
+## 0.5.0-beta-8
+
+* Fix: `SqlCall` out params are now passed by index instead of name to make them independent of
+  actual sql procedure parameter names.
+* Fix: `param()` to work for non-null values when calling context's capture type is `*`,
+  previous implementation would always result in `Any` type, fixed implementation uses the
+  value's class for type's class.
+* Fix: `param()` to not construct a new instance if passed value is already `Parameter<*>`
+* Fix: SQL generation for model `listQuery` with where clause and/or alias
+* Add: `InOut` type to `Parameter()`, defaults to `InOut.IN` so parameter carries direction of
+  parameter and type.
+* Add: `inTo`, `outTo` and `inOutTo` infix functions to use instead of `to` for param creation.
+  These create parameters with in/inOut/out type eliminating the need for multiple `params()`
+  functions for directional information. Default direction is `in` if not provided.
+
+  They also create an instance of `Parameter` when the captured type is known. Functions using
+  `param()` from a collection iteration have `*` for type capture and loose actual type,
+  resorting to `Any` (ie. `Object`).
+
+  These also have `Collection<T>` versions which create a Parameter() with a collection value
+  but type is `T::class.java`. When generating parameters for prepared stmt this type is used to
+  determine sql type for the element of the collection instead of generic `Any` as was before,
+  again because of `*` captured type from a collection.
+* Fix: extract `SqlQueryBase<T>` for `SqlQuery` and `SqlCall` to eliminate the need to override
+  function just to cast them to the right class. `SqlCall` no longer extends `SqlQuery`.
+* Fix: `SqlQueryBase` now stores each parameter in `Parameter()` data class format. Eliminates
+  creating a new instance with param() since if it is already parameter it just returns the
+  instance.
+* Fix: deprecate old methods in favor of directional parameter declaration.
+* Fix: change `Session` methods to use `SqlQueryBase<*>` when either `SqlQuery` or `SqlCall` can
+  be used. For some, like updates with get keys, `SqlCall` never returns any keys even when
+  stored procedure executes DML that does, so these are now `SqlQuery` only. Similarly, those
+  only applicable to `SqlCall` are now `SqlCall` typed and will not take `SqlQuery`
+* Fix: deprecate `Session.forEach(SqlCall, (stmt: CallableStatement) -> Unit, (rs: ResultSet,
+  index: Int) -> Unit)`
+* Add: `Session.executeCall(SqlCall, (results: SqlCallResults) -> Unit)` to replace
+  `Session.forEach(SqlCall, (stmt: CallableStatement) -> Unit, (rs: ResultSet, index: Int) ->
+  Unit)`. Use `SqlCallResults.forEach` to process result sets returned by the procedure call. To
+  get values of out params use `SqlCallResults.get{Type}(paramName)` to get non-null values or
+  `SqlCallResults.get{Type}OrNull(paramName)` to get nullable values.
+
+  For example, when using old `forEach` the code was:
+
+  ```kotlin
+  val sqlQuery = sqlCall("""CALL processInstances(:clientId, :types)""")
+    .inParams("clientId" to 35)
+    .inOutParams("types" to "")
+
+  val jsonResult = MutableJsObject()
+  var types: List<String> = listOf()
+
+  session.forEach(sqlQuery, { stmt ->
+      types = stmt.getString("types").split(',')
+  }) { rs, index ->
+      val key = types[index]
+      jsonResult[key] = MutableJsArray(Rows(rs).map(toJsonObject).toList())
+  }
+  ```
+
+  Using the new `executeCall` and directional param declarations, the code changes to:
+
+  ```kotlin
+  val sqlQuery = sqlCall("""CALL processInstances(:clientId, :types)""",
+            mapOf("clientId" inTo 35, "types" inOutTo ""))
+
+  val jsonResult = MutableJsObject()
+
+  session.executeCall(sqlQuery) { results:SqlCallResults ->
+      val types = results.getString("types").split(',')
+      results.forEach { rs, index ->
+          val key = types[index]
+          jsonResult[key] = MutableJsArray(Rows(rs).map(toJsonObject).toList())
+      }
+  }
+  ```
+
+## 0.5.0-beta-7
+
+* Add: import evolutions to also accept `# -- !Ups` and `# -- !Downs` as valid Scala play
+  evolution markers
+* Fix: merge fixes made by [Nick Johnson](https://github.com/Sylvyrfysh) in master
+
+## 0.5.0-beta-6
+
+* Break: Add profile name after `db/` to allow multi-database migrations.
+  * :warning: To migrate previous `db/` structure move all directories other than `templates` of
+    `db/` to `db/default`
+  * default profile is in `default` directory
+  * templates remain under `db/templates` and will apply to all profiles
+  * new `Migrations` constructor takes maps for session arguments indexed by profile string
+  * old `Migrations` constructor now uses `default` for profile name
+  * `profile` command line option specifies which profile is to be used. Some commands like
+    `rollback` require an explicit profile name, others will use `default` when one is not
+    given, some like `init` and `migrate` will apply the command over all profiles
+
+## 0.5.0-beta-5
+
+* Fix: Rollback used string compare instead of version compare, causing 0_7_2 to match 0_7_20
+  rollback.
+
+## 0.5.0-beta-4
+
+* Fix: [`JavaScript-Enumerated-Value-Type.js`] for latest version of [`enumerated-type`] with
+  objects for values and `dropdownChoices` property of `{ value: xxx, label: "yyy", }`
+  automatically generated from the enum id column and enum type column.
+
+## 0.5.0-beta-3
+
+* Fix: [`JavaScript-Enumerated-Value-Type.js`] for latest version of [`enumerated-type`] with
+  object value containing the id and type instead of constants.
+* Add: option to Scala model script to generate a separate Database model and an Api Model used
+  for REST api data exchange.
+* Fix: `Generate Kotlin-Model.groovy` now will look for the model map file starting from the
+  directory selected for generation and go up, until encountering directory with sub-directory
+  `.idea`, hitting the root directory or finding `model-config.json` file. Mappings in this file
+  are now relative to the directory of the `model-config.json` file.
+
+  if `.idea` sub-directory was seen then will assume that this is the project root and if no
+  `model-config.json` file is provided then will use the destination directory, without the
+  project directory prefix and one more directory removed to generate the package for generated
+  files. If the first sub-directory is marked as `sources root` then the package will be
+  correct. Otherwise create a `model-config.json`.
+
+  Intended use case is to place the `model-config.json` at the project root and map all files in
+  it with path relative to project root. Generating models then is not dependent on which
+  directory in the project is selected as the directory for generating models.
+* Fix: `Generate Scala-Slick-Model.groovy` to work like `Generate Kotlin-Model.groovy`
+* Fix: make `Generate Kotlin-Model.groovy` and `Generate Scala-Slick-Model.groovy` more generic
+  with the differences isolated to the last generate method.
+* Fix: model generation scripts to get nullability and default value for column from database
+  information. No longer kludging based on column names.
+* Add: `Scala-Object-Enum.kt.js` to generate an `object` with fields mimicking enum values,
+  needs work to make real Scala enums.
+* Add: `import-evolutions path min {max}` where path is to the directory holding evolutions and
+  `min` is the minimum evolution to import. `max` is optional and if provided gives the maximum
+  evolution number to import.
+* Fix: `new-evolution` to put down migration script right after the up migration script instead
+  of all up migrations followed by reversed down migrations.
+
+## 0.5.0-beta-2
+
+* Add: `jsonArray` functions to `Model` to list query results directly to `JsonArray` of
+  `JsonObject`.
+
+  :warning: will convert all columns of the query to properties of the `JsonObject` without
+  filtering by model properties.
+
+* Add: `listData` and `listModel` variants with parameter list and no where clause to have the
+  where clause generated from passed parameters.
+
+* Add: optional `model-config.json` to be used by Kotlin model generating script to control
+  location and name of generated models.
+
+## 0.5.0-beta-1
+
+* Fix: API Change
+
 ## 0.4.10
 
 * Fix: merge #7, isLast and isAfterLast checking removed for TYPE_FORWARD_ONLY ResultSet thanks
@@ -51,8 +268,8 @@
 ## 0.4.8
 
 * Fix: migrate was using string compare for current version and versions for finding later ones
-* Fix: parameter extraction should take quoted, double quoted and back-quoted strings into account.
-  Otherwise a string with `:\w+` will be treated as a parameter.
+* Fix: parameter extraction should take quoted, double quoted and back-quoted strings into
+  account. Otherwise a string with `:\w+` will be treated as a parameter.
 
 ## 0.4.6
 
@@ -145,7 +362,7 @@ To expand to `SELECT * FROM Table WHERE column in (?,?,?)` with parameters of `1
   table data. See:
 * Add: IntelliJ Ultimate Database Tools data extraction script to generate Kotlin enum from
   table data. See:
-  [Installing IntelliJ Ultimate Database Tools Extension Scripts](README.md#installing-intellij-ultimate-database-tools-extension-scripts)
+  [Installing IntelliJ Ultimate Database Tools Extension Scripts](README.md#installing-database-tools-extension-scripts)
 * Fix: table validation for out of order lines to ignore trailing , otherwise the last line out
   of order does not match.
 * Fix: init command when run on a database without `migrations` table will use db versions table
@@ -278,4 +495,8 @@ To expand to `SELECT * FROM Table WHERE column in (?,?,?)` with parameters of `1
 ## 0.1.0
 
 * Initial release
+
+[`enumerated-type`]: https://github.com/vsch/enumerated-type
+[`Generate Kotlin-Model.groovy`]: extensions/com.intellij.database/schema/Generate%20Kotlin-Model.groovy
+[`JavaScript-Enumerated-Value-Type.js`]: extensions/com.intellij.database/data/extractors/JavaScript-Enumerated-Value-Type.js
 

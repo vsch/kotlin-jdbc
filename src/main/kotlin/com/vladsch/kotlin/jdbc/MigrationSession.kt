@@ -4,7 +4,6 @@ import org.intellij.lang.annotations.Language
 import java.time.LocalDateTime
 
 class MigrationSession(val batchId: Int, val version: String, val migrations: Migrations) {
-
     data class Migration(
         val migration_id: Int,
         val version: String,

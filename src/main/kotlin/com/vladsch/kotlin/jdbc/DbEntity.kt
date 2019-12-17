@@ -16,7 +16,7 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
     ;
 
     companion object {
-        fun isEntityDirectory(name: String):Boolean {
+        fun isEntityDirectory(name: String): Boolean {
             return values().any { it.dbEntityDirectory == name }
         }
     }
@@ -45,13 +45,13 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
         return fileName + fileSuffix
     }
 
-    fun getEntityDirectory(dbDir: File, dbVersion: String, createDir: Boolean?): File {
-        val dbVersionDir = getVersionDirectory(dbDir, dbVersion, createDir)
+    fun getEntityDirectory(dbDir: File, dbProfile: String, dbVersion: String, createDir: Boolean?): File {
+        val dbVersionDir = getVersionDirectory(dbDir, dbProfile, dbVersion, createDir)
         return getEntityDirectory(dbVersionDir, createDir)
     }
 
-    fun getEntityResourceDirectory(dbVersion: String): File {
-        val dbVersionDir = File("/db") + dbVersion
+    fun getEntityResourceDirectory(dbProfile: String, dbVersion: String): File {
+        val dbVersionDir = File("/db/$dbProfile") + dbVersion
 
         // may need to create table directory
         val entityDir = dbVersionDir + this.dbEntityDirectory
@@ -119,12 +119,12 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
         return entityList
     }
 
-    fun getEntityFiles(dbDir: File, dbVersion: String, createDir: Boolean? = true): List<String> {
-        val entityDir = this.getEntityDirectory(dbDir, dbVersion, createDir)
+    fun getEntityFiles(dbDir: File, dbProfile: String, dbVersion: String, createDir: Boolean? = true): List<String> {
+        val entityDir = this.getEntityDirectory(dbDir, dbProfile, dbVersion, createDir)
         if (createDir == true) {
-            entityDir.ensureCreateDirectory("dbDir/dbVersion/${this.dbEntityDirectory}")
+            entityDir.ensureCreateDirectory("dbDir/dbProfile/dbVersion/${this.dbEntityDirectory}")
         } else if (createDir == false) {
-            entityDir.ensureExistingDirectory("dbDir/dbVersion/${this.dbEntityDirectory}")
+            entityDir.ensureExistingDirectory("dbDir/dbProfile/dbVersion/${this.dbEntityDirectory}")
         } else {
             return listOf()
         }
@@ -132,8 +132,8 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
         return getEntityFiles(entityDir)
     }
 
-    fun getEntityResourceFiles(resourceClass: Class<*>, dbVersion: String): List<String> {
-        val entityDir = this.getEntityResourceDirectory(dbVersion)
+    fun getEntityResourceFiles(resourceClass: Class<*>, dbProfile:String, dbVersion: String): List<String> {
+        val entityDir = this.getEntityResourceDirectory(dbProfile, dbVersion)
         return getResourceFiles(resourceClass, entityDir.path)
     }
 
@@ -141,8 +141,8 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
         return entityDir + (entityName + this.fileSuffix)
     }
 
-    fun getEntityFile(dbDir: File, dbVersion: String, entityName: String, createDir: Boolean? = true): File {
-        val entityDir = getEntityDirectory(dbDir, dbVersion, createDir)
+    fun getEntityFile(dbDir: File, dbProfile: String, dbVersion: String, entityName: String, createDir: Boolean? = true): File {
+        val entityDir = getEntityDirectory(dbDir, dbProfile, dbVersion, createDir)
         return getEntityFile(entityDir, entityName)
     }
 
@@ -163,7 +163,22 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
         }
     }
 
-    fun extractEntityName(dbEntityExtractor: DbEntityExtractor, entitySql: String):String? {
+    object MIGRATIONS_NAME_COMPARATOR : Comparator<String> {
+        override fun compare(o1: String?, o2: String?): Int {
+            val (num1, name1) = o1.extractLeadingDigits()
+            val (num2, name2) = o2.extractLeadingDigits()
+
+            return if (num1 != null && num2 != null) {
+                val nums = num1.compareTo(num2)
+                if (nums == 0) name1.compareTo(name2)
+                else nums
+            } else {
+                name1.compareTo(name2)
+            }
+        }
+    }
+
+    fun extractEntityName(dbEntityExtractor: DbEntityExtractor, entitySql: String): String? {
         val entityNameRegEx = dbEntityExtractor.getExtractEntityNameRegEx(this) ?: return null
         return extractEntityName(entityNameRegEx, entitySql)
     }
@@ -226,8 +241,8 @@ enum class DbEntity(val dbEntity: String, val displayName: String, val dbEntityD
         return entities
     }
 
-    fun getEntityResourceScripts(resourceClass: Class<*>, dbEntityExtractor: DbEntityExtractor, dbVersion: String): Map<String, EntityData> {
-        val entityDir = getEntityDirectory(File("/db"), dbVersion, null)
+    fun getEntityResourceScripts(resourceClass: Class<*>, dbEntityExtractor: DbEntityExtractor, dbProfile: String, dbVersion: String): Map<String, EntityData> {
+        val entityDir = getEntityDirectory(File("/db"), dbProfile, dbVersion, null)
         return getEntityResourceScripts(resourceClass, dbEntityExtractor, entityDir)
     }
 }

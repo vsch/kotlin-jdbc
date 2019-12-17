@@ -1,7 +1,60 @@
 # Kotlin-JDBC
 
 [![Build Status](https://travis-ci.org/vsch/kotlin-jdbc.svg)](https://travis-ci.org/vsch/kotlin-jdbc)
-[![Maven Central status](https://img.shields.io/maven-central/v/com.vladsch.kotlin-jdbc/kotlin-jdbc.svg)](https://search.maven.org/search?q=g:com.vladsch.kotlin-jdbc)
+[![Maven Central status](https://img.shields.io/maven-central/v/com.vladsch.kotlin-jdbc/kotlin-jdbc.svg)](https://search.maven.org/search?q=g:com.vladsch.kotlin-jdbc)<!-- @IGNORE PREVIOUS: link -->
+
+## Version 0.5.0 API Breaking Release
+
+:information_source: This branch is a rework with breaking changes to refactor models and
+related classes to eliminate having to specify identifier quoting in the model by creating the
+model for a database session. Which makes sense for a database model class.
+
+Biggest change is that the model now takes two template arguments: main model class and its
+associated data class with an optional session instance and identifier quoting string.
+
+If `session` is not given or `null` then default session will be used.
+
+If `quote` if not given or `null` then the connection `metaData.identifierQuoteString` will be
+used, anything else will use whatever string is passed in. Unless your jdbc driver does not
+provide identifier quoting, there is no need to use anything but the default.
+
+Companion object now only has the table name constant string.
+
+All other functions implemented in the `Model` with two abstract members: `toData()` returning
+the data class for the model and `operator invoke` for the factory function for the model. To
+get another instance of a model `myModel` invoke the model instance as a function `myModel()`.
+
+For models that do not need a data class `ModelNoData` is also available which only takes a
+single template argument, as was the case for the `Model` class in previous releases.
+
+Having the session instance information in the model simplifies using models because session no
+longer has to be specified for every method performing database access.
+
+Additionally, list results are simplified because neither the session nor the extractor needs to
+be passed, with `myModel.listData()` variations can be used or `myModel.listModel()` variations.
+
+Additionally there is now an `alias:String? = null` argument available for sql generating
+functions which will add a table alias to the table name and use the alias for disambiguating
+column names. If generating queries with multiple tables, set the `alias` to empty string `""`
+or the table name to have it added to the column references. An empty table alias or one equal
+to the table name will only be used for column references.
+
+[`Generate Kotlin-Model.groovy`] has been updated to generate the new model format from tables
+in the database and optionally use a `model-config.json` to provide table to generated model
+file.
+
+### :warning: 0.5.0-beta-6 Added *profileName* after `db/`
+
+Breaking change in resource `db/` adds profile name after `db/` to allow multi-database
+migrations, with `default` being the default profile name.
+
+To migrate previous `db/` structure move all directories other than `templates` under `db/` to
+`db/default`
+
+### :information_source: master branch is now Version 0.5
+### :information_source: Version 0.4.x moved to branch 0.4
+
+## Overview
 
 A light weight library that exposes JDBC API with the convenience of Kotlin and gets out of the
 way when it is not needed.
@@ -25,14 +78,16 @@ import java.sql.Timestamp
 
 // dbCase = true if database columns same as properties
 // dbCase = false if database columns are snake-case versions of property names
-class ValidModel(quote:String? = null) : Model<ValidModel>("tableName", dbCase = true, quote = quote) {
+class ValidModel(session:Session? = null, quote:String? = null) : ModelNoData<ValidModel>("tableName", dbCase = true) {
     var processId: Long? by db.autoKey
     var title: String by db
     var version: String by db
-    var optional: Int? by db           
-    var hasOwnColumnName: Int? by db.column("own_name")           
+    var optional: Int? by db
+    var hasOwnColumnName: Int? by db.column("own_name")
     var updatedAt: Timestamp? by db.auto
     var createdAt: Timestamp? by db.auto
+
+    override operator fun invoke() = ValidModel(_session, _quote)
 }
 ```
 
@@ -44,7 +99,7 @@ even easier to work with SQL queries. See
 
 IntelliJ Ultimate Database Tools extension script for conversion of SQL tables to a Model is
 also available. See
-[Installing IntelliJ Ultimate Database Tools Extension Script](#installing-intellij-ultimate-database-tools-extension-scripts).
+[Installing IntelliJ Ultimate Database Tools Extension Script](#installing-database-tools-extension-scripts).
 
 The library provides a simple migration command processor to implement migrate/rollback
 functionality with version tracking with each version containing a copy of database entities:
@@ -58,14 +113,14 @@ functions, procedures, tables, triggers and views. See [Migrations](#migrations)
 <dependency>
     <groupId>com.vladsch.kotlin-jdbc</groupId>
     <artifactId>kotlin-jdbc</artifactId>
-    <version>0.4.4</version>
+    <version>0.5.0</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```gradle
-compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.4.4"
+compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.5.0"
 ```
 
 ### Example
@@ -79,7 +134,7 @@ objects or json arrays.
 ```kotlin-a
 import com.vladsch.kotlin.jdbc.*
 
-val session = session("jdbc:h2:mem:hello", "user", "pass") 
+val session = session("jdbc:h2:mem:hello", "user", "pass")
 ```
 
 #### HikariCP
@@ -150,10 +205,10 @@ data class Member(
   val name: String?,
   val createdAt: java.time.ZonedDateTime)
 
-val toMember: (Row) -> Member = { row -> 
+val toMember: (Row) -> Member = { row ->
   Member(
-    row.int("id"), 
-    row.stringOrNull("name"), 
+    row.int("id"),
+    row.stringOrNull("name"),
     row.zonedDateTime("created_at")
   )
 }
@@ -192,7 +247,7 @@ parameters pass the name in both maps.
 
 ```kotlin-a
 sqlCall("""call storedProc(:inParam,:inOutParam,:outParam)""",
-	mapOf("inParam" to "Alice", "inOutParam" to "Bob"), 
+	mapOf("inParam" to "Alice", "inOutParam" to "Bob"),
 	mapOf("inOutParam" to "", "outParam" to ""))
 ```
 
@@ -202,7 +257,7 @@ maps:
 ```kotlin-a
 sqlCall("""call storedProc(:inParam,:inOutParam,:outParam)""")
 	.inParams("inParam" to "Alice")
-	.inOutParms("inOutParam" to "Bob") 
+	.inOutParms("inOutParam" to "Bob")
 	.outParams("outParam" to "")
 ```
 
@@ -226,23 +281,23 @@ passed to the prepared statement.
 
 #### Typed params
 
-In the case, the parameter type has to be explicitly stated, there's a wrapper class -
-`Parameter` that will help provide explicit type information.
+When the parameter type has to be explicitly stated there's a wrapper class - `Parameter` that
+will help provide explicit type information.
 
 ```kotlin-a
 val param = Parameter(param, String::class.java)
-sqlQuery("""select id, name 
-    from members 
-    where ? is null or ? = name""", 
+sqlQuery("""select id, name
+    from members
+    where ? is null or ? = name""",
     param, param)
 ```
 
 or also with the helper function `param`
 
 ```kotlin-a
-sqlQuery("""select id, name 
-    from members 
-    where ? is null or ? = name""", 
+sqlQuery("""select id, name
+    from members
+    where ? is null or ? = name""",
     null.param<String>(), null.param<String>())
 ```
 
@@ -320,8 +375,8 @@ and return an instance of something:
 Iteration helpers which will invoke a consumer for every row of result set data:
 
 * `session.forEach` to iterate over each row or a result set from an `SqlQuery` or `SqlCall`
-* `session.forEach` to iterate over each result set from a `SqlCall` and to process inout/out
-  parameters.
+* `session.executeCall` to iterate over each result set from a `SqlCall` and to process
+  inout/out parameters.
 
 Update and getting generated key(s):
 
@@ -360,9 +415,8 @@ If column names are the same as the property names then set `dbCase = true` for 
 constructor argument. If column names are snake-case versions of camelcase property names
 (lowercase with underscores between words) then set `dbCase = false` and the model will generate
 correct column names automatically. When needed, you can provide a column name explicitly via
-`.column("columnName")` making it independent of the property name. This function is available
-on any delegate provider so it can be combined with key, auto and default properties: `model`,
-`model.key`, `model.auto`, `model.default`
+`.column("columnName")` making it independent of the property name. This function can be
+combined with: `db`, `db.auto`, `db.autoKey`, `db.key`, `db.default`
 
 By default models allow public setters on properties marked `auto` or `autoKey`. To add
 validation forcing all `auto` properties to have no `set` method or have `private set` pass
@@ -372,27 +426,16 @@ Any property marked as `auto` generated will not be used in `UPDATE` or `INSERT`
 
 ##### Identifier Quoting
 
-Column and table names are not quoted by default. If the same database type is used on all
-connections then quoting should be set during initialization through `Model.databaseQuoting`.
-
-When multiple database quoting types are used for different sessions then quote string to be
-used by models should be passed to the model constructor based on the database type for the
-session. This means that models with different quoting strings.
+Each model is attached to a session. Column and table names are quoted by default using the
+connection's `metaData.identifierQuoteString`.
 
 ##### Model Generation
 
 For IntelliJ Ultimate a Database extension script can be installed which will generate models
 from the context menu of any table in the database tools window. See
-[Installing IntelliJ Ultimate Database Tools Extension Script](#installing-intellij-ultimate-database-tools-extension-scripts)
-
-##### Companion Helpers
-
-The model's companion implements helper functions for converting result set row to the data
-class, JSON object and creating list queries.
+[Installing Database Tools Extension Scripts](#installing-database-tools-extension-scripts)
 
 Result set row to model/json/data conversion:
-
-These return conversion function without identifier quoting option:
 
 * `val toModel: (Row) -> M = toModel()`
 * `val toData: (Row) -> D = toData()`
@@ -400,102 +443,118 @@ These return conversion function without identifier quoting option:
 
 These return conversion function with identifier quoting option:
 
-* `fun toModel(quote: String? = null): (Row) -> M`
-* `fun toData(quote: String? = null): (Row) -> D`
-* `fun toJson(quote: String? = null): (Row) -> JsonObject`
-
+**These need updating for version 0.5**
 
 List Query Helpers:
 
-* `fun listQuery(vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): SqlQuery`
-* `fun listQuery(params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): SqlQuery`
-* `fun listQuery(whereClause:String, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): SqlQuery`
-* `fun listQuery(whereClause:String, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): SqlQuery`
+<!-- @formatter:off -->
 
-List results:
+* `fun quoteIdentifier(id: String): String`
+* `fun appendSelectSql(out: Appendable, alias: String? = null): Appendable`
+* `fun appendListQuery(out: Appendable, params: Array<out Pair<String, Any?>>, alias: String? = null): Appendable`
+* `fun appendListQuery(out: Appendable, params: Map<String, Any?>, alias: String? = null): Appendable`
+* `fun listQuery(params: Map<String, Any?>, alias: String? = null): SqlQuery`
+* `fun listQuery(vararg params: Pair<String, Any?>, alias: String? = null): SqlQuery`
+* `fun listQuery(whereClause: String, params: Map<String, Any?>, alias: String? = null): SqlQuery`
 
-* `fun list(session: Session, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): List<D>`
-* `fun list(session: Session, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): List<D>`
-* `fun list(session: Session, whereClause:String, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): List<D>`
-* `fun list(session: Session, whereClause:String, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): List<D>`
+List Data results:
+
+* `fun listData(whereClause: String): List<Data>`
+* `fun listData(sqlQuery: SqlQuery): List<Data>`
+* `fun listData(params: Map<String, Any?>, alias: String? = null): List<Data>`
+* `fun listData(whereClause: String, params: Map<String, Any?>, alias: String? = null): List<Data>`
+
+List Model results:
+
+* `fun listModel(): List<Model>`
+* `fun listModel(whereClause: String): List<Model>`
+* `fun listModel(sqlQuery: SqlQuery): List<Model>`
+* `fun listModel(params: Map<String, Any?>, alias: String? = null): List<Model>`
+* `fun listModel(whereClause: String, params: Map<String, Any?>, alias: String? = null): List<Model>`
 
 JSON Array results:
 
-* `fun jsonArray(session: Session, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): JsonArray`
-* `fun jsonArray(session: Session, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): JsonArray`
-* `fun jsonArray(session: Session, whereClause:String, vararg params: Pair<String, Any?>, quote:String = ModelProperties.databaseQuoting): JsonArray`
-* `fun jsonArray(session: Session, whereClause:String, params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting): JsonArray`
+* `fun jsonArray(): JsonArray`
+* `fun jsonArray(whereClause: String): JsonArray`
+* `fun jsonArray(sqlQuery: SqlQuery): JsonArray`
+* `fun jsonArray(params: Map<String, Any?>, alias: String? = null): JsonArray`
+* `fun jsonArray(whereClause: String, params: Map<String, Any?>, alias: String? = null): JsonArray`
 
-```kotlin-a
-data class ValidData(
-    val processId: Long?,
-    val title: String,
-    val version: String,
-    val batch: Int?,
-    val updatedAt: String?,
-    val createdAt: String?
-)
+<!-- @formatter:on -->
 
-class ValidModel(quote:String? = null) : Model<ValidModel>(tableName, dbCase = true, quote = quote) {
-    var processId: Long? by db.auto.key
-    var title: String by db
-    var version: String by db
-    var batch: Int? by db.default(1)
-    var updatedAt: String? by db.auto
-    var createdAt: String? by db.auto
-
-    fun toData() = ValidData(
-        processId,
-        title,
-        version,
-        batch,
-        updatedAt,
-        createdAt
+```kotlin
+    data class ValidData(
+        val processId: Long?,
+        val noSetter: String,
+        val noSetter2: String,
+        val title: String,
+        val version: String,
+        val unknown: String?,
+        val createdAt: String?,
+        val createdAt2: String?
     )
 
-    companion object : ModelCompanion<ValidModel, ValidData> {
-        override val tableName = "tableName"
-        override fun createModel(quote:String?): ValidModel = ValidModel(quote)
-        override fun createData(model: ValidModel): ValidData = model.toData()
+    class ValidModel(session: Session? = session(), quote: String? = null) : Model<ValidModel, ValidData>(session, tableName, true, false, quote) {
+
+        var processId: Long? by db.key.auto; private set
+        val noSetter: String by db.auto
+        val noSetter2: String by db.autoKey
+        var title: String by db
+        var version: String by db
+        var unknown: String? by db
+        var createdAt: String? by db.auto; private set
+        val createdAt2: String? by db.auto
+
+        override fun invoke(): ValidModel {
+            return ValidModel(_session, _quote)
+        }
+
+        override fun toData(): ValidData {
+            return ValidData(processId, noSetter, noSetter2, title, version, unknown, createdAt, createdAt2)
+        }
+
+        companion object {
+            const val tableName = "TableName"
+        }
     }
-}
+
 
 fun useModel() {
     using(session(HikariCP.default())) { session ->
-        // get all rows from table as list
-        val modelList = ValidModel.list(session)
+        // get all rows from table as list of the data class
+        val modelList = ValidModel(session).listData()
 
-        val model = ValidModel()
+        val model = ValidModel(session)
         model.title = "title text"
         model.version = "V1.0"
 
         // execute an insert and set model's key properties from the keys returned by the database
         // batch will be set to 1 since it is not set in properties
-        model.insert(session)
+        model.insert()
 
         // this will delete the model and clear auto.key properties
-        model.delete(session)
+        model.delete()
 
         // this will delete the model but not clear auto.key properties
-        model.deleteKeepAutoKeys(session)
+        model.deleteKeepAutoKeys()
 
         // execute select query for model (based on keys) and load model
-        model.select(session)
+        model.select()
 
         // just insert, don't bother getting keys
-        model.insertIgnoreKeys(session)
+        model.insertIgnoreKeys()
 
         // take a snapshot of current properties
         model.snapshot()
         model.version = "V2.0"
 
         // will only update version since it is the only one changed, does automatic snapshot after update
-        model.update(session)
+        model.update()
 
-        // will only update version since it is the only one changed but will reload model from database 
+        // will only update version since it is the only one changed but will reload model from database
         // if updatedAt field is timestamped on update then it will be loaded with a new value
         model.version = "V3.0"
-        model.updateReload(session)
+        model.updateReload()
     }
 }
 ```
@@ -522,7 +581,12 @@ To get full benefit of SQL completions you should also define a database source 
 against which you are developing (or a local clone of it) and configure the SQL dialect for the
 database you are using.
 
-#### Installing IntelliJ Ultimate Database Tools Extension Scripts
+#### Installing Database Tools Extension Scripts
+
+:information_source: Database Tools are available on IntelliJ Ultimate and other IDEs but not in
+the IntelliJ Community Edition
+
+##### Generate Kotlin Models from Tables Script
 
 Download the groovy script for generating a `kotlin-jdbc` model:
 [Generate Kotlin-Model.groovy](extensions/com.intellij.database/schema/Generate%20Kotlin-Model.groovy)
@@ -537,13 +601,107 @@ introspection instead of JDBC in connection configuration.
 
 ![Scripted Extensions Generate Kotlin Model](assets/images/Scripted_Extensions_Generate_Kotlin-Model.png)
 
-Add
-[Generate Scala-Slick-Model.groovy](extensions/com.intellij.database/schema/Generate%20Scala-Slick-Model.groovy)
-for generating a Scala/Slick database model.
+If the a file `model-config.json` file exists in output directory or its along the parent path
+then it will be used for determining the models actual output file and package.
 
-[Kotlin-Enum.kt.js](extensions/com.intellij.database/data/extractors/Kotlin-Enum.kt.js) to
-convert result set data to Kotlin Enum definition. You need to add it to the `data/extractors`
-directory
+For example:
+
+```json
+{
+  "package-prefix" : "",
+  "remove-prefix" : "gen/main/kotlin/",
+  "skip-unmapped" : false,
+  "file-map": {
+    "play_evolutionModel.kt": "",
+    "migrationModel.kt": "",
+
+    "ProcessInstanceModel.kt": "gen/main/kotlin/com/vladsch/kotlin/models/process/ProcessInstanceModel.kt",
+    "ProcessModel.kt": "gen/main/kotlin/com/vladsch/kotlin/models/process/ProcessModel.kt",
+
+    "": "gen/main/kotlin/com/vladsch/kotlin/models/"
+  }
+}
+```
+
+* `remove-prefix` if present and matches the mapped file name prefix, will be removed from the
+  mapped file before prefixing with `package-prefix`
+* `package-prefix` if present will be prefixed to the generated package name
+* `skip-unmapped`, if `true`, any model names not present in the mapped will not be generated,
+  if `false` the models will be generated to the output directory. Ignored if empty file name
+  mapping exists.
+* `file-map`, map of model name to file path relative to `model-config.json` file location.
+  * an empty name entry will match any file not explicitly matched by other entries and allows
+    directing unmapped entries to a default location.
+  * if a model is mapped to an empty name then this model will not be generated.
+* script hardcoded parameters can also be changed in the config file to eliminate the need to
+  edit the script. If no value provided then script default will be used:
+  * `classFileNameSuffix`, default `"Model"`, appended to class file name
+  * `downsizeLongIdToInt`, default `true`, if `true` changes id columns which would be declared
+    `Long` to `Int`, change this to false to leave them as `Long`
+  * `fileExtension`, default `".kt"`, model extension
+  * `forceBooleanTinyInt`, default "", regex for column names marked as boolean when tinyint,
+    only needed if using jdbc introspection which does not report actual declared type so all
+    `tinyint` are `tinyint(3)`
+  * `snakeCaseTables`, default false, if true convert snake_case table names to Pascal case,
+    else leave as is
+  * `indent`, default 4 spaces, string to use for each indent level
+
+:information_source: the easiest way to generate the file-map is first generate models with
+default mapping the file map. Move them to the desired sub-directories and then use the IDE
+`Copy Relative Path` context menu action and multi-caret editing or or a script to generate the
+mapping from existing directory structure and content. If any tables are added in the future
+they will automatically generate in the root and can be moved to the desired sub-directory and
+mapping added to the file-map.
+
+Will not generate models for tables `play_evolutions` and `migrations`, will output `AuditLogs`
+table model to `app/audit/models/` subdirectory with package set to `app.audit.models`
+
+All other tables, if selected will be generated to the output directory with package set to
+`com.sample`
+
+The intended use case is to have a generated models directory with the configuration file and
+all generated models in the project directory. When generating models, select any sub-directory
+of the project and the files will be generated in the correct location, especially if default
+file location mapping was provided.
+
+If you need to modify the models after they are generated, it is best to copy the auto-generated
+models to another directory as the source used in the project. Subsequent auto-generated models
+should still be generated into the same directory and compared and/or merged into manually
+changed model using the compare directory/file action of the IDE.
+
+##### Generate Scala Slick Models from Tables
+
+Add [`Generate Scala-Slick-Model.groovy`] for generating a Scala/Slick database model.
+
+* In addition to the Kotlin model generator `model-config.json` configuration values Scala model
+  generator has additional configuration properties to control model generation:
+  * `classFileNameSuffix`, default `"Model"`, appended to class file name
+  * downsizeLongIdToInt, default `true`, if true changes id columns which would be declared
+    `Long` to `Int`, change this to `false` to leave them as `Long`
+  * `fileExtension`, default `".scala"`, model extension
+  * `forceBooleanTinyInt`, default "", regex for column names marked as boolean when tinyint,
+    only needed if using jdbc introspection which does not report actual declared type so all
+    `tinyint` are `tinyint(3)`
+  * `snakeCaseTables`, default `false`, if `true` convert snake_case table names to Pascal case,
+    else leave as is
+  * `indent`, default 2 spaces, string to use for each indent level
+  * `addToApi`, default `true`, create database Model class with `Date`/`Time`/`Timestamp` field
+    types and an Api class with `String` data types for these fields. Intended to be used for
+    converting to/from JSON when communicating with a JavaScript client. The Api class has
+    methods `toModel()` and `fromModel()` to easily convert between Api and database model
+    class.
+
+    :information_source:The Api class will only be created if there are date/time fields in the
+    model.
+
+  * `apiFileNameSuffix`, default `"Gen"`, appended to file name for the generated Api class.
+  * `convertTimeBasedToString`, default `false`, to convert all date, time and timestamp to
+    String in the model
+
+##### Result Set Conversion Scripts
+
+[`Kotlin-Enum.kt.js`] to convert result set data to Kotlin Enum definition. You need to add it
+to the `data/extractors` directory
 
 ![Scripted_Extensions_Generate-Kotlin-Model](assets/images/Scripted_Extensions_Data_Extractors.png)
 
@@ -567,7 +725,7 @@ Result set:
 
 Generated Kotlin enum:
 
-```kotlin-a
+```kotlin
 enum class ChangeHistoryTypes(val id: Int, val type: String) {
   PROCESS(1, "Process"),
   FILE(2, "File"),
@@ -583,12 +741,10 @@ enum class ChangeHistoryTypes(val id: Int, val type: String) {
 ```
 
 A script for generating a JavaScript enum based on [`enumerated-type`] npm package will generate
-an enum usable in JavaScript
-[JavaScript-Enumerated-Value-Type.kt.js](extensions/com.intellij.database/data/extractors/JavaScript-Enumerated-Value-Type.kt.js)
+an enum usable in JavaScript [`JavaScript-Enumerated-Value-Type.js`]
 
-A script for generating a markdown table for the table data
-[Markdown-Table.md.js](extensions/com.intellij.database/data/extractors/Markdown-Table.md.js)
-Note: the table above was generated with this script.
+A script for generating a markdown table for the table data [`Markdown-Table.md.js`]. The table
+above was generated with this script.
 
 ## Migrations
 
@@ -610,25 +766,27 @@ integer and meta is any string. Only the Vv portion is required. Minor, patch an
 optional. The underscore separating version parts belongs to the next element. i.e. the correct
 version is `V1` not `V1_`, `V1_2` and not `V1_2_`, etc.
 
-Each version has the following directory structure and database entity script naming
+Each profile/version has the following directory structure and database entity script naming
 conventions:
 
 ```
 db/
-└── V0_0_0
-    ├── functions
-    │   └── sample-function.udf.sql
-    ├── migrations
-    │   ├── 0.sample-migration.down.sql
-    │   └── 0.sample-migration.up.sql
-    ├── procedures
-    │   └── sample-stored-procedure.prc.sql
-    ├── tables
-    │   └── sample-table.tbl.sql
-    ├── triggers
-    │   └── sample-trigger.trg.sql
-    └── views
-        └── sample-view.view.sql
+└── profileName
+    └── schema
+    └── V0_0_0
+        ├── functions
+        │   └── sample-function.udf.sql
+        ├── migrations
+        │   ├── 0.sample-migration.down.sql
+        │   └── 0.sample-migration.up.sql
+        ├── procedures
+        │   └── sample-stored-procedure.prc.sql
+        ├── tables
+        │   └── sample-table.tbl.sql
+        ├── triggers
+        │   └── sample-trigger.trg.sql
+        └── views
+            └── sample-view.view.sql
 ```
 
 Database Entities:
@@ -695,13 +853,10 @@ run the `dump-tables` command.
 
 Commands:
 
-* init - initialize migrations table and migrate all to given version or latest version based on
-  database table match to table schemas contained in versions
-
-* path "resources/db" - set path to resources/db directory of the project where version
+* `path "resources/db"` - set path to resources/db directory of the project where version
   information is stored.
 
-* version "versionID" - set specific version for following commands
+* `version "versionID"` - set specific version for following commands
 
   "versionID" must be of the regex form `V\d+(_\d+(_\d+(_.*)?)?)?`
 
@@ -710,16 +865,27 @@ Commands:
 
   The metadata if present will be compared using regular string comparison, ie. normal sort.
 
-* new-major - create a new version directory with major version incremented, from current or
+* `profile "profileName"` - set specific db profile name to use for the commands
+
+* `init` - initialize migrations table and migrate all to given version or latest version based
+  on database table match to table schemas contained in versions
+
+  if profile is not given then will init all defined profiles
+
+* `new-major` - create a new version directory with major version incremented, from current or
   requested version.
 
-* new-minor - create a new version directory with minor version incremented, from current or
+  specific profile name is required
+
+* `new-minor` - create a new version directory with minor version incremented, from current or
   requested version.
 
-* new-patch - create a new version directory with patch version incremented, from current or
+* `new-patch` - create a new version directory with patch version incremented, from current or
   requested version.
 
-* new-version - create a new version directory for the requested version. The directory cannot
+  specific profile name is required
+
+* `new-version` - create a new version directory for the requested version. The directory cannot
   already exist. If the version is not provided then the current version with its patch version
   number incremented will be used.
 
@@ -728,59 +894,97 @@ Commands:
   If there is a previous version to the one requested then all its entity scripts will be copied
   to the new version directory.
 
-* new-evolution "play/evolutions/directory" create a new play evolution file from current or
+  specific profile name is required
+
+* `import-evolutions "play/evolutions/directory" "min" "max"`. Import evolutions converting them
+  to migrations in the current version. `min` is the minimum evolution to import. `max` is
+  optional and if provided gives the maximum evolution number to import.
+
+  specific profile name is required
+
+* `ne`w-evolution "play/evolutions/directory" create a new play evolution file from current or
   requested version migrations and rollbacks in the requested directory.
 
-* new-migration "title" - create a new up/down migration script files in the requested (or
+  specific profile name is required
+
+* `new-migration "title"` - create a new up/down migration script files in the requested (or
   current) version's migrations directory. The file name will be in the form: N.title.D.sql
   where N is numeric integer 1..., D is up or down and title is the title passed command.
   Placeholders in the file: `__VERSION__` will be replaced with the version for which this file
   is generated and `__TITLE__` with the "title" passed to the command.
 
-* new-function "name" - create a new function file using resources/db/templates customized
+  profile name defaults to `default` if one is not given
+
+* `new-function "name"` - create a new function file using resources/db/templates customized
   template or built-in if none Placeholders in the file: `__VERSION__` will be replaced with the
   version for which this file is generated and `__NAME__` with the "name" passed to the command.
 
-* new-procedure "name" - create a new procedure file using resources/db/templates customized
+  profile name defaults to `default` if one is not given
+
+* `new-procedure "name"` - create a new procedure file using resources/db/templates customized
   template or built-in if none Placeholders in the file: `__VERSION__` will be replaced with the
   version for which this file is generated and `__NAME__` with the "name" passed to the command.
 
-* new-trigger "name" - create a new trigger file using resources/db/templates customized
+  profile name defaults to `default` if one is not given
+
+* `new-trigger "name"` - create a new trigger file using resources/db/templates customized
   template or built-in if none Placeholders in the file: `__VERSION__` will be replaced with the
   version for which this file is generated and `__NAME__` with the "name" passed to the command.
 
-* new-view "name" - create a new view file using resources/db/templates customized template or
+  profile name defaults to `default` if one is not given
+
+* `new-view "name"` - create a new view file using resources/db/templates customized template or
   built-in if none Placeholders in the file: `__VERSION__` will be replaced with the version for
   which this file is generated and `__NAME__` with the "name" passed to the command.
 
-* migrate - migrate to given version or to latest version
+* `migrate` - migrate to given version or to latest version
 
-* rollback - rollback to given version or to previous version
+  applies command to all defined profiles if profile name is not given
 
-* dump-tables - dump database tables
+* `rollback` - rollback to given version or to previous version
 
-* create-tables - create all tables which exist in the version tables directory and which do not
-  exist in the database
+  specific profile name is required
 
-* validate-tables - validate that version table scripts and database agree
+* `dump-tables` - dump database tables
 
-* update-all - update all: functions, views, procedures, triggers. This runs the scripts
+  applies command to all defined profiles if profile name is not given
+
+* `create-tables` - create all tables which exist in the version tables directory and which do
+  not exist in the database
+
+  applies command to all defined profiles if profile name is not given
+
+* `validate-tables` - validate that version table scripts and database agree
+
+  applies command to all defined profiles if profile name is not given
+
+* `update-all` - update all: functions, views, procedures, triggers. This runs the scripts
   corresponding to the database object for the requested version.
 
-* update-procedures  
-  update-procs - update stored procedures
+  applies command to all defined profiles if profile name is not given
 
-* update-functions  
-  update-funcs - update functions
+* `update-procedures` `update-procs` - update stored procedures
 
-* update-triggers - update triggers
+  applies command to all defined profiles if profile name is not given
 
-* update-schema - update `schema` directory with entities from selected version (or current if
+* `update-functions` `update-funcs` - update functions
+
+  applies command to all defined profiles if profile name is not given
+
+* `update-triggers` - update triggers
+
+  applies command to all defined profiles if profile name is not given
+
+* `update-schema` - update `schema` directory with entities from selected version (or current if
   none given)
 
-* update-views - update views
+  applies command to all defined profiles if profile name is not given
 
-* exit - exit application
+* `update-views` - update views
+
+  applies command to all defined profiles if profile name is not given
+
+* `exit` - exit application
 
 #### Customizing Templates used by `new-...` command
 
@@ -807,8 +1011,15 @@ db/
 
 (The MIT License)
 
-Copyright (c) 2018 - Vladimir Schneider  
 Copyright (c) 2015 - Kazuhiro Sera
 
+Copyright (c) 2018-2019 - Vladimir Schneider
+
 [`enumerated-type`]: https://github.com/vsch/enumerated-type
+[`Generate Kotlin-Model.groovy`]: https://github.com/vsch/kotlin-jdbc/blob/master/extensions/com.intellij.database/schema/Generate%20Kotlin-Model.groovy
+[`Generate Scala-Slick-Model.groovy`]: extensions/com.intellij.database/schema/Generate%20Scala-Slick-Model.groovy
+[`JavaScript-Enumerated-Value-Type.js`]: extensions/com.intellij.database/data/extractors/JavaScript-Enumerated-Value-Type.js
+[`Kotlin-Enum.kt.js`]: extensions/com.intellij.database/data/extractors/Kotlin-Enum.js
+[`Markdown-Table.md.js`]: extensions/com.intellij.database/data/extractors/Markdown-Table.md.js
+[enumerated-type]: https://github.com/vsch/enumerated-type
 
