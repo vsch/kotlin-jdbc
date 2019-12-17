@@ -12,6 +12,16 @@ object HikariCP {
         return init("default", url, username, password)
     }
 
+    fun custom(name: String, custom: HikariDataSource) {
+        val existing: HikariDataSource? = pools[name]
+        if (existing != null && existing.isClosed) {
+            existing.close()
+        }
+        pools.put(name, custom)
+    }
+
+    fun defaultCustom(custom: HikariDataSource) = custom("default", custom)
+
     fun init(name: String, url: String, username: String, password: String): HikariDataSource {
         val config: HikariConfig = HikariConfig()
         config.jdbcUrl = url
