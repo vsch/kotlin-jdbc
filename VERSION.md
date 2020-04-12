@@ -1,10 +1,11 @@
 # Version History
 
-[TOC]: # " "
+[TOC]: # ""
 
 - [TODO](#todo)
-    - [High Priority](#high-priority)
+  - [High Priority](#high-priority)
 - [0.5.0 API Breaking Release](#050-api-breaking-release)
+- [0.5.2](#052)
 - [0.5.0](#050)
 - [0.5.0-beta-8](#050-beta-8)
 - [0.5.0-beta-7](#050-beta-7)
@@ -103,6 +104,10 @@ to the table name will only be used for column references.
 
 [`Generate Kotlin-Model.groovy`] has been updated to generate the new model format from tables
 in the database.
+
+## 0.5.2
+
+* Fix: #17, Condition WHERE IN not working
 
 ## 0.5.0
 
@@ -503,7 +508,7 @@ To expand to `SELECT * FROM Table WHERE column in (?,?,?)` with parameters of `1
 
 * Initial release
 
-[`enumerated-type`]: https://github.com/vsch/enumerated-type
 [`Generate Kotlin-Model.groovy`]: extensions/com.intellij.database/schema/Generate%20Kotlin-Model.groovy
 [`JavaScript-Enumerated-Value-Type.js`]: extensions/com.intellij.database/data/extractors/JavaScript-Enumerated-Value-Type.js
+[`enumerated-type`]: https://github.com/vsch/enumerated-type
 

@@ -1,8 +1,8 @@
 package com.vladsch.kotlin.jdbc
 
-import org.junit.Test
 //import kotlin.test.assertEquals
 import org.junit.Assert.assertEquals
+import org.junit.Test
 
 class NamedParamTest {
     companion object {
@@ -150,6 +150,33 @@ class NamedParamTest {
                 assertEquals("""SELECT * FROM table t WHERE t.a IN (?,?,?) AND t.b = ?""", cleanStatement.normalizeSpaces())
                 assertEquals(mapOf("param" to listOf(0), "paramB" to listOf(3)), query.replacementMap)
                 assertEquals(listOf<Any?>(0, 1, 2, 10), query.getParams())
+            }
+        }
+
+        describe("should extract a single list param before single param") {
+            withQueries(
+                """SELECT * FROM table t WHERE t.a IN (:param) AND t.b = :paramB""") { query ->
+                query.params("param" inTo listOf(1), "paramB" inTo listOf(10))
+
+                val cleanStatement = query.cleanStatement
+
+                assertEquals("""SELECT * FROM table t WHERE t.a IN (?) AND t.b = ?""", cleanStatement.normalizeSpaces())
+                assertEquals(mapOf("param" to listOf(0), "paramB" to listOf(1)), query.replacementMap)
+                assertEquals(listOf<Any?>(1, 10), query.getParams())
+            }
+        }
+
+        // issue: #17
+        describe("should extract a single list param of one element") {
+            withQueries(
+                """SELECT * FROM country WHERE id IN (:ids)""") { query ->
+                query.inParams("ids" to listOf(1))
+
+                val cleanStatement = query.cleanStatement
+
+                assertEquals("""SELECT * FROM country WHERE id IN (?)""", cleanStatement.normalizeSpaces())
+                assertEquals(mapOf("ids" to listOf(0)), query.replacementMap)
+                assertEquals(listOf<Any?>(1), query.getParams())
             }
         }
 

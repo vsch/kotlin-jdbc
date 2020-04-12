@@ -8,6 +8,7 @@ abstract class SqlQueryBase<T : SqlQueryBase<T>>(
     params: List<Any?> = listOf(),
     namedParams: Map<String, Any?> = mapOf()
 ) {
+
     protected val params = ArrayList(params.asParamList())
     protected val namedParams: HashMap<String, Parameter<*>> = HashMap(namedParams.asParamMap())
 
@@ -99,7 +100,10 @@ abstract class SqlQueryBase<T : SqlQueryBase<T>>(
             if (param.value is Collection<*>) {
                 param.value.forEachIndexed { idx, paramItem ->
                     occurrences.forEach {
-                        stmt.setTypedParam(it + idx + 1, paramItem, param)
+                        when (paramItem) {
+                            is Parameter<*> -> stmt.setTypedParam(it + idx + 1, param)
+                            else -> stmt.setParam(it + idx + 1, paramItem)
+                        }
                     }
                 }
             } else {

@@ -72,6 +72,59 @@ create table members (
     }
 
     @Test
+    fun sessionUsageIssue17() {
+        using(borrowConnection()) { conn ->
+
+            val session = SessionImpl(Connection(conn, driverName))
+
+            session.execute(sqlQuery("drop table members if exists"))
+            session.execute(sqlQuery("""
+create table members (
+  id serial not null primary key,
+  name varchar(64),
+  created_at timestamp not null
+)
+        """))
+            session.update(sqlQuery(insert, "China", Date()))
+            session.update(sqlQuery(insert, "Russia", Date()))
+            session.update(sqlQuery(insert, "USA", Date()))
+
+            val ids: List<Int> = session.list(sqlQuery("select id from members")) { row -> row.int("id") }
+            assertEquals(3, ids.size)
+
+            val members: List<Member> = session.list(sqlQuery("select id, name, created_at from members"), toMember)
+            assertEquals(3, members.size)
+
+            var count = 0
+            session.forEach(sqlQuery("select id from members")) { row ->
+                count++
+                assertNotNull(row.int("id"))
+            }
+            assertEquals(3, count)
+
+            val nameQuery = "select id, name, created_at from members where name = ?"
+            val alice: Member? = session.first(sqlQuery(nameQuery, "China"), toMember)
+            assertNotNull(alice)
+
+            val bob: Member? = session.first(sqlQuery(nameQuery, "Russia"), toMember)
+            assertNotNull(bob)
+
+            val chris: Member? = session.first(sqlQuery(nameQuery, "USA"), toMember)
+            assertNotNull(chris)
+
+            val q = sqlQuery("SELECT * FROM members WHERE id IN (:ids)")
+                .inParams("ids" to listOf(1))
+
+            val countries: List<Member> = session.list(q, toMember)
+            count = countries.size
+            assertEquals(1, count)
+
+            count = session.count(q)
+            assertEquals(1, count)
+        }
+    }
+
+    @Test
     fun addNewWithId() {
         using(borrowConnection()) { conn ->
             val session = SessionImpl(Connection(conn, driverName))
