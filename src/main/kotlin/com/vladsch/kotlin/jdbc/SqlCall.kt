@@ -6,70 +6,74 @@ import java.sql.PreparedStatement
 class SqlCall(
     statement: String,
     params: List<Any?> = listOf(),
-    inputParams: Map<String, Any?> = mapOf(),
-    outputParams: Map<String, Any> = mapOf()
-) : SqlQuery(statement, params, inputParams) {
+    namedParams: Map<String, Any?> = mapOf()
+) : SqlQueryBase<SqlCall>(statement, params, namedParams) {
 
-    protected val outputParams = HashMap(outputParams)
+    @Deprecated(message = "Use directional parameter construction with to/inTo, outTo, inOutTo infix functions")
+    constructor(
+        statement: String,
+        params: List<Any?> = listOf(),
+        inputParams: Map<String, Any?> = mapOf(),
+        outputParams: Map<String, Any> = mapOf()
+    ) : this(statement, params, inputParams.asParamMap(InOut.IN)) {
+        params(outputParams.asParamMap(InOut.OUT))
+    }
 
-    override fun populateNamedParam(stmt: PreparedStatement, paramName: String, occurrences: List<Int>) {
-        super.populateNamedParam(stmt, paramName, occurrences)
+    override fun populateNamedParams(stmt: PreparedStatement) {
+        super.populateNamedParams(stmt)
 
-        if (outputParams.containsKey(paramName)) {
-            // setup out or inout param
-            (stmt as CallableStatement).registerOutParameter(paramName, outputParams[paramName].param().sqlType())
+        stmt as CallableStatement? ?: return
+
+        forEachNamedParam(InOut.OUT) { paramName, param, occurrences ->
+            require(occurrences.size == 1) { "Output parameter $paramName should have exactly 1 occurrence, got ${occurrences.size}" }
+            stmt.registerOutParameter(occurrences.first() + 1, param.sqlType())
         }
     }
 
-    override fun params(vararg params: Any?): SqlCall {
-        return super.params(*params) as SqlCall
+    private fun outputParamIndices(stmt: CallableStatement): Map<String, Int> {
+        val params = HashMap<String, Int>()
+        forEachNamedParam(InOut.OUT) { paramName, _, occurrences ->
+            require(occurrences.size == 1) { "Output parameter $paramName should have exactly 1 occurrence, got ${occurrences.size}" }
+            params[paramName] = occurrences.first() + 1
+        }
+        return params
     }
 
-    override fun paramsArray(params: Array<out Any?>): SqlCall {
-        return super.paramsArray(params) as SqlCall
+    fun handleResults(stmt: CallableStatement, stmtProc: (results: SqlCallResults) -> Unit) {
+        val results = stmt.execute();
+        val outputParams = outputParamIndices(stmt as CallableStatement)
+        val callableOutParams = SqlCallResults(stmt, results, outputParams)
+        stmtProc.invoke(callableOutParams)
     }
 
-    override fun paramsList(params: Collection<Any?>): SqlCall {
-        return super.paramsList(params) as SqlCall
+    @Deprecated(message = "Use Session.executeCall which handles out parameters")
+    fun outParamIndex(paramName: String): Int {
+        require(outputParams.containsKey(paramName)) { "Parameter $paramName is not an outParam" }
+        require(replacementMap[paramName]?.size == 1) { "Output parameter $paramName should have exactly 1 occurrence, got ${replacementMap[paramName]?.size}" }
+        return replacementMap[paramName]?.first()!! + 1
     }
 
-    override fun inParams(params: Map<String, Any?>): SqlCall {
-        return super.inParams(params) as SqlCall
-    }
-
-    override fun inParams(vararg params: Pair<String, Any?>): SqlCall {
-        return super.inParams(*params) as SqlCall
-    }
-
-    override fun inParamsArray(params: Array<out Pair<String, Any?>>): SqlCall {
-        return super.inParamsArray(params) as SqlCall
-    }
-
+    @Deprecated(message = "Use directional parameter construction with to/inTo, outTo, inOutTo infix functions", replaceWith = ReplaceWith("params"))
     fun inOutParams(params: Map<String, Any?>): SqlCall {
-        outputParams.putAll(params)
-        inParams(params)
-        return this
+        return params(params.asParamMap(InOut.IN_OUT))
     }
 
+    @Deprecated(message = "Use directional parameter construction with to/inTo, outTo, inOutTo infix functions", replaceWith = ReplaceWith("params"))
     fun inOutParams(vararg params: Pair<String, Any?>): SqlCall {
-        outputParams.putAll(params)
-        inParamsArray(params)
-        return this
+        return params(params.asParamMap(InOut.IN_OUT))
     }
 
+    @Deprecated(message = "Use directional parameter construction with to/inTo, outTo, inOutTo infix functions", replaceWith = ReplaceWith("params"))
     fun outParams(params: Map<String, Any?>): SqlCall {
-        outputParams.putAll(params)
-        resetDetails()
-        return this
+        return params(params.asParamMap(InOut.OUT))
     }
 
+    @Deprecated(message = "Use directional parameter construction with to/inTo, outTo, inOutTo infix functions", replaceWith = ReplaceWith("params"))
     fun outParams(vararg params: Pair<String, Any?>): SqlCall {
-        outputParams.putAll(params)
-        resetDetails()
-        return this
+        return params(params.asParamMap(InOut.OUT))
     }
 
     override fun toString(): String {
-        return "SqlCall(outputParams=$outputParams) ${super.toString()}"
+        return "SqlCall(statement='$statement', params=${params.map { it.value }}, namedParams=${namedParams.map { it.key to it.value.value }}, replacementMap=$replacementMap, cleanStatement='$cleanStatement')"
     }
 }

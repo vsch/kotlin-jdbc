@@ -3,7 +3,7 @@
 [![Build Status](https://travis-ci.org/vsch/kotlin-jdbc.svg)](https://travis-ci.org/vsch/kotlin-jdbc)
 [![Maven Central status](https://img.shields.io/maven-central/v/com.vladsch.kotlin-jdbc/kotlin-jdbc.svg)](https://search.maven.org/search?q=g:com.vladsch.kotlin-jdbc)<!-- @IGNORE PREVIOUS: link -->
 
-## Version 0.5 API Breaking Release
+## Version 0.5.0 API Breaking Release
 
 :information_source: This branch is a rework with breaking changes to refactor models and
 related classes to eliminate having to specify identifier quoting in the model by creating the
@@ -43,13 +43,16 @@ to the table name will only be used for column references.
 in the database and optionally use a `model-config.json` to provide table to generated model
 file.
 
-### :warning: 0.5.0-beta-6 Adds *profileName* after `db/`
+### :warning: 0.5.0-beta-6 Added *profileName* after `db/`
 
 Breaking change in resource `db/` adds profile name after `db/` to allow multi-database
 migrations, with `default` being the default profile name.
 
 To migrate previous `db/` structure move all directories other than `templates` under `db/` to
 `db/default`
+
+### :information_source: master branch is now Version 0.5
+### :information_source: Version 0.4.x moved to branch 0.4
 
 ## Overview
 
@@ -110,14 +113,14 @@ functions, procedures, tables, triggers and views. See [Migrations](#migrations)
 <dependency>
     <groupId>com.vladsch.kotlin-jdbc</groupId>
     <artifactId>kotlin-jdbc</artifactId>
-    <version>0.5.0-beta-7</version>
+    <version>0.5.0</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```gradle
-compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.5.0-beta-7"
+compile "com.vladsch.kotlin-jdbc:kotlin-jdbc:0.5.0"
 ```
 
 ### Example
@@ -278,8 +281,8 @@ passed to the prepared statement.
 
 #### Typed params
 
-In the case, the parameter type has to be explicitly stated, there's a wrapper class -
-`Parameter` that will help provide explicit type information.
+When the parameter type has to be explicitly stated there's a wrapper class - `Parameter` that
+will help provide explicit type information.
 
 ```kotlin-a
 val param = Parameter(param, String::class.java)
@@ -372,8 +375,8 @@ and return an instance of something:
 Iteration helpers which will invoke a consumer for every row of result set data:
 
 * `session.forEach` to iterate over each row or a result set from an `SqlQuery` or `SqlCall`
-* `session.forEach` to iterate over each result set from a `SqlCall` and to process inout/out
-  parameters.
+* `session.executeCall` to iterate over each result set from a `SqlCall` and to process
+  inout/out parameters.
 
 Update and getting generated key(s):
 
@@ -412,9 +415,8 @@ If column names are the same as the property names then set `dbCase = true` for 
 constructor argument. If column names are snake-case versions of camelcase property names
 (lowercase with underscores between words) then set `dbCase = false` and the model will generate
 correct column names automatically. When needed, you can provide a column name explicitly via
-`.column("columnName")` making it independent of the property name. This function is available
-on any delegate provider so it can be combined with key, auto and default properties: `model`,
-`model.key`, `model.auto`, `model.default`
+`.column("columnName")` making it independent of the property name. This function can be
+combined with: `db`, `db.auto`, `db.autoKey`, `db.key`, `db.default`
 
 By default models allow public setters on properties marked `auto` or `autoKey`. To add
 validation forcing all `auto` properties to have no `set` method or have `private set` pass
@@ -445,36 +447,40 @@ These return conversion function with identifier quoting option:
 
 List Query Helpers:
 
-* `fun listQuery(vararg params: Pair<String, Any?>, quote:String =
-  ModelProperties.databaseQuoting): SqlQuery`
-* `fun listQuery(params: Map<String, Any?>, quote:String = ModelProperties.databaseQuoting):
-  SqlQuery`
-* `fun listQuery(whereClause:String, vararg params: Pair<String, Any?>, quote:String =
-  ModelProperties.databaseQuoting): SqlQuery`
-* `fun listQuery(whereClause:String, params: Map<String, Any?>, quote:String =
-  ModelProperties.databaseQuoting): SqlQuery`
+<!-- @formatter:off -->
 
-List results:
+* `fun quoteIdentifier(id: String): String`
+* `fun appendSelectSql(out: Appendable, alias: String? = null): Appendable`
+* `fun appendListQuery(out: Appendable, params: Array<out Pair<String, Any?>>, alias: String? = null): Appendable`
+* `fun appendListQuery(out: Appendable, params: Map<String, Any?>, alias: String? = null): Appendable`
+* `fun listQuery(params: Map<String, Any?>, alias: String? = null): SqlQuery`
+* `fun listQuery(vararg params: Pair<String, Any?>, alias: String? = null): SqlQuery`
+* `fun listQuery(whereClause: String, params: Map<String, Any?>, alias: String? = null): SqlQuery`
 
-* `fun list(session: Session, vararg params: Pair<String, Any?>, quote:String =
-  ModelProperties.databaseQuoting): List<D>`
-* `fun list(session: Session, params: Map<String, Any?>, quote:String =
-  ModelProperties.databaseQuoting): List<D>`
-* `fun list(session: Session, whereClause:String, vararg params: Pair<String, Any?>,
-  quote:String = ModelProperties.databaseQuoting): List<D>`
-* `fun list(session: Session, whereClause:String, params: Map<String, Any?>, quote:String =
-  ModelProperties.databaseQuoting): List<D>`
+List Data results:
+
+* `fun listData(whereClause: String): List<Data>`
+* `fun listData(sqlQuery: SqlQuery): List<Data>`
+* `fun listData(params: Map<String, Any?>, alias: String? = null): List<Data>`
+* `fun listData(whereClause: String, params: Map<String, Any?>, alias: String? = null): List<Data>`
+
+List Model results:
+
+* `fun listModel(): List<Model>`
+* `fun listModel(whereClause: String): List<Model>`
+* `fun listModel(sqlQuery: SqlQuery): List<Model>`
+* `fun listModel(params: Map<String, Any?>, alias: String? = null): List<Model>`
+* `fun listModel(whereClause: String, params: Map<String, Any?>, alias: String? = null): List<Model>`
 
 JSON Array results:
 
-* `fun jsonArray(session: Session, vararg params: Pair<String, Any?>, quote:String =
-  ModelProperties.databaseQuoting): JsonArray`
-* `fun jsonArray(session: Session, params: Map<String, Any?>, quote:String =
-  ModelProperties.databaseQuoting): JsonArray`
-* `fun jsonArray(session: Session, whereClause:String, vararg params: Pair<String, Any?>,
-  quote:String = ModelProperties.databaseQuoting): JsonArray`
-* `fun jsonArray(session: Session, whereClause:String, params: Map<String, Any?>, quote:String =
-  ModelProperties.databaseQuoting): JsonArray`
+* `fun jsonArray(): JsonArray`
+* `fun jsonArray(whereClause: String): JsonArray`
+* `fun jsonArray(sqlQuery: SqlQuery): JsonArray`
+* `fun jsonArray(params: Map<String, Any?>, alias: String? = null): JsonArray`
+* `fun jsonArray(whereClause: String, params: Map<String, Any?>, alias: String? = null): JsonArray`
+
+<!-- @formatter:on -->
 
 ```kotlin
     data class ValidData(
@@ -847,10 +853,10 @@ run the `dump-tables` command.
 
 Commands:
 
-* path "resources/db" - set path to resources/db directory of the project where version
+* `path "resources/db"` - set path to resources/db directory of the project where version
   information is stored.
 
-* version "versionID" - set specific version for following commands
+* `version "versionID"` - set specific version for following commands
 
   "versionID" must be of the regex form `V\d+(_\d+(_\d+(_.*)?)?)?`
 
@@ -859,27 +865,27 @@ Commands:
 
   The metadata if present will be compared using regular string comparison, ie. normal sort.
 
-* profile "profileName" - set specific db profile name to use for the commands
+* `profile "profileName"` - set specific db profile name to use for the commands
 
-* init - initialize migrations table and migrate all to given version or latest version based on
-  database table match to table schemas contained in versions
+* `init` - initialize migrations table and migrate all to given version or latest version based
+  on database table match to table schemas contained in versions
 
   if profile is not given then will init all defined profiles
 
-* new-major - create a new version directory with major version incremented, from current or
+* `new-major` - create a new version directory with major version incremented, from current or
   requested version.
 
   specific profile name is required
 
-* new-minor - create a new version directory with minor version incremented, from current or
+* `new-minor` - create a new version directory with minor version incremented, from current or
   requested version.
 
-* new-patch - create a new version directory with patch version incremented, from current or
+* `new-patch` - create a new version directory with patch version incremented, from current or
   requested version.
 
   specific profile name is required
 
-* new-version - create a new version directory for the requested version. The directory cannot
+* `new-version` - create a new version directory for the requested version. The directory cannot
   already exist. If the version is not provided then the current version with its patch version
   number incremented will be used.
 
@@ -890,18 +896,18 @@ Commands:
 
   specific profile name is required
 
-* import-evolutions "play/evolutions/directory" "min" "max". Import evolutions converting them
+* `import-evolutions "play/evolutions/directory" "min" "max"`. Import evolutions converting them
   to migrations in the current version. `min` is the minimum evolution to import. `max` is
   optional and if provided gives the maximum evolution number to import.
 
   specific profile name is required
 
-* new-evolution "play/evolutions/directory" create a new play evolution file from current or
+* `ne`w-evolution "play/evolutions/directory" create a new play evolution file from current or
   requested version migrations and rollbacks in the requested directory.
 
   specific profile name is required
 
-* new-migration "title" - create a new up/down migration script files in the requested (or
+* `new-migration "title"` - create a new up/down migration script files in the requested (or
   current) version's migrations directory. The file name will be in the form: N.title.D.sql
   where N is numeric integer 1..., D is up or down and title is the title passed command.
   Placeholders in the file: `__VERSION__` will be replaced with the version for which this file
@@ -909,76 +915,76 @@ Commands:
 
   profile name defaults to `default` if one is not given
 
-* new-function "name" - create a new function file using resources/db/templates customized
+* `new-function "name"` - create a new function file using resources/db/templates customized
   template or built-in if none Placeholders in the file: `__VERSION__` will be replaced with the
   version for which this file is generated and `__NAME__` with the "name" passed to the command.
 
   profile name defaults to `default` if one is not given
 
-* new-procedure "name" - create a new procedure file using resources/db/templates customized
+* `new-procedure "name"` - create a new procedure file using resources/db/templates customized
   template or built-in if none Placeholders in the file: `__VERSION__` will be replaced with the
   version for which this file is generated and `__NAME__` with the "name" passed to the command.
 
   profile name defaults to `default` if one is not given
 
-* new-trigger "name" - create a new trigger file using resources/db/templates customized
+* `new-trigger "name"` - create a new trigger file using resources/db/templates customized
   template or built-in if none Placeholders in the file: `__VERSION__` will be replaced with the
   version for which this file is generated and `__NAME__` with the "name" passed to the command.
 
   profile name defaults to `default` if one is not given
 
-* new-view "name" - create a new view file using resources/db/templates customized template or
+* `new-view "name"` - create a new view file using resources/db/templates customized template or
   built-in if none Placeholders in the file: `__VERSION__` will be replaced with the version for
   which this file is generated and `__NAME__` with the "name" passed to the command.
 
-* migrate - migrate to given version or to latest version
+* `migrate` - migrate to given version or to latest version
 
   applies command to all defined profiles if profile name is not given
 
-* rollback - rollback to given version or to previous version
+* `rollback` - rollback to given version or to previous version
 
   specific profile name is required
 
-* dump-tables - dump database tables
+* `dump-tables` - dump database tables
 
   applies command to all defined profiles if profile name is not given
 
-* create-tables - create all tables which exist in the version tables directory and which do not
-  exist in the database
+* `create-tables` - create all tables which exist in the version tables directory and which do
+  not exist in the database
 
   applies command to all defined profiles if profile name is not given
 
-* validate-tables - validate that version table scripts and database agree
+* `validate-tables` - validate that version table scripts and database agree
 
   applies command to all defined profiles if profile name is not given
 
-* update-all - update all: functions, views, procedures, triggers. This runs the scripts
+* `update-all` - update all: functions, views, procedures, triggers. This runs the scripts
   corresponding to the database object for the requested version.
 
   applies command to all defined profiles if profile name is not given
 
-* update-procedures update-procs - update stored procedures
+* `update-procedures` `update-procs` - update stored procedures
 
   applies command to all defined profiles if profile name is not given
 
-* update-functions update-funcs - update functions
+* `update-functions` `update-funcs` - update functions
 
   applies command to all defined profiles if profile name is not given
 
-* update-triggers - update triggers
+* `update-triggers` - update triggers
 
   applies command to all defined profiles if profile name is not given
 
-* update-schema - update `schema` directory with entities from selected version (or current if
+* `update-schema` - update `schema` directory with entities from selected version (or current if
   none given)
 
   applies command to all defined profiles if profile name is not given
 
-* update-views - update views
+* `update-views` - update views
 
   applies command to all defined profiles if profile name is not given
 
-* exit - exit application
+* `exit` - exit application
 
 #### Customizing Templates used by `new-...` command
 

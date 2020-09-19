@@ -5,6 +5,7 @@
 - [TODO](#todo)
     - [High Priority](#high-priority)
 - [0.5.0 API Breaking Release](#050-api-breaking-release)
+- [0.5.0-beta-8](#050-beta-8)
 - [0.5.0-beta-7](#050-beta-7)
 - [0.5.0-beta-6](#050-beta-6)
 - [0.5.0-beta-5](#050-beta-5)
@@ -102,6 +103,82 @@ to the table name will only be used for column references.
 [`Generate Kotlin-Model.groovy`] has been updated to generate the new model format from tables
 in the database.
 
+## 0.5.0-beta-8
+
+* Fix: `SqlCall` out params are now passed by index instead of name to make them independent of
+  actual sql procedure parameter names.
+* Fix: `param()` to work for non-null values when calling context's capture type is `*`,
+  previous implementation would always result in `Any` type, fixed implementation uses the
+  value's class for type's class.
+* Fix: `param()` to not construct a new instance if passed value is already `Parameter<*>`
+* Fix: SQL generation for model `listQuery` with where clause and/or alias
+* Add: `InOut` type to `Parameter()`, defaults to `InOut.IN` so parameter carries direction of
+  parameter and type.
+* Add: `inTo`, `outTo` and `inOutTo` infix functions to use instead of `to` for param creation.
+  These create parameters with in/inOut/out type eliminating the need for multiple `params()`
+  functions for directional information. Default direction is `in` if not provided.
+
+  They also create an instance of `Parameter` when the captured type is known. Functions using
+  `param()` from a collection iteration have `*` for type capture and loose actual type,
+  resorting to `Any` (ie. `Object`).
+
+  These also have `Collection<T>` versions which create a Parameter() with a collection value
+  but type is `T::class.java`. When generating parameters for prepared stmt this type is used to
+  determine sql type for the element of the collection instead of generic `Any` as was before,
+  again because of `*` captured type from a collection.
+* Fix: extract `SqlQueryBase<T>` for `SqlQuery` and `SqlCall` to eliminate the need to override
+  function just to cast them to the right class. `SqlCall` no longer extends `SqlQuery`.
+* Fix: `SqlQueryBase` now stores each parameter in `Parameter()` data class format. Eliminates
+  creating a new instance with param() since if it is already parameter it just returns the
+  instance.
+* Fix: deprecate old methods in favor of directional parameter declaration.
+* Fix: change `Session` methods to use `SqlQueryBase<*>` when either `SqlQuery` or `SqlCall` can
+  be used. For some, like updates with get keys, `SqlCall` never returns any keys even when
+  stored procedure executes DML that does, so these are now `SqlQuery` only. Similarly, those
+  only applicable to `SqlCall` are now `SqlCall` typed and will not take `SqlQuery`
+* Fix: deprecate `Session.forEach(SqlCall, (stmt: CallableStatement) -> Unit, (rs: ResultSet,
+  index: Int) -> Unit)`
+* Add: `Session.executeCall(SqlCall, (results: SqlCallResults) -> Unit)` to replace
+  `Session.forEach(SqlCall, (stmt: CallableStatement) -> Unit, (rs: ResultSet, index: Int) ->
+  Unit)`. Use `SqlCallResults.forEach` to process result sets returned by the procedure call. To
+  get values of out params use `SqlCallResults.get{Type}(paramName)` to get non-null values or
+  `SqlCallResults.get{Type}OrNull(paramName)` to get nullable values.
+
+  For example, when using old `forEach` the code was:
+
+  ```kotlin
+  val sqlQuery = sqlCall("""CALL processInstances(:clientId, :types)""")
+    .inParams("clientId" to 35)
+    .inOutParams("types" to "")
+
+  val jsonResult = MutableJsObject()
+  var types: List<String> = listOf()
+
+  session.forEach(sqlQuery, { stmt ->
+      types = stmt.getString("types").split(',')
+  }) { rs, index ->
+      val key = types[index]
+      jsonResult[key] = MutableJsArray(Rows(rs).map(toJsonObject).toList())
+  }
+  ```
+
+  Using the new `executeCall` and directional param declarations, the code changes to:
+
+  ```kotlin
+  val sqlQuery = sqlCall("""CALL processInstances(:clientId, :types)""",
+            mapOf("clientId" inTo 35, "types" inOutTo ""))
+
+  val jsonResult = MutableJsObject()
+
+  session.executeCall(sqlQuery) { results:SqlCallResults ->
+      val types = results.getString("types").split(',')
+      results.forEach { rs, index ->
+          val key = types[index]
+          jsonResult[key] = MutableJsArray(Rows(rs).map(toJsonObject).toList())
+      }
+  }
+  ```
+
 ## 0.5.0-beta-7
 
 * Add: import evolutions to also accept `# -- !Ups` and `# -- !Downs` as valid Scala play
@@ -129,8 +206,8 @@ in the database.
 ## 0.5.0-beta-4
 
 * Fix: [`JavaScript-Enumerated-Value-Type.js`] for latest version of [`enumerated-type`] with
-      objects for values and `dropdownChoices` property of `{ value: xxx, label: "yyy", }`
-      automatically generated from the enum id column and enum type column.
+  objects for values and `dropdownChoices` property of `{ value: xxx, label: "yyy", }`
+  automatically generated from the enum id column and enum type column.
 
 ## 0.5.0-beta-3
 
@@ -140,8 +217,8 @@ in the database.
   for REST api data exchange.
 * Fix: `Generate Kotlin-Model.groovy` now will look for the model map file starting from the
   directory selected for generation and go up, until encountering directory with sub-directory
-  `.idea`, hitting the root directory or finding `model-config.json` file. Mappings in
-  this file are now relative to the directory of the `model-config.json` file.
+  `.idea`, hitting the root directory or finding `model-config.json` file. Mappings in this file
+  are now relative to the directory of the `model-config.json` file.
 
   if `.idea` sub-directory was seen then will assume that this is the project root and if no
   `model-config.json` file is provided then will use the destination directory, without the
@@ -419,8 +496,7 @@ To expand to `SELECT * FROM Table WHERE column in (?,?,?)` with parameters of `1
 
 * Initial release
 
+[`enumerated-type`]: https://github.com/vsch/enumerated-type
 [`Generate Kotlin-Model.groovy`]: extensions/com.intellij.database/schema/Generate%20Kotlin-Model.groovy
 [`JavaScript-Enumerated-Value-Type.js`]: extensions/com.intellij.database/data/extractors/JavaScript-Enumerated-Value-Type.js
-[`enumerated-type`]: https://github.com/vsch/enumerated-type
-
 

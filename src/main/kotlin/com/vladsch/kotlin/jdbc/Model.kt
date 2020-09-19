@@ -1,5 +1,6 @@
 package com.vladsch.kotlin.jdbc
 
+import javax.json.JsonArray
 import javax.json.JsonObject
 import kotlin.reflect.KProperty
 
@@ -85,45 +86,45 @@ abstract class Model<M : Model<M, D>, D>(session: Session?, sqlTable: String, db
 
     fun appendSelectSql(out: Appendable, alias: String? = null): Appendable = _db.appendSelectSql(out, alias)
 
-    fun appendListQuery(out: Appendable, params: Array<out Pair<String, Any?>>, alias: String? = null) = _db.appendListQuery(out, params, alias)
+    fun appendListQuery(out: Appendable, params: Array<out Pair<String, Any?>>, alias: String? = null): Appendable = _db.appendListQuery(out, params, alias)
 
-    fun appendListQuery(out: Appendable, params: Map<String, Any?>, alias: String? = null) = _db.appendListQuery(out, params, alias)
+    fun appendListQuery(out: Appendable, params: Map<String, Any?>, alias: String? = null): Appendable = _db.appendListQuery(out, params, alias)
 
-    fun listQuery(params: Map<String, Any?>, alias: String? = null) = _db.listQuery(params, alias)
+    fun listQuery(params: Map<String, Any?>, alias: String? = null): SqlQuery = _db.listQuery(params, alias)
 
-    fun listQuery(vararg params: Pair<String, Any?>, alias: String? = null) = _db.listQuery(params, alias)
+    fun listQuery(vararg params: Pair<String, Any?>, alias: String? = null): SqlQuery = _db.listQuery(params, alias)
 
-    fun listQuery(whereClause: String, params: Map<String, Any?>, alias: String? = null) = _db.listQuery(whereClause, params, alias)
+    fun listQuery(whereClause: String, params: Map<String, Any?>, alias: String? = null): SqlQuery = _db.listQuery(whereClause, params, alias)
 
-    fun listData() = _db.listData(toData)
+    fun listData(): List<D> = _db.listData(toData)
 
-    fun listData(whereClause: String) = _db.listData(whereClause, toData)
+    fun listData(whereClause: String): List<D> = _db.listData(whereClause, toData)
 
-    fun listData(sqlQuery: SqlQuery) = _db.session.list(sqlQuery, toData)
+    fun listData(sqlQuery: SqlQuery): List<D> = _db.session.list(sqlQuery, toData)
 
-    fun listData(params: Map<String, Any?>, alias: String? = null) = _db.session.list(listQuery(params, alias), toData)
+    fun listData(params: Map<String, Any?>, alias: String? = null): List<D> = _db.session.list(listQuery(params, alias), toData)
 
-    fun listData(whereClause: String, params: Map<String, Any?>, alias: String? = null) = _db.session.list(listQuery(whereClause, params, alias), toData)
+    fun listData(whereClause: String, params: Map<String, Any?>, alias: String? = null): List<D> = _db.session.list(listQuery(whereClause, params, alias), toData)
 
-    fun jsonArray() = _db.session.jsonArray(listQuery(), toJsonObject)
+    fun jsonArray(): JsonArray = _db.session.jsonArray(listQuery(), toJsonObject)
 
-    fun jsonArray(whereClause: String) = _db.session.jsonArray(listQuery(whereClause, mapOf()), toJsonObject)
+    fun jsonArray(whereClause: String): JsonArray = _db.session.jsonArray(listQuery(whereClause, mapOf()), toJsonObject)
 
-    fun jsonArray(sqlQuery: SqlQuery) = _db.session.jsonArray(sqlQuery, toJsonObject)
+    fun jsonArray(sqlQuery: SqlQuery): JsonArray = _db.session.jsonArray(sqlQuery, toJsonObject)
 
-    fun jsonArray(params: Map<String, Any?>, alias: String? = null) = _db.session.jsonArray(listQuery(params), toJsonObject)
+    fun jsonArray(params: Map<String, Any?>, alias: String? = null): JsonArray = _db.session.jsonArray(listQuery(params, alias), toJsonObject)
 
-    fun jsonArray(whereClause: String, params: Map<String, Any?>, alias: String? = null) = _db.session.jsonArray(listQuery(whereClause, params, alias), toJsonObject)
+    fun jsonArray(whereClause: String, params: Map<String, Any?>, alias: String? = null): JsonArray = _db.session.jsonArray(listQuery(whereClause, params, alias), toJsonObject)
 
-    fun listModel() = _db.listModel(toModel)
+    fun listModel(): List<M> = _db.listModel(toModel) as List<M>
 
-    fun listModel(whereClause: String) = _db.listModel(whereClause, toModel)
+    fun listModel(whereClause: String): List<M> = _db.listModel(whereClause, toModel) as List<M>
 
-    fun listModel(sqlQuery: SqlQuery) = _db.session.list(sqlQuery, toModel)
+    fun listModel(sqlQuery: SqlQuery): List<M> = _db.session.list(sqlQuery, toModel)
 
-    fun listModel(params: Map<String, Any?>, alias: String? = null) = _db.session.list(listQuery(params, alias), toModel)
+    fun listModel(params: Map<String, Any?>, alias: String? = null): List<M> = _db.session.list(listQuery(params, alias), toModel)
 
-    fun listModel(whereClause: String, params: Map<String, Any?>, alias: String? = null) = _db.session.list(listQuery(whereClause, params, alias), toModel)
+    fun listModel(whereClause: String, params: Map<String, Any?>, alias: String? = null): List<M> = _db.session.list(listQuery(whereClause, params, alias), toModel)
 
     // create a new copy, same params
     abstract operator fun invoke(): M

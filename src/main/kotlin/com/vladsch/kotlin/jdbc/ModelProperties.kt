@@ -89,7 +89,7 @@ class ModelProperties<M : Model<*, *>>(val session: Session, val tableName: Stri
         out.append("SELECT * FROM ")
         appendQuoted(out, tableName) //.append(" ")
         if (!alias.isNullOrBlank() && alias != tableName) {
-            out.append(alias)
+            out.append(' ').append(alias)
         }
         return out
     }
@@ -448,17 +448,23 @@ class ModelProperties<M : Model<*, *>>(val session: Session, val tableName: Stri
     }
 
     fun forEachKey(consumer: (prop: KProperty<*>, propType: PropertyType, value: Any?) -> Unit) {
-        for (prop in keyProperties) {
-            if (properties.containsKey(prop.name)) {
-                consumer.invoke(prop, propertyTypes[prop.name]!!, properties[prop.name])
-            } else {
-                consumer.invoke(prop, propertyTypes[prop.name]!!, Unit)
-            }
-        }
+        forEachPropTypeValue(keyProperties, consumer)
     }
 
     fun forEachProp(consumer: (prop: KProperty<*>, propType: PropertyType, value: Any?) -> Unit) {
-        for (prop in kProperties) {
+        forEachPropTypeValue(kProperties, consumer)
+    }
+
+    fun forEachKey(consumer: (prop: KProperty<*>, propType: PropertyType, columnName: String, value: Any?) -> Unit) {
+        forEachPropTypeColumnNameValue(keyProperties, consumer)
+    }
+
+    fun forEachProp(consumer: (prop: KProperty<*>, propType: PropertyType, columnName: String, value: Any?) -> Unit) {
+        forEachPropTypeColumnNameValue(kProperties, consumer)
+    }
+
+    private fun forEachPropTypeValue(useProperties: ArrayList<KProperty<*>>, consumer: (prop: KProperty<*>, propType: PropertyType, value: Any?) -> Unit) {
+        for (prop in useProperties) {
             if (properties.containsKey(prop.name)) {
                 consumer.invoke(prop, propertyTypes[prop.name]!!, properties[prop.name])
             } else {
@@ -467,22 +473,11 @@ class ModelProperties<M : Model<*, *>>(val session: Session, val tableName: Stri
         }
     }
 
-    fun forEachKey(consumer: (prop: KProperty<*>, propType: PropertyType, columnName: String, value: Any?) -> Unit) {
-        for (prop in keyProperties) {
+    private fun forEachPropTypeColumnNameValue(useProperties: ArrayList<KProperty<*>>, consumer: (prop: KProperty<*>, propType: PropertyType, columnName: String, value: Any?) -> Unit) {
+        for (prop in useProperties) {
             val columnName = columnNames[prop.name] ?: prop.name
-            if (properties.containsKey(prop.name)) {
-                consumer.invoke(prop, propertyTypes[prop.name]!!, columnName, properties[prop.name])
-            } else {
-                consumer.invoke(prop, propertyTypes[prop.name]!!, columnName, Unit)
-            }
-        }
-    }
-
-    fun forEachProp(consumer: (prop: KProperty<*>, propType: PropertyType, columnName: String, value: Any?) -> Unit) {
-        for (prop in kProperties) {
-            val columnName = columnNames[prop.name] ?: prop.name
-            if (properties.containsKey(prop.name)) {
-                consumer.invoke(prop, propertyTypes[prop.name]!!, columnName, properties[prop.name])
+            if (this.properties.containsKey(prop.name)) {
+                consumer.invoke(prop, propertyTypes[prop.name]!!, columnName, this.properties[prop.name])
             } else {
                 consumer.invoke(prop, propertyTypes[prop.name]!!, columnName, Unit)
             }
@@ -704,18 +699,7 @@ class ModelProperties<M : Model<*, *>>(val session: Session, val tableName: Stri
 
     fun listQuery(whereClause: String, params: Map<String, Any?>, alias: String? = null): SqlQuery {
         val sb = StringBuilder()
-        val aliasedWhereClause = if(!alias.isNullOrEmpty()) {
-            whereClause.split(" ").joinToString(" ") {
-                if (properties.containsKey(it) || propertyDefaults.containsKey(it)) {
-                    "$alias.$it"
-                } else {
-                    it
-                }
-            }
-        } else {
-            whereClause
-        }
-        appendSelectSql(sb, alias).append(" WHERE ", aliasedWhereClause)
+        appendSelectSql(sb, alias).append(' ').append(whereClause)
         return sqlQuery(sb.toString(), params)
     }
 }

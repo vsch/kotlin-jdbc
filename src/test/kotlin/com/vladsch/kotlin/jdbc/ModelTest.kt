@@ -1,11 +1,11 @@
 package com.vladsch.kotlin.jdbc
 
-import org.junit.Before
+//import kotlin.test.assertEquals
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.ExpectedException
 import java.sql.DriverManager
-import kotlin.test.assertEquals
 
 fun session(): Session {
     val driverName = "org.h2.Driver"
@@ -27,11 +27,11 @@ class ModelTest {
 
     class InvalidModelPublicAutoKey(session: Session? = session(), quote: String? = null) : Model<InvalidModelPublicAutoKey, InvalidModelPublicAutoKey.Data>(session, "tests", true, false, quote = quote) {
         data class Data(
-                val processId: Long?,
-                val title: String,
-                val version: String,
-                val unknown: String?,
-                val createdAt: String?
+            val processId: Long?,
+            val title: String,
+            val version: String,
+            val unknown: String?,
+            val createdAt: String?
         )
 
         var processId: Long? by db.autoKey
@@ -51,11 +51,11 @@ class ModelTest {
 
     class InvalidModelPublicAuto(session: Session? = session(), quote: String? = null) : Model<InvalidModelPublicAuto, InvalidModelPublicAuto.Data>(session, "tests", true, false, quote = quote) {
         data class Data(
-                val processId: Long?,
-                val title: String,
-                val version: String,
-                val unknown: String?,
-                val createdAt: String?
+            val processId: Long?,
+            val title: String,
+            val version: String,
+            val unknown: String?,
+            val createdAt: String?
         )
 
         var processId: Long? by db.autoKey; private set
@@ -75,11 +75,11 @@ class ModelTest {
 
     class ValidModelPublicAuto(session: Session? = session(), quote: String? = null) : Model<ValidModelPublicAuto, ValidModelPublicAuto.Data>(session, sqlTable = "tests", dbCase = true, quote = quote) {
         data class Data(
-                val processId: Long?,
-                val title: String,
-                val version: String,
-                val unknown: String?,
-                val createdAt: String?
+            val processId: Long?,
+            val title: String,
+            val version: String,
+            val unknown: String?,
+            val createdAt: String?
         )
 
         var processId: Long? by db.autoKey
@@ -134,15 +134,15 @@ class ModelTest {
 
     class DatabaseModel(session: Session? = session(), quote: String? = null) : Model<DatabaseModel, DatabaseModel.Data>(session, "tests", false, true, quote) {
         data class Data(
-                val processId: Long?,
-                val modelName: String?,
-                val title: String,
-                val version: String,
-                val ownName: String,
-                val CappedName: Int,
-                val ALLCAPS: Int,
-                val withDigits2: Int,
-                val createdAt: String?
+            val processId: Long?,
+            val modelName: String?,
+            val title: String,
+            val version: String,
+            val ownName: String,
+            val CappedName: Int,
+            val ALLCAPS: Int,
+            val withDigits2: Int,
+            val createdAt: String?
         )
 
         var processId: Long? by db.key.auto
@@ -166,22 +166,22 @@ class ModelTest {
 
     class TestModel(session: Session? = session(), quote: String? = null) : Model<TestModel, TestModel.Data>(session, "tests", true, false, quote) {
         data class Data(
-                val processId: Long?,
-                val title: String,
-                val version: String,
-                val batch: Int?,
-                val createdAt: String?
+            val processId: Long?,
+            val title: String,
+            val version: String,
+            val batch: Int?,
+            val createdAt: String?
         )
 
         constructor(
-                processId: Long? = null,
-                title: String,
-                version: String,
-                batch: Int? = null,
-                createdAt: String? = null,
-                session: Session? = session(),
-                quote:String? = null
-        ) : this(session,quote) {
+            processId: Long? = null,
+            title: String,
+            version: String,
+            batch: Int? = null,
+            createdAt: String? = null,
+            session: Session? = session(),
+            quote: String? = null
+        ) : this(session, quote) {
             if (processId != null) this.processId = processId
             this.title = title
             this.version = version
@@ -209,21 +209,21 @@ class ModelTest {
 
     class TestModelDefaultValue(session: Session? = session(), quote: String? = null) : Model<TestModelDefaultValue, TestModelDefaultValue.Data>(session, "tests", true, false, quote = quote) {
         data class Data(
-                var processId: Long?,
-                var title: String,
-                var version: String,
-                var batch: Int?,
-                var createdAt: String?
+            var processId: Long?,
+            var title: String,
+            var version: String,
+            var batch: Int?,
+            var createdAt: String?
         )
 
         constructor(
-                processId: Long? = null,
-                title: String,
-                version: String,
-                batch: Int? = null,
-                createdAt: String? = null,
-                session: Session? = session(),
-                quote:String? = null
+            processId: Long? = null,
+            title: String,
+            version: String,
+            batch: Int? = null,
+            createdAt: String? = null,
+            session: Session? = session(),
+            quote: String? = null
         ) : this(session, quote) {
             if (processId != null) this.processId = processId
             this.title = title
@@ -256,22 +256,22 @@ class ModelTest {
 
     class TestNoNonDefaultModel(session: Session? = session(), quote: String? = null) : Model<TestNoNonDefaultModel, TestNoNonDefaultModel.Data>(session, "tests", true, false, quote = quote) {
         data class Data(
-                var processId: Long?,
-                var title: String?,
-                var version: String?,
-                var batch: Int?,
-                var createdAt: String?
+            var processId: Long?,
+            var title: String?,
+            var version: String?,
+            var batch: Int?,
+            var createdAt: String?
         )
 
         constructor(
-                processId: Long? = null,
-                title: String? = null,
-                version: String? = null,
-                batch: Int? = null,
-                createdAt: String? = null,
-                session: Session? = session(),
-                quote: String? = null
-        ) : this(session,quote) {
+            processId: Long? = null,
+            title: String? = null,
+            version: String? = null,
+            batch: Int? = null,
+            createdAt: String? = null,
+            session: Session? = session(),
+            quote: String? = null
+        ) : this(session, quote) {
             if (processId != null) this.processId = processId
             this.title = title
             this.version = version
