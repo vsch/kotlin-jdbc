@@ -11,7 +11,7 @@ import kotlin.reflect.KMutableProperty
 import kotlin.reflect.KProperty
 import kotlin.reflect.KVisibility
 
-class ModelProperties<M>(val session: Session, val tableName: String, val dbCase: Boolean, val allowSetAuto: Boolean = false, quote: String? = null) : InternalModelPropertyProvider<M> {
+class ModelProperties<M : Model<*, *>>(val session: Session, val tableName: String, val dbCase: Boolean, val allowSetAuto: Boolean = false, quote: String? = null) : InternalModelPropertyProvider<M> {
     private val properties = HashMap<String, Any?>()
     private val kProperties = ArrayList<KProperty<*>>()
     private val propertyTypes = HashMap<String, PropertyType>()
@@ -325,43 +325,12 @@ class ModelProperties<M>(val session: Session, val tableName: String, val dbCase
 
     fun sqlInsertQuery(): SqlQuery {
         val sb = StringBuilder()
-        val sbValues = StringBuilder()
-        val params = ArrayList<Any?>()
-        var sep = ""
 
-        sb.append("INSERT INTO ")
-        appendQuoted(sb, tableName).append(" (")
+        sb.append(getBaseInsertString())
+        sb.append(" VALUES ")
+        sb.append(getInsertQuestionMarks())
 
-        for (prop in kProperties) {
-            val propType = propertyTypes[prop.name] ?: PropertyType.PROPERTY
-
-            if (!propType.isAuto) {
-                if (properties.containsKey(prop.name) || propertyDefaults.containsKey(prop.name)) {
-                    val propValue = properties[prop.name]
-                    // skip null properties which have defaults (null means use default)
-                    if (propValue != null || !propType.isDefault) {
-                        val columnName = columnNames[prop.name] ?: prop.name
-                        sb.append(sep)
-                        appendQuoted(sb, columnName)
-                        sbValues.append(sep).append("?")
-                        sep = ", "
-                        params.add(propValue)
-                    } else if (propertyDefaults.containsKey(prop.name)) {
-                        val columnName = columnNames[prop.name] ?: prop.name
-                        sb.append(sep)
-                        appendQuoted(sb, columnName)
-                        sbValues.append(sep).append("?")
-                        sep = ", "
-                        params.add(propertyDefaults[prop.name])
-                    }
-                } else if (!prop.returnType.isMarkedNullable && !propType.isDefault) {
-                    throw IllegalStateException("$tableName.${prop.name} property is not nullable nor default and not defined in ${this}")
-                }
-            }
-        }
-
-        sb.append(") VALUES (").append(sbValues).append(")")
-        return sqlQuery(sb.toString(), params)
+        return sqlQuery(sb.toString(), generateInsertString())
     }
 
     @Suppress("MemberVisibilityCanBePrivate")
@@ -523,6 +492,126 @@ class ModelProperties<M>(val session: Session, val tableName: String, val dbCase
 
     fun insertIgnoreKeys() {
         session.update(sqlInsertQuery())
+    }
+
+    fun bulkInsert(items: List<M>) {
+        bulkInsertIgnoreKeys(items)
+        items.forEach { it._db.select() }
+    }
+
+    fun bulkInsertIgnoreKeys(items: List<M>) {
+        val sb = StringBuilder()
+
+        sb.append(getBaseInsertString())
+        sb.append(" VALUES ")
+
+        val s = items.map { it._db.generateInsertString() }
+
+        val appStr = ArrayList<String>().apply { repeat(s.size) { add(getInsertQuestionMarks()) } }.joinToString(separator = ",")
+        val allItems = s.reduce { acc, arrayList -> ArrayList(acc + arrayList) }
+
+        session.execute(sqlQuery(sb.append(appStr).toString(), allItems))
+    }
+
+    fun batchInsert(items: List<M>) {
+        batchInsertIgnoreKeys(items)
+        items.forEach { it._db.select() }
+    }
+
+    fun batchInsertIgnoreKeys(items: List<M>) {
+        val sb = StringBuilder()
+
+        sb.append(getBaseInsertString())
+        sb.append(" VALUES ")
+        sb.append(getInsertQuestionMarks())
+
+        val stmt = session.prepare(sqlQuery(sb.toString()))
+
+        items.map { it._db.generateInsertString() }.forEach {
+            it.forEachIndexed { index, value ->
+                stmt.setTypedParam(index + 1, value.param())
+            }
+            stmt.addBatch()
+        }
+
+        stmt.executeBatch()
+    }
+
+    internal fun generateInsertString(): ArrayList<Any?> {
+        val params = ArrayList<Any?>()
+
+        for (prop in kProperties) {
+            val propType = propertyTypes[prop.name] ?: PropertyType.PROPERTY
+
+            if (!propType.isAuto) {
+                if (properties.containsKey(prop.name) || propertyDefaults.containsKey(prop.name)) {
+                    val propValue = properties[prop.name]
+                    // skip null properties which have defaults (null means use default)
+                    if (propValue != null || !propType.isDefault) {
+                        params.add(propValue)
+                    } else if (propertyDefaults.containsKey(prop.name)) {
+                        params.add(propertyDefaults[prop.name])
+                    }
+                } else if (!prop.returnType.isMarkedNullable && !propType.isDefault) {
+                    throw IllegalStateException("$tableName.${prop.name} property is not nullable nor default and not defined in ${this}")
+                }
+            }
+        }
+        return params
+    }
+
+    internal fun getInsertQuestionMarks(): String {
+        val sbValues = StringBuilder().append('(')
+        var sep = ""
+
+        for (prop in kProperties) {
+            val propType = propertyTypes[prop.name] ?: PropertyType.PROPERTY
+
+            if (!propType.isAuto) {
+                if (properties.containsKey(prop.name) || propertyDefaults.containsKey(prop.name)) {
+                    sbValues.append(sep).append("?")
+                    sep = ", "
+                } else if (!prop.returnType.isMarkedNullable && !propType.isDefault) {
+                    throw IllegalStateException("$tableName.${prop.name} property is not nullable nor default and not defined in ${this}")
+                }
+            }
+        }
+
+        return sbValues.append(')').toString()
+    }
+
+    internal fun getBaseInsertString(): String {
+        val sb = StringBuilder()
+        var sep = ""
+
+        sb.append("INSERT INTO ")
+        appendQuoted(sb, tableName).append(" (")
+
+        for (prop in kProperties) {
+            val propType = propertyTypes[prop.name] ?: PropertyType.PROPERTY
+
+            if (!propType.isAuto) {
+                if (properties.containsKey(prop.name) || propertyDefaults.containsKey(prop.name)) {
+                    val propValue = properties[prop.name]
+                    // skip null properties which have defaults (null means use default)
+                    if (propValue != null || !propType.isDefault) {
+                        val columnName = columnNames[prop.name] ?: prop.name
+                        sb.append(sep)
+                        appendQuoted(sb, columnName)
+                        sep = ", "
+                    } else if (propertyDefaults.containsKey(prop.name)) {
+                        val columnName = columnNames[prop.name] ?: prop.name
+                        sb.append(sep)
+                        appendQuoted(sb, columnName)
+                        sep = ", "
+                    }
+                } else if (!prop.returnType.isMarkedNullable && !propType.isDefault) {
+                    throw IllegalStateException("$tableName.${prop.name} property is not nullable nor default and not defined in ${this}")
+                }
+            }
+        }
+
+        return sb.append(')').toString()
     }
 
     fun select() {
